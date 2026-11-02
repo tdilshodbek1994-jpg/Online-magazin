@@ -85,6 +85,7 @@ export async function buildApp(cfg: AppConfig, db: Db): Promise<FastifyInstance>
     const status = (err as { statusCode?: number }).statusCode;
     if (status && status < 500) return reply.status(status).send({ code: 'BAD_REQUEST', message_key: 'errors.BAD_REQUEST', field_errors: {}, retryable: false, correlation_id });
     req.log.error({ err }, 'unhandled');
+    if (process.env.DEBUG_ERRORS) console.error(err);
     // No stack traces or internals to clients (MASTER 8.5).
     return reply.status(500).send({ code: 'INTERNAL', message_key: 'errors.INTERNAL', field_errors: {}, retryable: true, correlation_id });
   });

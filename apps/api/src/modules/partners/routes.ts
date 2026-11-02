@@ -372,7 +372,7 @@ export function registerPartners(app: FastifyInstance, deps: Deps): void {
         await transfer(tx, { partnerId: a.partner_id, from: bucket, to: 'external', amount: BigInt(a.target_minor), sourceType: 'accrual', sourceId: a.id, effectKey: `v${a.version + 1}:correction`, reason: 'attribution_correction', actorId: actor.userId });
         await tx.query(`UPDATE commission_accruals SET target_minor=0, state='superseded', version=version+1 WHERE id=$1`, [a.id]);
       }
-      await tx.query(`UPDATE orders SET attributed_partner_id=$2, attribution = COALESCE(attribution,'{}'::jsonb) || jsonb_build_object('corrected', true, 'corrected_partner_id', $2::text), version=version+1 WHERE id=$1`, [params.id, body.new_partner_id]);
+      await tx.query(`UPDATE orders SET attributed_partner_id=$2::uuid, attribution = COALESCE(attribution,'{}'::jsonb) || jsonb_build_object('corrected', true, 'corrected_partner_id', $2::uuid), version=version+1 WHERE id=$1`, [params.id, body.new_partner_id]);
       if (body.new_partner_id) {
         const np = await maybeOne<{ status: string }>(tx, `SELECT status FROM partners WHERE id=$1`, [body.new_partner_id]);
         if (!np) throw notFound('PARTNER');

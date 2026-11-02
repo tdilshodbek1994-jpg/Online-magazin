@@ -126,6 +126,25 @@ export function registerAdmin(app: FastifyInstance, deps: Deps): void {
     return { ok: true };
   });
 
+  // ---------- Feature flags (e.g. ai.enabled): owner + step-up, audited ----------
+  route(app, deps, { method: 'GET', url: '/admin/feature-flags', tags: T, summary: 'Feature flags' }, async ({ actor, db }) => {
+    requirePerm(actor, 'policies.manage');
+    return { items: await many(db, `SELECT key, enabled, description, updated_at, version FROM feature_flags ORDER BY key`) };
+  });
+  route(app, deps, { method: 'POST', url: '/admin/feature-flags/:key', tags: T, summary: 'Enable/disable a feature flag (kill switch)', params: z.object({ key: z.string().regex(/^[a-z0-9_.]{2,60}$/) }), body: z.object({ enabled: z.boolean(), reason: z.string().min(3).max(300) }) },
+    async ({ actor, db, params, body }) => {
+      requirePerm(actor, 'policies.manage'); requireStepUp(actor);
+      const r = await db.query(`UPDATE feature_flags SET enabled=$2, updated_by=$3, updated_at=now(), version=version+1 WHERE key=$1 RETURNING key, enabled, version`, [params.key, body.enabled, actor.userId]);
+      if (!r.rowCount) throw notFound('FEATURE_FLAG');
+      await audit(db, actor, 'feature_flag.changed', { type: 'feature_flag', id: params.key }, { after: { enabled: body.enabled }, reason: body.reason });
+      return r.rows[0];
+    });
+  // Public, read-only: which optional features the UI may show (no secrets).
+  route(app, deps, { method: 'GET', url: '/features', tags: T, summary: 'Public feature availability' }, async ({ db }) => {
+    const r = await many<{ key: string; enabled: boolean }>(db, `SELECT key, enabled FROM feature_flags WHERE key IN ('ai.enabled')`);
+    return Object.fromEntries(r.map((x) => [x.key, x.enabled]));
+  });
+
   route(app, deps, { method: 'GET', url: '/admin/audit', tags: T, summary: 'Audit log', query: z.object({ target_type: z.string().optional(), target_id: z.string().optional(), limit: z.coerce.number().int().min(1).max(500).default(100) }) },
     async ({ actor, db, query }) => {
       requirePerm(actor, 'audit.read');

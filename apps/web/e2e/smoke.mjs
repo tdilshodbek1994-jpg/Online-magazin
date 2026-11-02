@@ -170,6 +170,27 @@ await step('E2E-12/T019', 'network drops while placing order: clear error, retry
   await p4.close();
 });
 
+await step('E2E-13/AI', 'owner enables AI (kill switch) in admin; shopper asks the AI assistant and gets catalog products; disabled again', async () => {
+  await page.goto(BASE + '/admin');
+  await page.getByRole('tab', { name: 'Integratsiyalar' }).click();
+  await page.getByRole('button', { name: 'Yoqish' }).click();
+  await page.getByRole('status').filter({ hasText: 'OK' }).waitFor();
+  await page.goto(BASE + '/');
+  const box = page.locator('section[aria-labelledby="ai-title"]');
+  await box.waitFor();
+  await box.getByPlaceholder(/Masalan/).fill('200 mingdan arzon quloqchin kerak');
+  await box.getByRole('button', { name: 'So‘rash' }).click();
+  await box.getByText('Simsiz quloqchin X1').waitFor();
+  await box.getByText(/Narx va mavjudlik buyurtma vaqtida/).waitFor();
+  await page.goto(BASE + '/admin');
+  await page.getByRole('tab', { name: 'Integratsiyalar' }).click();
+  await page.getByRole('button', { name: /O‘chirish/ }).click();
+  await page.getByRole('status').filter({ hasText: 'OK' }).waitFor();
+  await page.goto(BASE + '/');
+  await page.waitForTimeout(800);
+  assert((await page.locator('section[aria-labelledby="ai-title"]').count()) === 0, 'AI box still visible after kill switch');
+});
+
 await step('E2E-11/T017-axe', 'axe-core WCAG 2.x A/AA scan: no serious/critical violations on key customer pages', async () => {
   const axeSrc = (await import('node:fs')).readFileSync(new URL('../node_modules/axe-core/axe.min.js', import.meta.url), 'utf8');
   const p3 = await ctx.newPage();

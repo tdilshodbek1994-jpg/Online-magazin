@@ -26,9 +26,10 @@
 | Idle memory (4 containers) | ~233 MB |
 | Peak memory under 30 s load (50 sessions) | **262 MB total** (postgres 108, api 53, web 58, caddy 43) |
 | Read latency under that load | p50 8 ms, p95 22 ms, 0 errors |
-| Browser E2E through Caddy + basic auth | **12 / 12 passed** (incl. axe-core WCAG scan, offline checkout, MFA step-up) |
+| Browser E2E through Caddy + basic auth | **13 / 13 passed** (incl. AI assistant + kill switch, axe-core WCAG scan, offline checkout, MFA step-up) |
 | Without password | 401; with password 200; Payme callback reachable without password and rejected by Payme auth (-32504) |
-| API tests (real PostgreSQL) | **80 / 80 passed** |
+| API tests (real PostgreSQL) | **81 / 81 passed** |
+| One-command local DEMO | `scripts/demo-local.sh --build` → 4 services up, seed loaded |
 
 ## 4. Problems found and fixed while preparing
 1. No `.dockerignore`: local `node_modules` leaked into the web image and broke `next build`.

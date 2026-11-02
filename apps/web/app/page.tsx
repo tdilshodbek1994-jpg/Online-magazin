@@ -2,6 +2,7 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { Async } from '@/components/Header';
+import { AiAssistant } from '@/components/AiAssistant';
 import { api, som } from '@/lib/api';
 import { pick, useI18n } from '@/lib/i18n';
 
@@ -27,6 +28,7 @@ export default function Home() {
         <button className="btn">{t('search')}</button>
         {q && <button type="button" className="btn secondary" onClick={() => { setQ(''); void load(''); }}>×</button>}
       </form>
+      <AiAssistant />
       <Async loading={state.loading} error={state.error} onRetry={() => load(q)}>
         {items.length === 0 ? <p>{t('empty')}</p> : (
           <div className="grid" style={{ marginTop: 16 }}>

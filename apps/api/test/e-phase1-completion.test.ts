@@ -404,3 +404,19 @@ describe('External AI provider (Claude API) — contract tests with a local fake
     }
   });
 });
+
+describe('Feature flag admin (AI kill switch)', () => {
+  it('owner toggles ai.enabled with step-up and reason; public /features reflects it; partner cannot', async () => {
+    const tt = await setupApp();
+    const owner = await mkUser(tt, ['owner']);
+    const ownerNoStep = await mkUser(tt, ['owner'], undefined, false);
+    expect((await api(tt, 'POST', '/admin/feature-flags/ai.enabled', { token: ownerNoStep.token, body: { enabled: true, reason: 'demo' } })).json.code).toBe('STEP_UP_REQUIRED');
+    expect((await api(tt, 'POST', '/admin/feature-flags/ai.enabled', { token: (await mkUser(tt, ['partner'])).token, body: { enabled: true, reason: 'x y z' } })).status).toBe(403);
+    expect((await api(tt, 'POST', '/admin/feature-flags/ai.enabled', { token: owner.token, body: { enabled: true, reason: 'demo uchun' } })).json.enabled).toBe(true);
+    expect((await api(tt, 'GET', '/features')).json['ai.enabled']).toBe(true);
+    await api(tt, 'POST', '/admin/feature-flags/ai.enabled', { token: owner.token, body: { enabled: false, reason: 'kill switch' } });
+    expect((await api(tt, 'GET', '/features')).json['ai.enabled']).toBe(false);
+    expect((await api(tt, 'POST', '/ai/shopping', { body: { message: 'quloqchin' } })).json.code).toBe('AI_DISABLED');
+    expect((await tt.db.query(`SELECT COUNT(*)::int n FROM audit_events WHERE action='feature_flag.changed' AND actor_user_id=$1`, [owner.id])).rows[0].n).toBe(2);
+  });
+});

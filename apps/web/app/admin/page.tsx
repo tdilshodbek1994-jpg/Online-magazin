@@ -176,8 +176,14 @@ function Finance({ act }: { act: any }) {
 
 function Integrations() {
   const { data, st, load } = useLoad<any>('/admin/integrations');
+  const flags = useLoad<any>('/admin/feature-flags');
+  const [msg, setMsg] = useState<string | null>(null);
+  const ai = flags.data?.items.find((f: any) => f.key === 'ai.enabled');
   return (
     <section className="card" style={{ marginTop: 12 }}>
+      {msg && <div className="notice" role="status">{msg}</div>}
+      {ai && <div className="row" style={{ marginBottom: 12 }}><strong>AI yordamchi:</strong> {ai.enabled ? 'yoqilgan' : 'o‘chiq'}
+        <button className="btn secondary" onClick={async () => { const r = prompt('Sabab'); if (!r) return; try { await api('/admin/feature-flags/ai.enabled', { method: 'POST', body: { enabled: !ai.enabled, reason: r } }); setMsg('OK'); flags.load(); } catch (e: any) { setMsg(e.code); } }}>{ai.enabled ? 'O‘chirish (kill switch)' : 'Yoqish'}</button></div>}
       <Async loading={st.loading} error={st.error} onRetry={load}>
         <table><tbody>{data?.items.map((i: any) => <tr key={i.key}><td>{i.key}</td><td><span className="badge test">{i.mode}</span></td><td>{i.live_verified ? 'live ✓' : 'live tekshirilmagan'}</td><td className="muted">{i.note}</td></tr>)}</tbody></table>
       </Async>

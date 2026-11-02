@@ -4,10 +4,12 @@ services:
   om-caddy:
     image: caddy:2.8.4
     environment:
-      OM_DOMAIN: ${OM_DOMAIN:?set OM_DOMAIN in .env (e.g. shop.example.uz)}
+      OM_DOMAIN: ${OM_DOMAIN:?set OM_DOMAIN in .env (e.g. uzshop.net)}
+      OM_STAGE_USER: ${OM_STAGE_USER:-owner}
+      OM_STAGE_HASH: ${OM_STAGE_HASH:-}
     ports: ["80:80", "443:443", "443:443/udp"]
     volumes:
-      - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./infra/caddy/${OM_CADDYFILE:-Caddyfile}:/etc/caddy/Caddyfile:ro
       - om_caddy_data:/data
       - om_caddy_config:/config
     depends_on: [om-web, om-api]
@@ -16,17 +18,17 @@ services:
   om-api:
     ports: !reset []
     environment:
-      NODE_ENV: production
+      NODE_ENV: ${OM_NODE_ENV:-production}
       PUBLIC_WEB_URL: https://${OM_DOMAIN}
     restart: unless-stopped
   om-web:
     ports: !reset []
     restart: unless-stopped
   om-worker:
-    environment: { NODE_ENV: production }
+    environment: { NODE_ENV: "${OM_NODE_ENV:-production}" }
     restart: unless-stopped
   om-migrate:
-    environment: { NODE_ENV: production }
+    environment: { NODE_ENV: "${OM_NODE_ENV:-production}" }
   om-postgres:
     ports: !reset []
     restart: unless-stopped

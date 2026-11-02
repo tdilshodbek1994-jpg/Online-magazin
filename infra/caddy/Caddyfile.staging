@@ -1,0 +1,28 @@
+# STAGING for {$OM_DOMAIN}: whole site behind HTTP basic auth. Use while running demo data / dev OTP echo
+# (before an SMS provider is connected) so that only the owner can open it.
+{$OM_DOMAIN} {
+	encode zstd gzip
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Robots-Tag "noindex, nofollow"
+		X-Content-Type-Options "nosniff"
+	}
+	@payment_callbacks path /api/v1/webhooks/*
+	handle @payment_callbacks {
+		reverse_proxy om-api:4000
+	}
+	basic_auth {
+		{$OM_STAGE_USER} {$OM_STAGE_HASH}
+	}
+	@api path /api/* /media/* /health/*
+	handle @api {
+		reverse_proxy om-api:4000
+	}
+	handle {
+		reverse_proxy om-web:3000
+	}
+}
+
+www.{$OM_DOMAIN} {
+	redir https://{$OM_DOMAIN}{uri} permanent
+}

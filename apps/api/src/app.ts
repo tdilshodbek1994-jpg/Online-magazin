@@ -1,0 +1,116 @@
+import cors from '@fastify/cors';
+import swagger from '@fastify/swagger';
+import swaggerUi from '@fastify/swagger-ui';
+import Fastify, { type FastifyInstance } from 'fastify';
+import { randomUUID } from 'node:crypto';
+import type { AppConfig } from './config.js';
+import { type Actor, loadActor } from './platform/auth.js';
+import type { Db } from './platform/db.js';
+import { AppError } from './platform/errors.js';
+import type { Deps } from './platform/http.js';
+import { registerIdentity } from './modules/identity/routes.js';
+import { registerConfig } from './modules/config/routes.js';
+import { registerCatalog } from './modules/catalog/routes.js';
+import { registerInventory } from './modules/inventory/routes.js';
+import { registerCheckout } from './modules/checkout/routes.js';
+import { registerOrders } from './modules/orders/routes.js';
+import { registerPayments } from './modules/payments/routes.js';
+import { registerAdmin } from './modules/admin/routes.js';
+
+declare module 'fastify' {
+  interface FastifyRequest {
+    actor: Actor;
+    rawBodyText?: string;
+  }
+}
+
+export async function buildApp(cfg: AppConfig, db: Db): Promise<FastifyInstance> {
+  const app = Fastify({
+    logger: cfg.env === 'test' ? false : { level: 'info', redact: ['req.headers.authorization', 'req.headers.cookie'] },
+    genReqId: (req) => (req.headers['x-request-id'] as string) || randomUUID(),
+    bodyLimit: 2 * 1024 * 1024,
+  });
+  // Validation is done with zod inside handlers; JSON schemas are for OpenAPI only.
+  app.setValidatorCompiler(() => () => true);
+
+  // Keep the raw body for webhook signature checks.
+  app.addContentTypeParser('application/json', { parseAs: 'string' }, (req, body, done) => {
+    req.rawBodyText = body as string;
+    if (!body) return done(null, {});
+    try {
+      done(null, JSON.parse(body as string));
+    } catch {
+      done(new AppError(400, 'MALFORMED_JSON'), undefined);
+    }
+  });
+  app.addContentTypeParser('application/x-www-form-urlencoded', { parseAs: 'string' }, (req, body, done) => {
+    req.rawBodyText = body as string;
+    done(null, Object.fromEntries(new URLSearchParams(body as string)));
+  });
+
+  await app.register(cors, { origin: [cfg.publicWebUrl], credentials: true, exposedHeaders: ['x-request-id', 'etag'] });
+  await app.register(swagger, {
+    openapi: {
+      info: { title: 'Online Magazin API', version: '1.0.0', description: 'MASTER 8.4 contract. Money = {amount_minor: string, currency}.' },
+      servers: [{ url: '/' }],
+    },
+  });
+  await app.register(swaggerUi, { routePrefix: '/api/docs' });
+
+  app.decorateRequest('actor', null as unknown as Actor);
+  app.addHook('onRequest', async (req, reply) => {
+    reply.header('x-request-id', req.id);
+    const auth = req.headers.authorization;
+    const token = auth?.startsWith('Bearer ') ? auth.slice(7) : null;
+    const guest = (req.headers['x-guest-token'] as string | undefined) ?? null;
+    req.actor = await loadActor(db, token, req.id, guest && guest.length >= 16 && guest.length <= 200 ? guest : null);
+  });
+
+  app.setErrorHandler((err, req, reply) => {
+    const correlation_id = req.id;
+    if (err instanceof AppError) {
+      return reply.status(err.status).send({
+        code: err.code, message_key: `errors.${err.code}`, field_errors: err.fieldErrors, retryable: err.retryable, correlation_id, ...(err.details ? { details: err.details } : {}),
+      });
+    }
+    const pg = err as { code?: string; message?: string; constraint?: string };
+    if (pg.code === '23505') return reply.status(409).send({ code: 'DUPLICATE', message_key: 'errors.DUPLICATE', field_errors: {}, retryable: false, correlation_id, details: { constraint: pg.constraint } });
+    if (pg.code === '23514' || pg.code === '23503') return reply.status(422).send({ code: 'CONSTRAINT_VIOLATION', message_key: 'errors.CONSTRAINT_VIOLATION', field_errors: {}, retryable: false, correlation_id, details: { constraint: pg.constraint } });
+    if (pg.code === 'P0001') {
+      const code = (pg.message ?? 'BUSINESS_RULE').split(/[: ]/)[0]!;
+      return reply.status(422).send({ code, message_key: `errors.${code}`, field_errors: {}, retryable: false, correlation_id });
+    }
+    if (pg.code === '40001' || pg.code === '40P01') return reply.status(409).send({ code: 'CONCURRENT_UPDATE', message_key: 'errors.CONCURRENT_UPDATE', field_errors: {}, retryable: true, correlation_id });
+    const status = (err as { statusCode?: number }).statusCode;
+    if (status && status < 500) return reply.status(status).send({ code: 'BAD_REQUEST', message_key: 'errors.BAD_REQUEST', field_errors: {}, retryable: false, correlation_id });
+    req.log.error({ err }, 'unhandled');
+    // No stack traces or internals to clients (MASTER 8.5).
+    return reply.status(500).send({ code: 'INTERNAL', message_key: 'errors.INTERNAL', field_errors: {}, retryable: true, correlation_id });
+  });
+
+  app.get('/health/live', { schema: { hide: true } }, async () => ({ status: 'ok' }));
+  app.get('/health/ready', { schema: { hide: true } }, async (_req, reply) => {
+    try {
+      await db.query('SELECT 1');
+      return { status: 'ready' };
+    } catch {
+      return reply.status(503).send({ status: 'db_unavailable' });
+    }
+  });
+
+  const deps: Deps = { db, cfg };
+  await app.register(
+    async (api) => {
+      registerIdentity(api, deps);
+      registerConfig(api, deps);
+      registerCatalog(api, deps);
+      registerInventory(api, deps);
+      registerCheckout(api, deps);
+      registerOrders(api, deps);
+      registerPayments(api, deps);
+      registerAdmin(api, deps);
+    },
+    { prefix: '/api/v1' },
+  );
+  return app;
+}

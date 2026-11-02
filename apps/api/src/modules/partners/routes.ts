@@ -18,7 +18,7 @@ import { isBotUserAgent, visitorHash } from './attribution.js';
 import { applyAmendment, rejectAmendment } from '../orders/amendments.js';
 
 /** The partner is always derived from the authenticated user — never from payload (§12, T039). */
-async function myPartner(tx: { query: Tx['query'] }, actor: Actor, requireActive = true) {
+export async function myPartner(tx: { query: Tx['query'] }, actor: Actor, requireActive = true) {
   requireUser(actor);
   const p = await maybeOne<{ id: string; status: string; code: string; display_name: string; user_id: string; payout_destination: unknown; payout_destination_verified_at: string | null }>(tx as Tx, `SELECT * FROM partners WHERE user_id=$1`, [actor.userId]);
   if (!p) throw notFound('PARTNER');

@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useCartCount } from '@/components/Header';
-import { IconBag, IconCart, IconGrid, IconHome, IconUser } from '@/components/Icons';
+import { IconBag, IconCart, IconChart, IconGauge, IconGrid, IconHome, IconLink, IconStore, IconUser, IconWallet } from '@/components/Icons';
 import { getToken } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
 import { useEffect, useState } from 'react';
@@ -14,6 +14,20 @@ export function BottomNav() {
   const count = useCartCount();
   const [logged, setLogged] = useState(false);
   useEffect(() => { setLogged(!!getToken()); }, [path]);
+  if (path.startsWith('/partner')) {
+    const pItems: [string, string, React.ReactNode][] = [
+      ['/partner', 'Dashboard', <IconGauge key="d" />], ['/partner/market', 'Market', <IconStore key="m" />], ['/partner/streams', 'Oqim', <IconLink key="o" />],
+      ['/partner/stats', 'Statistika', <IconChart key="s" />], ['/partner/payouts', "To'lov", <IconWallet key="t" />],
+    ];
+    return (
+      <nav className="bottom-nav five" aria-label="Hamkor menyusi">
+        {pItems.map(([href, label, icon]) => {
+          const on = href === '/partner' ? path === '/partner' : path.startsWith(href);
+          return <Link key={href} href={href} className={on ? 'on' : ''} aria-current={on ? 'page' : undefined}><span className="bn-icon">{icon}</span><span>{label}</span></Link>;
+        })}
+      </nav>
+    );
+  }
   const items: [string, string, React.ReactNode, boolean][] = [
     ['/', t('home'), <IconHome key="h" />, path === '/'],
     ['/catalog', t('catalog'), <IconGrid key="g" />, path.startsWith('/catalog') || path.startsWith('/p/')],

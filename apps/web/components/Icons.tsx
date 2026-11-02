@@ -18,6 +18,12 @@ export const IconMinus = (p: P) => <svg {...base(p)}><path d="M5 12h14" /></svg>
 export const IconCheck = (p: P) => <svg {...base(p)}><path d="m5 12 4.5 4.5L19 7" /></svg>;
 export const IconBag = (p: P) => <svg {...base(p)}><path d="M5 8h14l-1 12H6z" /><path d="M9 8V6.5a3 3 0 0 1 6 0V8" /></svg>;
 
+export const IconGauge = (p: P) => <svg {...base(p)}><path d="M4 18a8 8 0 1 1 16 0" /><path d="m12 18 4-5" /><circle cx="12" cy="18" r="1.2" /></svg>;
+export const IconStore = (p: P) => <svg {...base(p)}><path d="M4 9 5.5 4h13L20 9" /><path d="M4 9h16v2.5a2.5 2.5 0 0 1-5 0 2.5 2.5 0 0 1-5 0 2.5 2.5 0 0 1-5 0z" /><path d="M5.5 13.5V20h13v-6.5" /></svg>;
+export const IconLink = (p: P) => <svg {...base(p)}><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1" /><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" /></svg>;
+export const IconChart = (p: P) => <svg {...base(p)}><path d="M4 4v16h16" /><path d="m7 15 4-5 3 3 5-6" /></svg>;
+export const IconWallet = (p: P) => <svg {...base(p)}><rect x="3" y="6" width="18" height="13" rx="2" /><path d="M16 12.5h2M3 9h18" /></svg>;
+
 /** Category pictograms by slug; unknown slugs get a generic bag. */
 export function CategoryIcon({ slug, size = 28 }: { slug: string; size?: number }) {
   const p = base({ size, strokeWidth: 1.6 });

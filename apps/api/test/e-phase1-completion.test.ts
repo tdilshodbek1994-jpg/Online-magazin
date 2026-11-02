@@ -299,3 +299,42 @@ describe('T028 / T097', () => {
     expect(r.stderr).toContain('seed refused');
   });
 });
+
+describe('Support tickets and staff invitations', () => {
+  it('support: customer sees own ticket, internal notes hidden; other customer gets 404', async () => {
+    const tt = await setupApp();
+    const st = await staff(tt);
+    const c = await mkUser(tt);
+    const other = await mkUser(tt);
+    const t1 = await api(tt, 'POST', '/support/tickets', { token: c.token, body: { subject: 'Yetkazish qachon?', body: 'Salom' } });
+    expect(t1.status).toBe(200);
+    await api(tt, 'POST', `/support/tickets/${t1.json.id}/messages`, { token: st.operator.token, body: { body: 'Ichki: mijoz VIP', internal: true } });
+    await api(tt, 'POST', `/support/tickets/${t1.json.id}/messages`, { token: st.operator.token, body: { body: 'Ertaga yetkaziladi', status: 'waiting_customer' } });
+    const mine = await api(tt, 'GET', `/support/tickets/${t1.json.id}`, { token: c.token });
+    expect(mine.json.messages.map((m: any) => m.body)).toEqual(['Salom', 'Ertaga yetkaziladi']);
+    const staffView = await api(tt, 'GET', `/support/tickets/${t1.json.id}`, { token: st.operator.token });
+    expect(staffView.json.messages).toHaveLength(3);
+    expect((await api(tt, 'GET', `/support/tickets/${t1.json.id}`, { token: other.token })).status).toBe(404);
+    // customer cannot post an internal note
+    await api(tt, 'POST', `/support/tickets/${t1.json.id}/messages`, { token: c.token, body: { body: 'men ham ichki', internal: true } });
+    expect((await tt.db.query(`SELECT internal FROM support_messages WHERE body='men ham ichki'`)).rows[0].internal).toBe(false);
+  });
+
+  it('staff invitation: only invited phone can accept, one-time, role granted, audit kept', async () => {
+    const tt = await setupApp();
+    const owner = await mkUser(tt, ['owner']);
+    const { nextPhone } = await import('./helpers.js');
+    const phone = nextPhone();
+    const inv = await api(tt, 'POST', '/admin/staff/invitations', { token: owner.token, body: { phone, role: 'operator' } });
+    expect(inv.status).toBe(200);
+    const stranger = await mkUser(tt);
+    expect((await api(tt, 'POST', '/staff/invitations/accept', { token: stranger.token, body: { token: inv.json.dev_token } })).json.code).toBe('INVITATION_PHONE_MISMATCH');
+    const invited = await mkUser(tt, ['customer'], phone);
+    expect((await api(tt, 'POST', '/staff/invitations/accept', { token: invited.token, body: { token: inv.json.dev_token } })).json.role).toBe('operator');
+    expect((await api(tt, 'POST', '/staff/invitations/accept', { token: invited.token, body: { token: inv.json.dev_token } })).json.code).toBe('INVITATION_INVALID_OR_EXPIRED');
+    expect((await api(tt, 'GET', '/ops/queues', { token: invited.token })).status).toBe(200);
+    expect((await api(tt, 'POST', '/admin/staff/invitations', { token: invited.token, body: { phone: nextPhone(), role: 'owner' } })).status).toBe(403);
+    const actions = (await tt.db.query(`SELECT action FROM audit_events WHERE actor_user_id IN ($1,$2) ORDER BY id`, [owner.id, invited.id])).rows.map((r) => r.action);
+    expect(actions).toEqual(expect.arrayContaining(['staff.invited', 'staff.joined']));
+  });
+});

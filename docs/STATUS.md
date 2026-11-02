@@ -9,7 +9,7 @@
 | C — referral, мижоз номидан буюртма (OTP/оператор), attribution, комиссия ledger, payout | tested |
 | D — Payme/Click adapter, refund, reconciliation, ортиқча тўлов | tested (протокол контракт); live — externally_blocked |
 | D — фискал чек | externally_blocked |
-| E — owner ҳисобот/CSV, CRM навбатлари, support, staff invitation | tested (support/invitation — implemented, алоҳида тестсиз) |
+| E — owner ҳисобот/CSV, CRM навбатлари, support, staff invitation | tested |
 | E — owner/finance TOTP MFA + step-up | tested |
 | E — маркетинг кампаниялари + розилик suppression | tested |
 | E — SMS юбориш | externally_blocked (dev adapter, `suppressed`) |
@@ -21,6 +21,6 @@
 | PostgreSQL restart, backup/restore (DB + media) | tested (demo ҳажмда) |
 | Docker images + Compose | tested: api/web image қурилди, compose'да 5 сервис ишлади |
 
-**Тестлар:** shared 19/19, API 75/75, браузер E2E 12/12 (axe-core билан), 0 skipped. **Қабул матрицаси:** 95 tested, 2 partial, 3 manual.
+**Тестлар:** shared 19/19, API 77/77, браузер E2E 12/12 (axe-core билан), 0 skipped. **Қабул матрицаси:** 95 tested, 2 partial, 3 manual.
 **Deploy:** фақат development сандбокс. Production'га ҳеч нарса deploy қилинмаган, `main`га merge қилинмаган.
 **Owner қарорисиз ёқилмайдиган қийматлар:** комиссия ставкалари, attribution муддати, hold, payout минимал/режим, етказиш тарифлари, ҳуқуқий матнлар — ҳаммаси demo (`is_demo`).

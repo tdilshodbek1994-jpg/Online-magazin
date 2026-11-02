@@ -5,7 +5,7 @@
 | Тўплам | Буйруқ | Passed | Failed | Skipped |
 |---|---|---|---|---|
 | Shared unit (пул, тақсимот, телефон, транслитерация) | `pnpm --filter @om/shared test` | 19 | 0 | 0 |
-| API integration, реал PostgreSQL (`om_test` ҳар сафар янгидан) | `pnpm --filter @om/api test` | 75 | 0 | 0 |
+| API integration, реал PostgreSQL (`om_test` ҳар сафар янгидан) | `pnpm --filter @om/api test` | 77 | 0 | 0 |
 | Браузер E2E (web :3000 → api :4000, seed DEMO), axe-core WCAG скани ва offline сценарийси билан | `node apps/web/e2e/smoke.mjs` | 12 | 0 | 0 |
 | TypeScript | `pnpm -r typecheck` (api, shared, web) | ✓ | — | — |
 | Web production build | `next build` | ✓ | — | — |

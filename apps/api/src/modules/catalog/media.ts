@@ -70,6 +70,21 @@ export function registerMedia(app: FastifyInstance, deps: Deps): void {
     return { id: row.id, mime, width: meta.width, height: meta.height, variants };
   });
 
+  route(app, deps, { method: 'GET', url: '/admin/products/:id/media', tags: ['catalog'], summary: 'Product images (approved, in display order)', params: zIdParam }, async ({ actor, db, params }) => {
+    requirePerm(actor, 'catalog.write');
+    const r = await db.query(`SELECT id, '/media/' || storage_key AS url, alt, sort, width, height, rights_source, created_at FROM media_assets WHERE product_id=$1 AND status='approved' ORDER BY sort, created_at`, [params.id]);
+    return { items: r.rows };
+  });
+
+  // Removal hides the image everywhere (status → rejected); files and the row stay for audit/restore.
+  route(app, deps, { method: 'DELETE', url: '/admin/media/:id', tags: ['catalog'], summary: 'Remove product image from the storefront (kept for audit)', params: zIdParam }, async ({ actor, db, params }) => {
+    requirePerm(actor, 'catalog.write');
+    const r = await db.query(`UPDATE media_assets SET status='rejected' WHERE id=$1 AND status='approved' RETURNING product_id`, [params.id]);
+    if (!r.rowCount) throw notFound('MEDIA');
+    await audit(db, actor, 'media.removed', { type: 'product', id: r.rows[0].product_id }, { after: { media_id: params.id } });
+    return { ok: true };
+  });
+
   route(app, deps, { method: 'PATCH', url: '/admin/media/:id', tags: ['catalog'], summary: 'Edit alt text / order', params: zIdParam, body: z.object({ alt: z.record(z.string(), z.string().max(200)).optional(), sort: z.number().int().min(0).max(100).optional() }) },
     async ({ actor, db, params, body }) => {
       requirePerm(actor, 'catalog.write');

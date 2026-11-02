@@ -94,13 +94,16 @@ export function registerOrders(app: FastifyInstance, deps: Deps): void {
   async ({ actor, db, cfg, params, body }) => {
     requirePerm(actor, 'orders.operate');
     return withTx(db, async (tx) => {
-      const o = await maybeOne<{ assigned_operator_id: string | null; payable_minor: string; commercial_status: string }>(tx, `SELECT assigned_operator_id, payable_minor, commercial_status FROM orders WHERE id=$1 FOR UPDATE`, [params.id]);
+      const o = await maybeOne<{ assigned_operator_id: string | null; payable_minor: string; commercial_status: string; quick_pending: boolean }>(tx,
+        `SELECT assigned_operator_id, payable_minor, commercial_status, (address_snapshot->>'quick'='true' AND address_snapshot->>'house'='-') AS quick_pending FROM orders WHERE id=$1 FOR UPDATE`, [params.id]);
       if (!o) throw notFound('ORDER');
       if (o.assigned_operator_id !== actor.userId && !can(actor, 'orders.reassign')) throw forbidden();
       await tx.query(`INSERT INTO call_logs (order_id, operator_id, outcome, note, callback_at) VALUES ($1,$2,$3,$4,$5)`, [params.id, actor.userId, body.outcome, body.note ?? null, body.callback_at ?? null]);
       if (body.outcome === 'confirmed') {
         // The operator must read back the exact total; mismatch means the customer agreed to something else (AC-M39-2).
         if (body.confirmed_total_minor !== o.payable_minor) throw unprocessable('CONFIRMED_TOTAL_MISMATCH', { payable_minor: o.payable_minor });
+        // Quick orders carry no street/house yet: the operator must record the address before confirming.
+        if (o.quick_pending) throw unprocessable('ADDRESS_REQUIRED');
         await tx.query(`INSERT INTO order_confirmations (order_id, method, status, actor_user_id, call_outcome, shown_total_minor, note) VALUES ($1,'operator_call','verified',$2,'confirmed',$3,$4)`, [params.id, actor.userId, o.payable_minor, body.note ?? null]);
         await confirmOrder(tx, cfg, actor, params.id, 'operator_call', { operator_id: actor.userId });
         await tx.query(`UPDATE orders SET callback_at=NULL WHERE id=$1`, [params.id]);

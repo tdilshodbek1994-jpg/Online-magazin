@@ -3,7 +3,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { hashToken } from '../../platform/auth.js';
 import { many, maybeOne, one, type Tx, withTx } from '../../platform/db.js';
-import { badRequest, conflict, notFound, unauthorized } from '../../platform/errors.js';
+import { AppError, badRequest, conflict, notFound, unauthorized } from '../../platform/errors.js';
 import { idempotent } from '../../platform/idempotency.js';
 import { type Deps, requireIdempotencyKey, route, zIdParam } from '../../platform/http.js';
 import type { Actor } from '../../platform/auth.js';
@@ -118,6 +118,45 @@ export function registerCheckout(app: FastifyInstance, deps: Deps): void {
         if (own) await tx.query(`UPDATE carts SET status='converted', updated_at=now() WHERE id=$1`, [own.id]);
         if (actor.userId && body.marketing_opt_in) await tx.query(`INSERT INTO consents (user_id, purpose, channel, granted, source) VALUES ($1,'marketing','any',true,'checkout_optional')`, [actor.userId]);
         return { status: 201, body: { order_id: order.id, number: order.number, confirmation: verified ? 'verified' : 'pending_operator_call' } };
+      }),
+    );
+    reply.status(res.replayed ? 200 : res.status);
+    return { ...res.body, replayed: res.replayed };
+  });
+
+  /**
+   * One-step "quick order": name + phone (+ optional region) from the product page. The operator calls the customer,
+   * collects the exact address (PATCH /ops/orders/:id/address) and confirms. Same pricing, reservation, attribution
+   * and commission paths as the normal checkout; the order always waits for the operator call.
+   */
+  route(app, deps, {
+    method: 'POST', url: '/checkout/quick-order', tags: T, summary: 'One-step order: SKU + name + phone; operator collects address by phone (Idempotency-Key required)',
+    body: z.object({ sku_id: z.string().uuid(), qty: z.number().int().min(1).max(20).default(1), name: z.string().trim().min(2).max(120), phone: z.string().min(5).max(32),
+      delivery_zone_id: z.string().uuid().optional(), accept_terms: z.literal(true), referral_code: z.string().max(20).optional() }),
+  }, async ({ actor, db, cfg, body, idempotencyKey, reply }) => {
+    const key = requireIdempotencyKey(idempotencyKey);
+    if (!actor.userId && !actor.guestToken) throw badRequest('GUEST_TOKEN_REQUIRED');
+    const phone = normalizeUzPhone(body.phone);
+    if (!phone) throw badRequest('PHONE_INVALID', { 'body.phone': 'validation.phone' });
+    const scope = `quick:${actor.userId ?? 'guest:' + (actor.guestToken ?? '')}`;
+    const res = await withTx(db, (tx) =>
+      idempotent(tx, scope, key, body, async () => {
+        // Abuse guard: at most 5 quick orders per phone per hour (operators call every one).
+        const recent = await one<{ n: number }>(tx, `SELECT COUNT(*)::int AS n FROM orders WHERE customer_phone=$1 AND created_at > now() - interval '1 hour' AND address_snapshot->>'quick'='true'`, [phone]);
+        if (recent.n >= 5) throw new AppError(429, 'QUICK_ORDER_RATE_LIMIT');
+        const zone = body.delivery_zone_id
+          ? await maybeOne<{ id: string; region_code: string; district: string | null }>(tx, `SELECT id, region_code, district FROM delivery_zones WHERE id=$1 AND active`, [body.delivery_zone_id])
+          : await maybeOne<{ id: string; region_code: string; district: string | null }>(tx, `SELECT id, region_code, district FROM delivery_zones WHERE active ORDER BY region_code='TAS' DESC, district NULLS FIRST LIMIT 1`);
+        if (!zone) throw badRequest('DELIVERY_ZONE_INVALID');
+        const priced = await priceLines(tx, { lines: [{ sku_id: body.sku_id, qty: body.qty }], delivery_zone_id: zone.id });
+        const address = { region_code: zone.region_code, district: zone.district ?? 'Aniqlanadi', street: 'Operator qo‘ng‘iroqda aniqlaydi', house: '-', quick: true };
+        const q = await storeQuote(tx, priced, { cartId: null, userId: actor.userId, createdBy: actor.userId, address, contact: { name: body.name, phone }, ttlMinutes: cfg.quoteTtlMinutes });
+        const attribution = await resolveAttribution(tx, cfg.env, { explicitCode: body.referral_code ?? null, guestToken: actor.guestToken, customerUserId: actor.userId });
+        const order = await createOrder(tx, cfg, actor, {
+          quoteId: q.id, quoteHash: priced.hash, paymentMethod: 'cod', channel: 'web', customerUserId: actor.userId, customerPhone: phone,
+          createdBy: actor.userId, confirmation: 'pending', attribution, acceptedTerms: body.accept_terms,
+        });
+        return { status: 201, body: { order_id: order.id, number: order.number, confirmation: 'pending_operator_call', payable: pricedToJson(priced).payable } };
       }),
     );
     reply.status(res.replayed ? 200 : res.status);

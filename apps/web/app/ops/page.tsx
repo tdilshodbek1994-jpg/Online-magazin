@@ -38,6 +38,8 @@ export default function Ops() {
         <section className="card" style={{ marginTop: 12 }}>
           <div className="spread"><h2>{sel.number}</h2><button className="btn secondary" onClick={() => setSel(null)}>×</button></div>
           <p>{sel.contact_snapshot?.name} · <a href={`tel:${sel.customer_phone}`}>{sel.customer_phone}</a> · {sel.address_snapshot?.district}, {sel.address_snapshot?.street} {sel.address_snapshot?.house}</p>
+          {sel.address_snapshot?.quick && <p className="notice">⚡ Tez buyurtma: mijoz faqat ism va telefon qoldirgan. Qo‘ng‘iroqda aniq manzilni so‘rab, pastda saqlang — manzilsiz tasdiqlab bo‘lmaydi.</p>}
+          {!['shipped', 'delivered', 'returned'].includes(sel.fulfillment_status) && <AddressEditor order={sel} onSave={(address) => act(() => api(`/ops/orders/${sel.id}/address`, { method: 'PATCH', body: { expected_version: sel.version, address, reason: 'operator qo‘ng‘iroq' } }))} />}
           <p>Hamkor: {sel.partner_code ?? '—'} ({sel.attribution?.reason ?? '—'}) · Holat: {sel.commercial_status} / {sel.confirmation_status} / {sel.fulfillment_status} / {sel.payment_status}</p>
           {sel.lines.map((l: any) => <div key={l.id} className="spread"><span>{pick(l.product_snapshot.name, lang)} × {l.qty}</span><span>{som(l.line_net_minor)}</span></div>)}
           <div className="spread" style={{ fontWeight: 700 }}><span>Jami</span><span>{som(sel.payable_minor)}</span></div>
@@ -61,5 +63,26 @@ export default function Ops() {
         </section>
       )}
     </>
+  );
+}
+
+function AddressEditor({ order, onSave }: { order: any; onSave: (a: Record<string, string>) => void }) {
+  const a = order.address_snapshot ?? {};
+  const quickPending = a.quick && a.house === '-';
+  const [open, setOpen] = useState<boolean>(!!quickPending);
+  const [f, setF] = useState({ district: a.district === 'Aniqlanadi' ? '' : a.district ?? '', street: quickPending ? '' : a.street ?? '', house: quickPending ? '' : a.house ?? '', apartment: a.apartment ?? '', landmark: a.landmark ?? '' });
+  if (!open) return <button className="btn secondary" onClick={() => setOpen(true)}>Manzilni tahrirlash</button>;
+  const fields: [keyof typeof f, string][] = [['district', 'Tuman'], ['street', 'Ko‘cha'], ['house', 'Uy'], ['apartment', 'Xonadon'], ['landmark', 'Mo‘ljal']];
+  return (
+    <div className="card" style={{ marginTop: 8 }}>
+      <b>Yetkazish manzili</b>
+      <div className="form-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))' }}>
+        {fields.map(([k, l]) => <div key={k}><label htmlFor={`ad-${k}`}>{l}</label><input id={`ad-${k}`} value={f[k]} onChange={(e) => setF({ ...f, [k]: e.target.value })} /></div>)}
+      </div>
+      <div className="row" style={{ marginTop: 8 }}>
+        <button className="btn" disabled={!f.district || !f.street || !f.house} onClick={() => onSave(Object.fromEntries(Object.entries(f).filter(([, v]) => v)))}>Manzilni saqlash</button>
+        {!quickPending && <button className="btn secondary" onClick={() => setOpen(false)}>Bekor</button>}
+      </div>
+    </div>
   );
 }

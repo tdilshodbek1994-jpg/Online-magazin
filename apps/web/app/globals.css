@@ -346,3 +346,17 @@ header.top { background: var(--surface); border-bottom: 1px solid var(--border);
   .scard-top img, .ph.sm { width: 72px; height: 72px; }
   .rank-card .see-all { display: none; }
 }
+.media-admin { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 6px 0; }
+.media-thumb { position: relative; }
+.media-thumb img { width: 64px; height: 64px; object-fit: cover; border-radius: 10px; display: block; border: 1px solid var(--border); }
+.media-thumb .btn { position: absolute; top: -8px; right: -8px; min-height: 28px; height: 28px; width: 28px; padding: 0; border-radius: 50%; }
+.quick-btn { background: #c2410c; border-color: #c2410c; color: #fff; margin-top: 8px; }
+.quick-btn:hover { background: #9a3412; border-color: #9a3412; }
+.quick-form, .quick-done { margin-top: 10px; padding: 14px; border: 2px solid #fdba74; border-radius: 16px; background: color-mix(in srgb, #fff7ed 70%, var(--surface)); display: grid; gap: 4px; }
+.quick-form label { margin-top: 6px; }
+.quick-done { border-color: #86efac; background: var(--ok-bg); gap: 8px; }
+.qd-icon { font-size: 32px; }
+@media (prefers-color-scheme: dark) { .quick-form { background: var(--surface-2); } }
+.login-cta { max-width: 480px; margin: 24px auto; text-align: center; display: grid; gap: 10px; justify-items: center; padding: 28px 20px; }
+.login-cta h1 { margin: 0; }
+.lc-icon { font-size: 44px; }

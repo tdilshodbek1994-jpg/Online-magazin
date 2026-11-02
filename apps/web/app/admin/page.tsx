@@ -97,6 +97,7 @@ function Products({ act, lang }: { act: any; lang: any }) {
                 <button className="btn secondary" onClick={() => { const q = prompt('Kirim soni'); if (q) act(() => api(`/admin/skus/${s.sku_id}/stock`, { method: 'POST', body: { kind: 'receipt', qty: Number(q), reason: 'kirim', ref: crypto.randomUUID() } }), load); }}>+ kirim</button></div>)}</td>
               <td>{p.commission_rule ? (p.commission_rule.kind === 'percent' ? `${p.commission_rule.rate_bps / 100}%` : som(p.commission_rule.fixed_minor) + '/dona') : '—'}
                 <label className="btn secondary" style={{ display: 'inline-flex', alignItems: 'center' }}>Rasm<input type="file" accept="image/jpeg,image/png,image/webp" style={{ display: 'none' }} onChange={(e) => { const f = e.target.files?.[0]; if (!f) return; const rd = new FileReader(); rd.onload = () => act(() => api(`/admin/products/${p.id}/media`, { method: 'POST', body: { filename: f.name, content_base64: String(rd.result).split(',')[1], alt: { 'uz-Latn': pick(p.name, 'uz-Latn' as any) }, rights_source: 'owner upload' } }), load); rd.readAsDataURL(f); }} /></label>
+                <ProductMedia productId={p.id} />
                 <button className="btn secondary" onClick={() => { const v = prompt('Foiz (masalan 10) yoki "f:30000" (dona uchun so‘m)'); if (!v) return; const body = v.startsWith('f:') ? { kind: 'fixed_per_unit', fixed_minor: String(BigInt(v.slice(2)) * 100n) } : { kind: 'percent', rate_bps: Math.round(Number(v) * 100) }; act(() => api(`/admin/products/${p.id}/commission-rules`, { method: 'POST', body }), load); }}>Qoida</button></td>
               <td>{p.status !== 'published' && <button className="btn" onClick={() => act(() => api(`/admin/products/${p.id}/status`, { method: 'POST', body: { status: 'published', expected_version: p.version } }), load)}>E’lon qilish</button>}
                 {p.status === 'published' && <button className="btn secondary" onClick={() => act(() => api(`/admin/products/${p.id}/status`, { method: 'POST', body: { status: 'archived', expected_version: p.version } }), load)}>Arxiv</button>}</td>
@@ -237,5 +238,24 @@ function Promos({ act }: { act: any }) {
           <td>{p.status === 'active' && <button className="btn secondary" onClick={() => act(() => api(`/admin/promotions/${p.id}/pause`, { method: 'POST' }), load)}>To‘xtatish</button>}</td></tr>)}</tbody></table>
       </Async>
     </section>
+  );
+}
+
+function ProductMedia({ productId }: { productId: string }) {
+  const [items, setItems] = useState<any[] | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const load = () => api(`/admin/products/${productId}/media`).then((r) => setItems(r.items)).catch((e) => setErr(e.code));
+  if (items === null) return <button className="btn secondary" onClick={load}>Rasmlar</button>;
+  return (
+    <div className="media-admin">
+      {items.length === 0 && <span className="muted small">Rasm yo‘q</span>}
+      {items.map((m) => (
+        <div key={m.id} className="media-thumb">
+          <img src={m.url} alt="" width={64} height={64} />
+          <button className="btn danger sm" aria-label="Rasmni o‘chirish" onClick={async () => { if (!confirm('Rasm do‘kondan olib tashlansinmi?')) return; try { await api(`/admin/media/${m.id}`, { method: 'DELETE' }); await load(); } catch (e: any) { setErr(e.code); } }}>×</button>
+        </div>
+      ))}
+      {err && <span className="field-error">{err}</span>}
+    </div>
   );
 }

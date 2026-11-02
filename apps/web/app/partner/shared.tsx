@@ -81,3 +81,20 @@ export function duration(secs: number | null | undefined): string {
   const d = Math.floor(secs / 86400), h = Math.floor((secs % 86400) / 3600), m = Math.floor((secs % 3600) / 60);
   return [d ? `${d} kun` : '', h ? `${h} soat` : '', !d && m ? `${m} daq` : ''].filter(Boolean).join(' ') || '1 daq';
 }
+
+/** Shown instead of partner pages when nobody is logged in: a clear next step, not a raw error code. */
+export function PartnerGuard({ children }: { children: React.ReactNode }) {
+  const [state, setState] = useState<'checking' | 'in' | 'out'>('checking');
+  useEffect(() => { try { setState(localStorage.getItem('om_token') ? 'in' : 'out'); } catch { setState('out'); } }, []);
+  if (state === 'checking') return null;
+  if (state === 'out') return (
+    <div className="card login-cta">
+      <div className="lc-icon" aria-hidden>🤝</div>
+      <h1>Hamkor kabineti</h1>
+      <p>Hamkor bo‘lish yoki kabinetga kirish uchun avval telefon raqamingiz bilan tizimga kiring.</p>
+      <Link className="btn big" href="/login?next=/partner">Kirish</Link>
+      <p className="muted small">Mahsulotlarni Telegram, Instagram yoki do‘stlaringiz orqali sotib, har bir yetkazilgan buyurtmadan pul ishlaysiz.</p>
+    </div>
+  );
+  return <>{children}</>;
+}

@@ -7,6 +7,7 @@ import { discountPct } from '@/components/ProductCard';
 import { api, som } from '@/lib/api';
 import { pick, useI18n } from '@/lib/i18n';
 import { Gallery } from './Gallery';
+import { QuickOrder } from './QuickOrder';
 
 export function AddToCart({ product, minPrice }: { product: any; minPrice: string | null }) {
   const { t, lang } = useI18n();
@@ -72,6 +73,7 @@ export function AddToCart({ product, minPrice }: { product: any; minPrice: strin
             {msg === 'ok' && <div className="added" role="status"><IconCheck size={18} /> {t('added')} · <Link href="/cart">{t('cart')} →</Link></div>}
             {msg && msg !== 'ok' && <span role="alert" className="field-error">{msg}</span>}
           </div>
+          <QuickOrder skuId={skuId} qty={qty} disabled={!inStock} />
           <ul className="perks">
             <li><IconCash size={20} /> {t('bCod')}</li>
             <li><IconTruck size={20} /> {t('delivery')}: zona tarifi checkoutda hisoblanadi</li>

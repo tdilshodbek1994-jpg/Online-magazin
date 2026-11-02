@@ -2,7 +2,7 @@ import { maskPhone } from '@om/shared';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { audit } from '../../platform/audit.js';
-import { can, requirePerm } from '../../platform/auth.js';
+import { can, requirePerm, requireStepUp } from '../../platform/auth.js';
 import { many, maybeOne, one, withTx } from '../../platform/db.js';
 import { conflict, forbidden, notFound, unprocessable } from '../../platform/errors.js';
 import { type Deps, route, zIdParam } from '../../platform/http.js';
@@ -250,7 +250,7 @@ export function registerOrders(app: FastifyInstance, deps: Deps): void {
 
   route(app, deps, { method: 'POST', url: '/finance/remittances/:id/confirm', tags: ['finance'], summary: 'Finance confirms received cash; discrepancy goes to finance queue', params: zIdParam, body: z.object({ received_minor: z.string().regex(/^\d+$/), note: z.string().max(500).optional() }) },
     async ({ actor, db, cfg, params, body }) => {
-      requirePerm(actor, 'cod.confirm');
+      requirePerm(actor, 'cod.confirm'); requireStepUp(actor);
       return withTx(db, async (tx) => {
         const r = await maybeOne<{ id: string; status: string; courier_user_id: string; expected_minor: string }>(tx, `SELECT * FROM cod_remittances WHERE id=$1 FOR UPDATE`, [params.id]);
         if (!r) throw notFound('REMITTANCE');

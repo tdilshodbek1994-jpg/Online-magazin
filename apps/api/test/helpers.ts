@@ -32,12 +32,13 @@ export interface U {
   phone: string;
 }
 
-export async function mkUser(t: T, roles: string[] = ['customer'], phone = nextPhone()): Promise<U> {
+export async function mkUser(t: T, roles: string[] = ['customer'], phone = nextPhone(), elevated = true): Promise<U> {
   const u = await t.db.query(`INSERT INTO users (phone_e164, phone_verified_at, display_name) VALUES ($1, now(), $2) RETURNING id`, [phone, `${roles[0]} ${phone.slice(-4)}`]);
   const id = u.rows[0].id as string;
   for (const r of roles) await t.db.query(`INSERT INTO memberships (user_id, role_code) VALUES ($1,$2)`, [id, r]);
   const { token, hash } = newToken();
-  await t.db.query(`INSERT INTO sessions (user_id, token_hash, phone_at_issue, expires_at) VALUES ($1,$2,$3, now() + interval '1 day')`, [id, hash, phone]);
+  // Test sessions are pre-elevated (as after a successful TOTP step-up) unless elevated=false.
+  await t.db.query(`INSERT INTO sessions (user_id, token_hash, phone_at_issue, expires_at, elevated_until) VALUES ($1,$2,$3, now() + interval '1 day', CASE WHEN $4 THEN now() + interval '1 hour' END)`, [id, hash, phone, elevated]);
   return { id, token, phone };
 }
 

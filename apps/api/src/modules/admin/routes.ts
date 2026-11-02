@@ -3,7 +3,7 @@ import { randomBytes } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { audit } from '../../platform/audit.js';
-import { hashToken, requirePerm, requireUser } from '../../platform/auth.js';
+import { hashToken, requirePerm, requireStepUp, requireUser } from '../../platform/auth.js';
 import { many, maybeOne, one, withTx } from '../../platform/db.js';
 import { AppError, badRequest, conflict, notFound } from '../../platform/errors.js';
 import { type Deps, route, zIdParam, zLocalized } from '../../platform/http.js';
@@ -23,7 +23,7 @@ export function registerAdmin(app: FastifyInstance, deps: Deps): void {
   // ---------- Staff invitations (§07) ----------
   route(app, deps, { method: 'POST', url: '/admin/staff/invitations', tags: T, summary: 'Invite staff by phone + role', body: z.object({ phone: z.string(), role: z.enum(['owner', 'catalog_manager', 'operator', 'warehouse', 'courier', 'finance']) }) },
     async ({ actor, db, cfg, body }) => {
-      requirePerm(actor, 'staff.manage');
+      requirePerm(actor, 'staff.manage'); requireStepUp(actor);
       const phone = normalizeUzPhone(body.phone);
       if (!phone) throw badRequest('PHONE_INVALID');
       const token = randomBytes(24).toString('base64url');
@@ -52,7 +52,7 @@ export function registerAdmin(app: FastifyInstance, deps: Deps): void {
   });
 
   route(app, deps, { method: 'POST', url: '/admin/staff/:id/revoke', tags: T, summary: 'Revoke role (takes effect on next request)', params: zIdParam, body: z.object({ role: z.string(), reason: z.string().min(3) }) }, async ({ actor, db, params, body }) => {
-    requirePerm(actor, 'staff.manage');
+    requirePerm(actor, 'staff.manage'); requireStepUp(actor);
     if (params.id === actor.userId && body.role === 'owner') throw conflict('CANNOT_REVOKE_OWN_OWNER_ROLE');
     const r = await db.query(`UPDATE memberships SET revoked_at=now() WHERE user_id=$1 AND role_code=$2 AND revoked_at IS NULL RETURNING id`, [params.id, body.role]);
     if (!r.rowCount) throw notFound('MEMBERSHIP');
@@ -77,7 +77,7 @@ export function registerAdmin(app: FastifyInstance, deps: Deps): void {
       });
     });
   route(app, deps, { method: 'POST', url: '/admin/policies/:id/approve', tags: T, summary: 'Approve policy version (owner)', params: zIdParam }, async ({ actor, db, params }) => {
-    requirePerm(actor, 'policies.manage');
+    requirePerm(actor, 'policies.manage'); requireStepUp(actor);
     const r = await db.query(`UPDATE business_policies SET status='approved', approved_by=$2, approved_at=now() WHERE id=$1 AND status='draft' RETURNING key, version`, [params.id, actor.userId]);
     if (!r.rowCount) throw conflict('POLICY_NOT_DRAFT');
     await audit(db, actor, 'policy.approved', { type: 'policy', id: r.rows[0].key }, { after: { version: r.rows[0].version } });

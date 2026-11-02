@@ -355,7 +355,8 @@ describe('Access control, auth and privacy (A1/A2)', () => {
 
   it('T012/T097: production config never echoes OTP and disables mock payments', async () => {
     const { loadConfig } = await import('../src/config.js');
-    const prod = loadConfig({ NODE_ENV: 'production', DATABASE_URL: 'postgres://x/y', PAYME_MODE: 'sandbox', CLICK_MODE: 'sandbox' });
+    expect(() => loadConfig({ NODE_ENV: 'production', DATABASE_URL: 'postgres://x/y' })).toThrow(/MFA_ENC_KEY/);
+    const prod = loadConfig({ NODE_ENV: 'production', DATABASE_URL: 'postgres://x/y', PAYME_MODE: 'sandbox', CLICK_MODE: 'sandbox', MFA_ENC_KEY: 'x'.repeat(40) });
     expect(prod.otp.devEcho).toBe(false);
     expect(prod.payments.mockEnabled).toBe(false);
   });

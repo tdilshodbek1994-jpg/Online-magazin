@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto';
 import type { Queryable } from './db.js';
-import { forbidden, unauthorized } from './errors.js';
+import { AppError, forbidden, unauthorized } from './errors.js';
 
 export interface Grant {
   role: string;
@@ -17,10 +17,11 @@ export interface Actor {
   perms: Map<string, Set<string>>;
   maxAmount: Map<string, bigint | null>;
   guestToken: string | null;
+  elevatedUntil: Date | null;
 }
 
 export function anonymous(requestId: string, guestToken: string | null): Actor {
-  return { kind: 'anonymous', userId: null, sessionId: null, requestId, grants: [], perms: new Map(), maxAmount: new Map(), guestToken };
+  return { kind: 'anonymous', userId: null, sessionId: null, requestId, grants: [], perms: new Map(), maxAmount: new Map(), guestToken, elevatedUntil: null };
 }
 
 export function newToken(): { token: string; hash: Buffer } {
@@ -40,11 +41,11 @@ export async function loadActor(q: Queryable, token: string | null, requestId: s
        FROM users u
       WHERE s.token_hash = $1 AND s.revoked_at IS NULL AND s.expires_at > now() AND u.id = s.user_id AND u.status = 'active'
         AND (s.phone_at_issue IS NOT DISTINCT FROM u.phone_e164)
-      RETURNING s.id, s.user_id, u.kind`,
+      RETURNING s.id, s.user_id, u.kind, s.elevated_until`,
     [hashToken(token)],
   );
   if (s.rowCount === 0) return anonymous(requestId, guestToken);
-  const { id: sessionId, user_id: userId, kind } = s.rows[0];
+  const { id: sessionId, user_id: userId, kind, elevated_until } = s.rows[0];
   const g = await q.query(
     `SELECT m.role_code, m.organization_id, rp.permission_code, rp.max_amount_minor
        FROM memberships m JOIN role_permissions rp ON rp.role_code = m.role_code
@@ -63,7 +64,7 @@ export async function loadActor(q: Queryable, token: string | null, requestId: s
     const prev = maxAmount.get(r.permission_code);
     if (prev === undefined || (prev !== null && (lim === null || lim > prev))) maxAmount.set(r.permission_code, lim);
   }
-  return { kind: kind === 'ai' ? 'ai' : 'user', userId, sessionId, requestId, grants: [...grants.values()], perms, maxAmount, guestToken };
+  return { kind: kind === 'ai' ? 'ai' : 'user', userId, sessionId, requestId, grants: [...grants.values()], perms, maxAmount, guestToken, elevatedUntil: elevated_until ? new Date(elevated_until) : null };
 }
 
 export function requireUser(a: Actor): asserts a is Actor & { userId: string } {
@@ -91,4 +92,15 @@ export function requireAmountWithin(a: Actor, perm: string, amountMinor: bigint)
 /** Org ids on which the actor holds perm; '*' means all. */
 export function orgsWith(a: Actor, perm: string): Set<string> {
   return a.perms.get(perm) ?? new Set();
+}
+
+/**
+ * Owner/finance must re-authenticate with their second factor (TOTP or recovery code) shortly before
+ * sensitive money/permission actions (§07, T020). Other roles are unaffected.
+ */
+export function requireStepUp(a: Actor): void {
+  requireUser(a);
+  const privileged = a.grants.some((g) => g.role === 'owner' || g.role === 'finance');
+  if (!privileged) return;
+  if (!a.elevatedUntil || a.elevatedUntil.getTime() < Date.now()) throw new AppError(403, 'STEP_UP_REQUIRED');
 }

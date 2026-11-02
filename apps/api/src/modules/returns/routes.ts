@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { audit } from '../../platform/audit.js';
-import { can, requirePerm, requireUser } from '../../platform/auth.js';
+import { can, requirePerm, requireStepUp, requireUser } from '../../platform/auth.js';
 import { many, maybeOne, one, withTx } from '../../platform/db.js';
 import { AppError, badRequest, conflict, forbidden, notFound, unprocessable } from '../../platform/errors.js';
 import { idempotent } from '../../platform/idempotency.js';
@@ -148,7 +148,7 @@ export function registerReturns(app: FastifyInstance, deps: Deps): void {
   });
 
   route(app, deps, { method: 'POST', url: '/refunds/:id/approve', tags: T, summary: 'Approve: reserves refundable amount (requester cannot approve)', params: zIdParam }, async ({ actor, db, params }) => {
-    requirePerm(actor, 'refunds.approve');
+    requirePerm(actor, 'refunds.approve'); requireStepUp(actor);
     return withTx(db, async (tx) => {
       const r = await maybeOne<{ status: string; created_by: string; intent_id: string; amount_minor: string }>(tx, `SELECT * FROM refunds WHERE id=$1 FOR UPDATE`, [params.id]);
       if (!r) throw notFound('REFUND');
@@ -166,7 +166,7 @@ export function registerReturns(app: FastifyInstance, deps: Deps): void {
   route(app, deps, { method: 'POST', url: '/refunds/:id/result', tags: T, summary: 'Record refund outcome (succeeded | failed | unknown_result)', params: zIdParam,
     body: z.object({ outcome: z.enum(['succeeded', 'failed', 'unknown_result']), reference: z.string().max(120).optional() }) },
   async ({ actor, db, params, body }) => {
-    requirePerm(actor, 'refunds.approve');
+    requirePerm(actor, 'refunds.approve'); requireStepUp(actor);
     return withTx(db, async (tx) => {
       const r = await maybeOne<{ status: string; intent_id: string; order_id: string; amount_minor: string; product_amount_minor: string; method: string }>(tx, `SELECT * FROM refunds WHERE id=$1 FOR UPDATE`, [params.id]);
       if (!r) throw notFound('REFUND');

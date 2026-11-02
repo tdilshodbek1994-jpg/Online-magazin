@@ -3,6 +3,7 @@ import { createHash, randomInt, timingSafeEqual } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { audit } from '../../platform/audit.js';
+import { decrypt, encrypt, hashRecovery, newSecret, verifyTotp } from '../../platform/mfa.js';
 import { newToken, requireUser } from '../../platform/auth.js';
 import { many, maybeOne, one, withTx } from '../../platform/db.js';
 import { AppError, badRequest, conflict, notFound } from '../../platform/errors.js';
@@ -170,6 +171,58 @@ export function registerIdentity(app: FastifyInstance, deps: Deps): void {
       requireUser(actor);
       await db.query(`INSERT INTO consents (user_id, purpose, channel, granted, source) VALUES ($1,$2,$3,$4,'cabinet')`, [actor.userId, body.purpose, body.channel, body.granted]);
       return { ok: true };
+    });
+
+  // ---------- MFA (TOTP) + step-up re-authentication (§07, T020) ----------
+  route(app, deps, { method: 'POST', url: '/auth/mfa/enroll', tags: T, summary: 'Start TOTP enrollment (returns secret once)' }, async ({ actor, db, cfg }) => {
+    requireUser(actor);
+    const ex = await maybeOne<{ enabled_at: string | null }>(db, `SELECT enabled_at FROM user_mfa WHERE user_id=$1`, [actor.userId]);
+    if (ex?.enabled_at) throw conflict('MFA_ALREADY_ENABLED');
+    const secret = newSecret();
+    await db.query(`INSERT INTO user_mfa (user_id, secret_enc) VALUES ($1,$2) ON CONFLICT (user_id) DO UPDATE SET secret_enc=EXCLUDED.secret_enc, created_at=now()`, [actor.userId, encrypt(secret, cfg.mfaKey)]);
+    const u = await one<{ phone_e164: string }>(db, `SELECT phone_e164 FROM users WHERE id=$1`, [actor.userId]);
+    return { secret, otpauth_uri: `otpauth://totp/OnlineMagazin:${encodeURIComponent(u.phone_e164)}?secret=${secret}&issuer=OnlineMagazin&digits=6&period=30` };
+  });
+
+  route(app, deps, { method: 'POST', url: '/auth/mfa/activate', tags: T, summary: 'Confirm TOTP code; returns 8 one-time recovery codes once', body: z.object({ code: z.string().regex(/^\d{6}$/) }) }, async ({ actor, db, cfg, body }) => {
+    requireUser(actor);
+    return withTx(db, async (tx) => {
+      const m = await maybeOne<{ secret_enc: string; enabled_at: string | null }>(tx, `SELECT secret_enc, enabled_at FROM user_mfa WHERE user_id=$1 FOR UPDATE`, [actor.userId]);
+      if (!m) throw notFound('MFA_ENROLLMENT');
+      if (m.enabled_at) throw conflict('MFA_ALREADY_ENABLED');
+      const step = verifyTotp(decrypt(m.secret_enc, cfg.mfaKey), body.code);
+      if (step === null) throw new AppError(400, 'MFA_CODE_INVALID');
+      const codes = Array.from({ length: 8 }, () => randomInt(0, 36 ** 8).toString(36).toUpperCase().padStart(8, '0'));
+      await tx.query(`UPDATE user_mfa SET enabled_at=now(), last_used_step=$2, recovery_hashes=$3 WHERE user_id=$1`, [actor.userId, step, JSON.stringify(codes.map((c) => ({ h: hashRecovery(c), used: false })))]);
+      await audit(tx, actor, 'mfa.enabled', { type: 'user', id: actor.userId });
+      return { enabled: true, recovery_codes: codes };
+    });
+  });
+
+  route(app, deps, { method: 'POST', url: '/auth/step-up', tags: T, summary: 'Re-authenticate with TOTP or recovery code before sensitive actions', body: z.object({ code: z.string().regex(/^\d{6}$/).optional(), recovery_code: z.string().min(8).max(12).optional() }) },
+    async ({ actor, db, cfg, body }) => {
+      requireUser(actor);
+      return withTx(db, async (tx) => {
+        const m = await maybeOne<{ secret_enc: string; enabled_at: string | null; last_used_step: string | null; recovery_hashes: { h: string; used: boolean }[] }>(tx, `SELECT * FROM user_mfa WHERE user_id=$1 FOR UPDATE`, [actor.userId]);
+        if (!m?.enabled_at) throw new AppError(403, 'MFA_ENROLLMENT_REQUIRED');
+        let method = 'totp';
+        if (body.code) {
+          const step = verifyTotp(decrypt(m.secret_enc, cfg.mfaKey), body.code);
+          // Replay protection: a TOTP step can be used once.
+          if (step === null || (m.last_used_step !== null && step <= Number(m.last_used_step))) throw new AppError(400, 'MFA_CODE_INVALID');
+          await tx.query(`UPDATE user_mfa SET last_used_step=$2 WHERE user_id=$1`, [actor.userId, step]);
+        } else if (body.recovery_code) {
+          const h = hashRecovery(body.recovery_code);
+          const idx = m.recovery_hashes.findIndex((r) => r.h === h && !r.used);
+          if (idx < 0) throw new AppError(400, 'MFA_CODE_INVALID');
+          m.recovery_hashes[idx]!.used = true;
+          await tx.query(`UPDATE user_mfa SET recovery_hashes=$2 WHERE user_id=$1`, [actor.userId, JSON.stringify(m.recovery_hashes)]);
+          method = 'recovery_code';
+        } else throw badRequest('MFA_CODE_REQUIRED');
+        const r = await one<{ elevated_until: string }>(tx, `UPDATE sessions SET elevated_until = now() + make_interval(mins => $2) WHERE id=$1 RETURNING elevated_until`, [actor.sessionId, cfg.stepUpMinutes]);
+        await audit(tx, actor, 'auth.step_up', { type: 'session', id: actor.sessionId }, { after: { method } });
+        return { elevated_until: r.elevated_until, method };
+      });
     });
 
   route(app, deps, { method: 'GET', url: '/regions', tags: T, summary: 'Service regions' }, async ({ db }) => ({ items: await many(db, `SELECT code, name, active, restriction_reason FROM service_regions ORDER BY code`) }));

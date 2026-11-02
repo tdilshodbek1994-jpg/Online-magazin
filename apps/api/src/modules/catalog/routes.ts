@@ -2,7 +2,7 @@ import { normalizeSearch, slugify, tokenize } from '@om/shared';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { audit } from '../../platform/audit.js';
-import { can, requirePerm } from '../../platform/auth.js';
+import { can, requirePerm, requireStepUp } from '../../platform/auth.js';
 import { many, maybeOne, one, withTx } from '../../platform/db.js';
 import { badRequest, conflict, notFound, unprocessable } from '../../platform/errors.js';
 import { type Deps, route, zIdParam, zLocalized } from '../../platform/http.js';
@@ -222,7 +222,7 @@ export function registerCatalog(app: FastifyInstance, deps: Deps): void {
   route(app, deps, { method: 'POST', url: '/admin/products/:id/commission-rules', tags: T, summary: 'New commission rule version (percent XOR fixed)', params: zIdParam,
     body: z.object({ kind: z.enum(['percent', 'fixed_per_unit']), rate_bps: z.number().int().min(1).max(10000).optional(), fixed_minor: z.string().regex(/^[1-9]\d{0,15}$/).optional(), effective_from: z.string().datetime().optional() }) },
   async ({ actor, db, params, body }) => {
-    requirePerm(actor, 'commission_rules.write');
+    requirePerm(actor, 'commission_rules.write'); requireStepUp(actor);
     if ((body.kind === 'percent') !== (body.rate_bps !== undefined) || (body.kind === 'fixed_per_unit') !== (body.fixed_minor !== undefined)) throw badRequest('COMMISSION_RULE_SHAPE');
     return withTx(db, async (tx) => {
       if (!(await maybeOne(tx, `SELECT 1 FROM products WHERE id=$1`, [params.id]))) throw notFound('PRODUCT');

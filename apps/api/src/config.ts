@@ -13,6 +13,9 @@ export interface AppConfig {
     mockEnabled: boolean;
   };
   publicWebUrl: string;
+  mfaKey: string;
+  stepUpMinutes: number;
+  mediaDir: string;
 }
 
 function num(v: string | undefined, d: number): number {
@@ -56,8 +59,12 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
       mockEnabled: mode !== 'production',
     },
     publicWebUrl: env.PUBLIC_WEB_URL ?? 'http://localhost:3000',
+    mfaKey: env.MFA_ENC_KEY ?? (mode === 'production' ? '' : 'dev-only-mfa-key'),
+    stepUpMinutes: num(env.STEP_UP_MINUTES, 10),
+    mediaDir: env.MEDIA_DIR ?? new URL('../../../var/media', import.meta.url).pathname,
   };
   if (mode === 'production') {
+    if (!cfg.mfaKey || cfg.mfaKey.length < 32) throw new Error('MFA_ENC_KEY (>=32 chars) required in production');
     if (cfg.payments.payme.mode === 'live' && cfg.payments.payme.key.startsWith('test')) throw new Error('PAYME_KEY required');
     if (cfg.payments.click.mode === 'live' && cfg.payments.click.secretKey.startsWith('test')) throw new Error('CLICK_SECRET_KEY required');
   }

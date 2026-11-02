@@ -3,7 +3,7 @@ import { createHash, randomBytes, randomInt, timingSafeEqual } from 'node:crypto
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { audit } from '../../platform/audit.js';
-import { type Actor, hashToken, requirePerm, requireUser } from '../../platform/auth.js';
+import { type Actor, hashToken, requirePerm, requireStepUp, requireUser } from '../../platform/auth.js';
 import { many, maybeOne, one, type Tx, withTx } from '../../platform/db.js';
 import { AppError, badRequest, conflict, forbidden, notFound, unprocessable } from '../../platform/errors.js';
 import { idempotent } from '../../platform/idempotency.js';
@@ -268,14 +268,14 @@ export function registerPartners(app: FastifyInstance, deps: Deps): void {
 
   // ---------- Admin: partners, payouts, attribution corrections ----------
   route(app, deps, { method: 'GET', url: '/admin/partners', tags: ['admin'], summary: 'Partners' }, async ({ actor, db }) => {
-    requirePerm(actor, 'partners.manage');
+    requirePerm(actor, 'partners.manage'); requireStepUp(actor);
     return { items: await many(db, `SELECT p.id, p.code, p.display_name, p.status, p.status_reason, p.created_at, p.payout_destination->>'masked' AS destination, p.payout_destination_verified_at, b.available_minor::text, b.pending_minor::text, b.debt_minor::text
         FROM partners p LEFT JOIN partner_balances b ON b.partner_id=p.id ORDER BY p.created_at DESC`) };
   });
 
   route(app, deps, { method: 'POST', url: '/admin/partners/:id/status', tags: ['admin'], summary: 'Approve / suspend / reject (history kept)', params: zIdParam, body: z.object({ status: z.enum(['active', 'suspended', 'rejected']), reason: z.string().min(3).max(300) }) },
     async ({ actor, db, params, body }) => {
-      requirePerm(actor, 'partners.manage');
+      requirePerm(actor, 'partners.manage'); requireStepUp(actor);
       return withTx(db, async (tx) => {
         const p = await maybeOne<{ status: string; user_id: string }>(tx, `SELECT status, user_id FROM partners WHERE id=$1 FOR UPDATE`, [params.id]);
         if (!p) throw notFound('PARTNER');
@@ -288,7 +288,7 @@ export function registerPartners(app: FastifyInstance, deps: Deps): void {
     });
 
   route(app, deps, { method: 'POST', url: '/admin/partners/:id/verify-destination', tags: ['admin'], summary: 'Verify payout destination', params: zIdParam }, async ({ actor, db, params }) => {
-    requirePerm(actor, 'payouts.approve');
+    requirePerm(actor, 'payouts.approve'); requireStepUp(actor);
     const r = await db.query(`UPDATE partners SET payout_destination_verified_at=now(), payout_destination_verified_by=$2 WHERE id=$1 AND payout_destination IS NOT NULL RETURNING id`, [params.id, actor.userId]);
     if (!r.rowCount) throw notFound('PARTNER');
     await audit(db, actor, 'partner.destination_verified', { type: 'partner', id: params.id });
@@ -309,7 +309,7 @@ export function registerPartners(app: FastifyInstance, deps: Deps): void {
   });
 
   route(app, deps, { method: 'POST', url: '/admin/payouts/:id/approve', tags: ['admin'], summary: 'Approve (maker != checker unless approved owner_only mode)', params: zIdParam }, async ({ actor, db, cfg, params }) => {
-    requirePerm(actor, 'payouts.approve');
+    requirePerm(actor, 'payouts.approve'); requireStepUp(actor);
     return withTx(db, async (tx) => {
       const r = await maybeOne<{ status: string; prepared_by: string | null }>(tx, `SELECT status, prepared_by FROM payout_requests WHERE id=$1 FOR UPDATE`, [params.id]);
       if (!r) throw notFound('PAYOUT');
@@ -331,7 +331,7 @@ export function registerPartners(app: FastifyInstance, deps: Deps): void {
   route(app, deps, { method: 'POST', url: '/admin/payouts/:id/result', tags: ['admin'], summary: 'Record manual bank transfer result (paid with reference | rejected | unknown)', params: zIdParam,
     body: z.object({ outcome: z.enum(['paid', 'rejected', 'processing_unknown']), reference: z.string().min(3).max(120).optional(), evidence: z.string().max(500).optional(), reason: z.string().max(300).optional() }) },
   async ({ actor, db, params, body }) => {
-    requirePerm(actor, 'payouts.approve');
+    requirePerm(actor, 'payouts.approve'); requireStepUp(actor);
     return withTx(db, async (tx) => {
       const r = await maybeOne<{ status: string; partner_id: string; amount_minor: string; approved_by: string | null }>(tx, `SELECT status, partner_id, amount_minor, approved_by FROM payout_requests WHERE id=$1 FOR UPDATE`, [params.id]);
       if (!r) throw notFound('PAYOUT');
@@ -359,7 +359,7 @@ export function registerPartners(app: FastifyInstance, deps: Deps): void {
   route(app, deps, { method: 'POST', url: '/admin/orders/:id/attribution', tags: ['admin'], summary: 'Attribution correction with reason+evidence (old record kept)', params: zIdParam,
     body: z.object({ new_partner_id: z.string().uuid().nullable(), reason: z.string().min(5).max(500), evidence: z.string().min(5).max(2000) }) },
   async ({ actor, db, params, body }) => {
-    requirePerm(actor, 'partners.manage');
+    requirePerm(actor, 'partners.manage'); requireStepUp(actor);
     return withTx(db, async (tx) => {
       const o = await maybeOne<{ attributed_partner_id: string | null }>(tx, `SELECT attributed_partner_id FROM orders WHERE id=$1 FOR UPDATE`, [params.id]);
       if (!o) throw notFound('ORDER');

@@ -20,6 +20,7 @@
     "@om/shared": "workspace:*",
     "fastify": "5.12.8",
     "pg": "8.23.1",
+    "sharp": "0.34.5",
     "zod": "4.6.7"
   },
   "devDependencies": {

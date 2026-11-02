@@ -102,7 +102,7 @@ export async function api(t: T, method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELE
   if (o.guest) headers['x-guest-token'] = o.guest;
   if (o.idem) headers['idempotency-key'] = o.idem;
   headers['user-agent'] = o.ua ?? 'Mozilla/5.0 (Linux; Android 14) Chrome/130 Mobile';
-  const res = await t.app.inject({ method, url: url.startsWith('/api') || url.startsWith('/health') ? url : `/api/v1${url}`, headers, payload: o.body as never });
+  const res = await t.app.inject({ method, url: url.startsWith('/api') || url.startsWith('/health') || url.startsWith('/media') ? url : `/api/v1${url}`, headers, payload: o.body as never });
   let json: any = null;
   try {
     json = res.json();

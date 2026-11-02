@@ -10,6 +10,8 @@ import { AppError } from './platform/errors.js';
 import type { Deps } from './platform/http.js';
 import { registerIdentity } from './modules/identity/routes.js';
 import { registerCatalog } from './modules/catalog/routes.js';
+import { registerMedia, registerMediaServe } from './modules/catalog/media.js';
+import { registerImports } from './modules/catalog/imports.js';
 import { registerCheckout } from './modules/checkout/routes.js';
 import { registerOrders } from './modules/orders/routes.js';
 import { registerPartners } from './modules/partners/routes.js';
@@ -29,7 +31,7 @@ export async function buildApp(cfg: AppConfig, db: Db): Promise<FastifyInstance>
   const app = Fastify({
     logger: cfg.env === 'test' ? false : { level: 'info', redact: ['req.headers.authorization', 'req.headers.cookie'] },
     genReqId: (req) => (req.headers['x-request-id'] as string) || randomUUID(),
-    bodyLimit: 2 * 1024 * 1024,
+    bodyLimit: 8 * 1024 * 1024,
   });
   // Validation is done with zod inside handlers; JSON schemas are for OpenAPI only.
   app.setValidatorCompiler(() => () => true);
@@ -101,10 +103,14 @@ export async function buildApp(cfg: AppConfig, db: Db): Promise<FastifyInstance>
   });
 
   const deps: Deps = { db, cfg };
+  registerMediaServe(app, deps);
+
   await app.register(
     async (api) => {
       registerIdentity(api, deps);
       registerCatalog(api, deps);
+      registerImports(api, deps);
+      registerMedia(api, deps);
       registerCheckout(api, deps);
       registerOrders(api, deps);
       registerPartners(api, deps);

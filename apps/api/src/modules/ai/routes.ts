@@ -6,6 +6,7 @@ import { many, maybeOne, one } from '../../platform/db.js';
 import { AppError, notFound } from '../../platform/errors.js';
 import { type Deps, route } from '../../platform/http.js';
 import type { Db } from '../../platform/db.js';
+import { getAdviceClient } from './claude.js';
 
 /**
  * Limited AI assist (§24). Provider abstraction: `local_retrieval` (deterministic, no LLM — answers only
@@ -35,7 +36,7 @@ export function parseBudget(text: string): bigint | null {
 }
 
 export function registerAi(app: FastifyInstance, deps: Deps): void {
-  route(app, deps, { method: 'POST', url: '/ai/shopping', tags: ['ai'], summary: 'Shopping advisor (catalog-grounded, live price/stock, source cards)', body: z.object({ message: z.string().min(2).max(500) }) },
+  route(app, deps, { method: 'POST', url: '/ai/shopping', tags: ['ai'], summary: 'Shopping advisor (catalog-grounded, live price/stock, source cards)', body: z.object({ message: z.string().min(2).max(500), locale: z.enum(['uz-Latn', 'uz-Cyrl', 'ru']).default('uz-Latn') }) },
     async ({ db, body }) => {
       await guard(db, 'shopping');
       const budget = parseBudget(body.message);
@@ -50,9 +51,35 @@ export function registerAi(app: FastifyInstance, deps: Deps): void {
           FROM products p JOIN skus s ON s.product_id=p.id AND s.status='active' JOIN offers o ON o.sku_id=s.id AND o.status='active' LEFT JOIN stock_balances sb ON sb.sku_id=s.id
          WHERE p.status='published' AND (${alts.map((_, i) => `p.search_doc LIKE $${i + 1}`).join(' OR ')})
          GROUP BY p.id HAVING ($${alts.length + 1}::bigint IS NULL OR MIN(o.price_minor) <= $${alts.length + 1}::bigint)
-         ORDER BY COALESCE(SUM(GREATEST(0, sb.on_hand_sellable - sb.reserved - sb.safety_buffer)),0) > 0 DESC, MIN(o.price_minor) ASC LIMIT 5`, [...alts.map((a) => `%${a}%`), budget?.toString() ?? null]);
+         ORDER BY COALESCE(SUM(GREATEST(0, sb.on_hand_sellable - sb.reserved - sb.safety_buffer)),0) > 0 DESC, MIN(o.price_minor) ASC LIMIT 10`, [...alts.map((a) => `%${a}%`), budget?.toString() ?? null]);
+      const toProduct = (r: (typeof rows)[number]) => ({ product_id: r.id, slug: r.slug, name: r.name, price: { amount_minor: r.min_price, currency: 'UZS' }, available: r.available, in_stock: r.available > 0 });
+      // External LLM (optional): chooses among server-built candidates only; any failure → local result.
+      const ai = rows.length ? getAdviceClient() : null;
+      let fallbackReason: string | null = null;
+      if (ai) {
+        try {
+          const cands = rows.map((r) => ({ id: r.id, name: r.name[body.locale] || r.name['uz-Latn'] || Object.values(r.name)[0] || '', price_som: (BigInt(r.min_price) / 100n).toString(), in_stock: r.available > 0 }));
+          const advice = await ai.advise(body.message, cands, body.locale);
+          const allowed = new Set(rows.map((r) => r.id));
+          const picked = advice.product_ids.filter((id) => allowed.has(id)); // hallucinated ids are dropped
+          const chosen = picked.map((id) => rows.find((r) => r.id === id)!).filter(Boolean);
+          return {
+            provider: 'anthropic',
+            answer_text: advice.answer,
+            budget_max_minor: budget?.toString() ?? null,
+            products: chosen.map(toProduct),
+            sources: chosen.map((r) => ({ type: 'catalog', product_id: r.id, url: `/p/${r.slug}` })),
+            dropped_unknown_ids: advice.product_ids.length - picked.length,
+            disclaimer_key: 'ai.price_checked_at_checkout',
+          };
+        } catch (e) {
+          fallbackReason = (e as Error).name === 'APIConnectionTimeoutError' ? 'timeout' : (e as Error).message?.slice(0, 60) || 'error';
+        }
+      }
+      rows.splice(5);
       return {
         provider: 'local_retrieval',
+        ...(fallbackReason ? { fallback_reason: fallbackReason } : {}),
         answer_key: rows.length ? 'ai.found_products' : budget ? 'ai.nothing_within_budget' : 'ai.nothing_found',
         budget_max_minor: budget?.toString() ?? null,
         products: rows.map((r) => ({ product_id: r.id, slug: r.slug, name: r.name, price: { amount_minor: r.min_price, currency: 'UZS' }, available: r.available, in_stock: r.available > 0 })),

@@ -64,7 +64,7 @@ function Summary() {
 
 async function downloadCsv(range: { from: string; to: string; date_type: string }) {
   const tok = localStorage.getItem('om_token');
-  const r = await fetch(`/api/v1/admin/reports/orders.csv?from=${range.from}&to=${range.to}&date_type=${range.date_type}`, { headers: { authorization: `Bearer ${tok}` } });
+  const r = await fetch(`/api/v1/admin/reports/orders.csv?from=${range.from}&to=${range.to}&date_type=${range.date_type}`, { headers: { 'x-session-token': tok ?? '' } });
   const blob = await r.blob();
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);

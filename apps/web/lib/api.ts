@@ -29,7 +29,7 @@ export const setToken = (t: string | null) => {
 export async function api<T = any>(path: string, opts: { method?: string; body?: unknown; idem?: string; noStepUp?: boolean } = {}): Promise<T> {
   const headers: Record<string, string> = { 'x-guest-token': guestToken() };
   const tok = getToken();
-  if (tok) headers.authorization = `Bearer ${tok}`;
+  if (tok) headers['x-session-token'] = tok; // Authorization stays free for DEMO basic-auth
   if (opts.body !== undefined) headers['content-type'] = 'application/json';
   if (opts.idem) headers['idempotency-key'] = opts.idem;
   let res: Response;

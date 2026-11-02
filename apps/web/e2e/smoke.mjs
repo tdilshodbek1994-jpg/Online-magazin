@@ -21,7 +21,9 @@ const step = async (id, name, fn) => {
 const assert = (c, m) => { if (!c) throw new Error(m); };
 
 const browser = await chromium.launch();
-const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+const basic = process.env.E2E_BASIC_AUTH; // "user:password" for password-protected DEMO/staging
+const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, ignoreHTTPSErrors: process.env.E2E_INSECURE === '1',
+  ...(basic ? { httpCredentials: { username: basic.split(':')[0], password: basic.split(':').slice(1).join(':') } } : {}) });
 const page = await ctx.newPage();
 if (process.env.E2E_DEBUG) page.on('response', (r) => { if (r.url().includes('/api/v1/') && r.status() >= 400) console.log('  resp', r.status(), r.request().method(), r.url().replace(BASE, '')); });
 
@@ -156,7 +158,7 @@ await step('E2E-12/T019', 'network drops while placing order: clear error, retry
   await p4.getByLabel('Uy', { exact: true }).fill('3');
   await p4.getByRole('button', { name: 'Hisoblash' }).click();
   await p4.getByText('Oferta shartlariga roziman').click();
-  const before = await (await fetch(BASE + '/api/v1/products?limit=1')).ok;
+  const before = (await p4.request.get(BASE + '/api/v1/products?limit=1')).ok();
   await ctx.setOffline(true);
   await p4.getByRole('button', { name: /Buyurtmani tasdiqlash/ }).click();
   await p4.getByRole('alert').filter({ hasText: 'NETWORK' }).waitFor();

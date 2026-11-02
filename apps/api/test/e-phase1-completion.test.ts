@@ -338,3 +338,69 @@ describe('Support tickets and staff invitations', () => {
     expect(actions).toEqual(expect.arrayContaining(['staff.invited', 'staff.joined']));
   });
 });
+
+describe('External AI provider (Claude API) — contract tests with a local fake endpoint (no real key)', () => {
+  it('sends only PII-stripped question + candidates with correct headers/body; hallucinated ids dropped; prices from DB', async () => {
+    const http = await import('node:http');
+    const { createClaudeClient, setAdviceClientFactory, stripPii } = await import('../src/modules/ai/claude.js');
+    const tt = await setupApp();
+    await tt.db.query(`UPDATE feature_flags SET enabled=true WHERE key='ai.enabled'`);
+    const { mkProduct } = await import('./helpers.js');
+    const tag = 'zzext' + randomUUID().slice(0, 5).replace(/\d/g, 'q');
+    const p = await mkProduct(tt, { name: `${tag} soat`, prices: [120_000], stock: [2] });
+    await tt.db.query(`UPDATE products SET search_doc=lower(name->>'uz-Latn') WHERE id=$1`, [p.productId]);
+    let seen: { headers: Record<string, unknown>; body: any } | null = null;
+    const srv = http.createServer((req, res) => {
+      let raw = '';
+      req.on('data', (c) => (raw += c));
+      req.on('end', () => {
+        seen = { headers: req.headers, body: JSON.parse(raw) };
+        const cands = JSON.parse(seen.body.messages[0].content).candidates;
+        res.setHeader('content-type', 'application/json');
+        res.end(JSON.stringify({ id: 'msg_test', type: 'message', role: 'assistant', model: seen.body.model, stop_reason: 'end_turn', stop_sequence: null,
+          usage: { input_tokens: 10, output_tokens: 10 },
+          content: [{ type: 'text', text: JSON.stringify({ product_ids: [cands[0].id, '00000000-0000-0000-0000-000000000000'], answer: 'Ushbu soat mos keladi.' }) }] }));
+      });
+    });
+    await new Promise<void>((r) => srv.listen(0, '127.0.0.1', () => r()));
+    const port = (srv.address() as { port: number }).port;
+    setAdviceClientFactory(() => createClaudeClient({ apiKey: 'test-key', model: 'claude-opus-5-5', timeoutMs: 3000, baseURL: `http://127.0.0.1:${port}` }));
+    try {
+      const r = await api(tt, 'POST', '/ai/shopping', { body: { message: `${tag} soat kerak, raqamim +998 90 123 45 67, a@b.uz`, locale: 'uz-Latn' } });
+      expect(r.status).toBe(200);
+      expect(r.json.provider).toBe('anthropic');
+      expect(r.json.products.map((x: any) => x.product_id)).toEqual([p.productId]);
+      expect(r.json.dropped_unknown_ids).toBe(1);
+      expect(r.json.products[0].price.amount_minor).toBe('12000000');
+      expect(seen!.headers.authorization).toBe('Bearer test-key'); // SDK 1.x sends the API key as a bearer token
+      expect(seen!.headers['anthropic-version']).toBeTruthy();
+      expect(seen!.body.model).toBe('claude-opus-5-5');
+      expect(seen!.body.output_config.format.type).toBe('json_schema');
+      const sent = seen!.body.messages[0].content as string;
+      expect(sent).not.toMatch(/998|a@b\.uz/);
+      expect(sent).toContain('[number]');
+      expect(stripPii('tel 90-123-45-67 ok')).toBe('tel [number] ok');
+    } finally {
+      srv.close();
+    }
+  });
+
+  it('timeout or provider error falls back to local_retrieval; core shopping unaffected', async () => {
+    const { setAdviceClientFactory } = await import('../src/modules/ai/claude.js');
+    const tt = await setupApp();
+    await tt.db.query(`UPDATE feature_flags SET enabled=true WHERE key='ai.enabled'`);
+    const { mkProduct } = await import('./helpers.js');
+    const tag = 'zzfb' + randomUUID().slice(0, 5).replace(/\d/g, 'q');
+    const p = await mkProduct(tt, { name: `${tag} choynak`, prices: [50_000] });
+    await tt.db.query(`UPDATE products SET search_doc=lower(name->>'uz-Latn') WHERE id=$1`, [p.productId]);
+    setAdviceClientFactory(() => ({ advise: async () => { throw new Error('AI_REFUSAL'); } }));
+    try {
+      const r = await api(tt, 'POST', '/ai/shopping', { body: { message: `${tag} choynak` } });
+      expect(r.json).toMatchObject({ provider: 'local_retrieval', fallback_reason: 'AI_REFUSAL' });
+      expect(r.json.products[0].product_id).toBe(p.productId);
+    } finally {
+      setAdviceClientFactory(null);
+      await tt.db.query(`UPDATE feature_flags SET enabled=false WHERE key='ai.enabled'`);
+    }
+  });
+});

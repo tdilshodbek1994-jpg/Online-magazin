@@ -54,7 +54,7 @@ export async function buildApp(cfg: AppConfig, db: Db): Promise<FastifyInstance>
     done(null, Object.fromEntries(new URLSearchParams(body as string)));
   });
 
-  await app.register(cors, { origin: [cfg.publicWebUrl], credentials: true, exposedHeaders: ['x-request-id', 'etag'] });
+  await app.register(cors, { origin: [cfg.publicWebUrl], credentials: true, exposedHeaders: ['x-request-id', 'etag'], allowedHeaders: ['content-type', 'authorization', 'x-session-token', 'x-guest-token', 'idempotency-key', 'x-request-id'] });
   await app.register(swagger, {
     openapi: {
       info: { title: 'Online Magazin API', version: '1.0.0', description: 'MASTER 8.4 contract. Money = {amount_minor: string, currency}.' },
@@ -66,8 +66,11 @@ export async function buildApp(cfg: AppConfig, db: Db): Promise<FastifyInstance>
   app.decorateRequest('actor', null as unknown as Actor);
   app.addHook('onRequest', async (req, reply) => {
     reply.header('x-request-id', req.id);
+    // Session token: X-Session-Token (web app; leaves Authorization free for an edge basic-auth on DEMO/staging)
+    // or Authorization: Bearer (API clients).
     const auth = req.headers.authorization;
-    const token = auth?.startsWith('Bearer ') ? auth.slice(7) : null;
+    const xs = req.headers['x-session-token'];
+    const token = typeof xs === 'string' && xs.length > 0 ? xs : auth?.startsWith('Bearer ') ? auth.slice(7) : null;
     const guest = (req.headers['x-guest-token'] as string | undefined) ?? null;
     req.actor = await loadActor(db, token, req.id, guest && guest.length >= 16 && guest.length <= 200 ? guest : null);
   });

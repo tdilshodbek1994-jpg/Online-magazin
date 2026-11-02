@@ -51,7 +51,7 @@ OM_CADDYFILE=Caddyfile.staging
 OM_NODE_ENV=development
 NODE_ENV=development
 OM_STAGE_USER=owner
-OM_STAGE_HASH=$HASH
+OM_STAGE_HASH='$HASH'
 EOT
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 docker compose -f docker-compose.yml -f docker-compose.prod.yml exec om-api node dist/seed.js   # DEMO ma'lumot

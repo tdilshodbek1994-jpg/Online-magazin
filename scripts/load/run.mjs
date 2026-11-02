@@ -8,7 +8,8 @@ const lat = { read: [], checkout: [] };
 let errors = { read: 0, checkout: 0 }, ok = { read: 0, checkout: 0 }, conflicts = 0;
 const pct = (a, p) => { const s = [...a].sort((x, y) => x - y); return s.length ? s[Math.min(s.length - 1, Math.floor((p / 100) * s.length))].toFixed(1) : 'n/a'; };
 async function timed(kind, fn) { const t = performance.now(); try { const r = await fn(); lat[kind].push(performance.now() - t); return r; } catch (e) { errors[kind]++; return null; } }
-async function j(url, opts = {}) { const r = await fetch(API + url, opts); const b = await r.json().catch(() => ({})); if (r.status >= 500) throw new Error(String(r.status)); return { status: r.status, body: b }; }
+const AUTH = process.env.LOAD_BASIC_AUTH ? { authorization: 'Basic ' + Buffer.from(process.env.LOAD_BASIC_AUTH).toString('base64') } : {};
+async function j(url, opts = {}) { const r = await fetch(API + url, { ...opts, headers: { ...AUTH, ...(opts.headers ?? {}) } }); const b = await r.json().catch(() => ({})); if (r.status >= 500) throw new Error(String(r.status)); return { status: r.status, body: b }; }
 const end = Date.now() + DURATION;
 const zone = (await j('/delivery-zones')).body.items[0].id;
 async function browser() {
@@ -40,7 +41,7 @@ async function checkout() {
   }
 }
 const t0 = Date.now();
-await Promise.all([...Array.from({ length: 100 }, browser), ...Array.from({ length: 10 }, checkout)]);
+await Promise.all([...Array.from({ length: Number(process.env.SESSIONS ?? 100) }, browser), ...Array.from({ length: Number(process.env.CHECKOUTS ?? 10) }, checkout)]);
 const secs = (Date.now() - t0) / 1000;
 const report = {
   duration_s: secs, read: { ok: ok.read, errors: errors.read, rps: (ok.read / secs).toFixed(1), p50_ms: pct(lat.read, 50), p95_ms: pct(lat.read, 95), p99_ms: pct(lat.read, 99) },

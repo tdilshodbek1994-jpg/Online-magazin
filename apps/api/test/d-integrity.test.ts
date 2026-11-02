@@ -330,6 +330,13 @@ describe('Access control, auth and privacy (A1/A2)', () => {
     expect(list.json.items.every((p: any) => (p.skus ?? []).every((x: any) => x.cost_minor === null))).toBe(true);
   });
 
+  it('session token accepted via X-Session-Token (web) and Authorization: Bearer (API clients)', async () => {
+    const u = await mkUser(t);
+    expect((await api(t, 'GET', '/me', { headers: { 'x-session-token': u.token } })).status).toBe(200);
+    expect((await api(t, 'GET', '/me', { token: u.token })).status).toBe(200);
+    expect((await api(t, 'GET', '/me', { headers: { 'x-session-token': u.token, authorization: 'Basic b3duZXI6eA==' } })).status).toBe(200);
+  });
+
   it('T009/T010/T020-partial: logout & revoked session lose access immediately; role downgrade applies next request', async () => {
     const u = await mkUser(t, ['operator']);
     expect((await api(t, 'GET', '/ops/queues', { token: u.token })).status).toBe(200);

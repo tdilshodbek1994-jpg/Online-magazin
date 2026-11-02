@@ -14,4 +14,8 @@
 | V14 Конфигурация | production'да OTP echo ва mock ўчиқ; `.env` ignore; секретлар фақат env | T012/T097 |
 | CI | gitleaks secret scan + `pnpm audit` | `.github/workflows/ci.yml` |
 
-**Очиқ:** owner/finance MFA ва step-up (T020), rate-limit HTTP қатламида (фақат OTP'да бор), CSRF — API Bearer token ишлатади (cookie йўқ), медиа upload ва SVG тозалаш (T030), CSP header'лари.
+| V2.8 MFA | owner/finance: TOTP (RFC 6238, AES-256-GCM да сақланади), replay ҳимояси, 8 та бир марталик tiklash kodi; муҳим амаллар олдидан step-up (10 дақ) | e-phase1 › T020, E2E-10 |
+| V12 Upload | magic-byte, ҳажм/ўлчам, SVG/HTML рад, қайта кодлаш (EXIF олиб ташланади), hash-ном | e-phase1 › T030 |
+| AI (OWASP LLM) | read-only tool'лар, ownership серверда, каталог матни маълумот сифатида, kill-switch flag, кунлик лимит | e-phase1 › T088–T090 |
+
+**Очиқ:** умумий HTTP rate-limit (ҳозир фақат OTP'да), CSP header'лари, қўлда pentest. CSRF: API Bearer token ишлатади (cookie йўқ).

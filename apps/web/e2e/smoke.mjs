@@ -143,6 +143,21 @@ await step('E2E-10/T020', 'owner enrolls TOTP in UI; sensitive admin action asks
   await page.getByRole('status').filter({ hasText: 'OK' }).waitFor();
 });
 
+await step('E2E-11/T017-axe', 'axe-core WCAG 2.x A/AA scan: no serious/critical violations on key customer pages', async () => {
+  const axeSrc = (await import('node:fs')).readFileSync(new URL('../node_modules/axe-core/axe.min.js', import.meta.url), 'utf8');
+  const p3 = await ctx.newPage();
+  const bad = [];
+  for (const path of ['/', '/p/simsiz-quloqchin-x1', '/cart', '/checkout', '/login']) {
+    await p3.goto(BASE + path);
+    await p3.waitForTimeout(500);
+    await p3.addScriptTag({ content: axeSrc });
+    const r = await p3.evaluate(async () => (await window.axe.run(document, { runOnly: ['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa'] })).violations.filter((v) => ['serious', 'critical'].includes(v.impact)).map((v) => `${v.id}(${v.nodes.length})`));
+    if (r.length) bad.push(`${path}: ${r.join(', ')}`);
+  }
+  await p3.close();
+  assert(bad.length === 0, bad.join(' | '));
+});
+
 await browser.close();
 const failed = results.filter((r) => !r.ok).length;
 console.log(`\nE2E: ${results.length - failed} passed, ${failed} failed, 0 skipped`);

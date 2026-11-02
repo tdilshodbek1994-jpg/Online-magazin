@@ -13,5 +13,12 @@ for sql in "SELECT count(*) FROM schema_migrations" "SELECT count(*) FROM orders
            "SELECT count(*) FROM stock_balances WHERE reserved > on_hand_sellable" "SELECT count(*) FROM partner_ledger" "SELECT coalesce(sum(available_minor+reserved_minor+paid_minor),0) FROM partner_balances"; do
   a=$(q "$SRC" "$sql"); b=$(q "$DST" "$sql"); s=$([ "$a" = "$b" ] && echo OK || echo MISMATCH); echo "$s | $sql | src=$a restored=$b"
 done
+if [ -n "${MEDIA_DIR:-}" ] && [ -d "$MEDIA_DIR" ]; then
+  MT="$(mktemp -d)"; tar -C "$MEDIA_DIR" -czf "$MT/m.tgz" .; mkdir "$MT/r"; tar -C "$MT/r" -xzf "$MT/m.tgz"
+  a=$(cd "$MEDIA_DIR" && find . -type f -exec sha256sum {} + | sort | sha256sum | cut -c1-16); b=$(cd "$MT/r" && find . -type f -exec sha256sum {} + | sort | sha256sum | cut -c1-16)
+  n=$(find "$MEDIA_DIR" -type f | wc -l); echo "$([ "$a" = "$b" ] && echo OK || echo MISMATCH) | media files=$n digest src=$a restored=$b"
+  # every DB media reference must exist in the restored media
+  missing=0; for k in $(psql "$DST" -tAc "SELECT storage_key FROM media_assets"); do [ -f "$MT/r/public/$k" ] || missing=$((missing+1)); done; echo "$([ $missing = 0 ] && echo OK || echo MISMATCH) | media references missing=$missing"
+fi
 printf 'dump_seconds=%.2f restore_seconds=%.2f size_bytes=%s\n' "$(echo "$t1-$t0" | bc)" "$(echo "$t2-$t1" | bc)" "$(stat -c %s "$FILE")"
 psql "$ADMIN" -qc "DROP DATABASE $DB WITH (FORCE)"

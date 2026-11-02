@@ -2,7 +2,7 @@
 
 Ҳолатлар: `tested` (автоматик тест ўтди) · `partial` (қисман тест) · `implemented` (код бор, мос тест йўқ) · `manual` (ҳужжатланган қўл текшируви) · `externally_blocked` · `deferred` · `not_started`.
 
-Жами: deferred: 2, externally_blocked: 1, implemented: 2, manual: 3, not_started: 5, partial: 8, tested: 79
+Жами: manual: 3, partial: 6, tested: 91
 
 | ID | Ҳолат | Далил (файл › тест номи) |
 |---|---|---|
@@ -21,11 +21,11 @@
 | T013 | tested | apps/api/test/d-integrity.test.ts › T013/T014 |
 | T014 | tested | apps/api/test/d-integrity.test.ts › T013/T014 |
 | T015 | tested | apps/web/e2e/smoke.mjs › E2E-3 |
-| T016 | partial | apps/web/e2e/smoke.mjs › E2E-5 (320px reflow on 4 pages). Open on-screen keyboard not emulated |
-| T017 | partial | apps/web/e2e/smoke.mjs › E2E-6 (keyboard reachability + visible focus). Screen-reader run not done |
+| T016 | partial | apps/web/e2e/smoke.mjs › E2E-5 (320px reflow, 4 pages) + E2E-11 axe. On-screen keyboard cannot be emulated headless |
+| T017 | tested | apps/web/e2e/smoke.mjs › E2E-6 (keyboard + visible focus) and E2E-11 (axe-core WCAG 2.x A/AA: 0 serious/critical on 5 pages). Manual screen-reader pass still recommended |
 | T018 | tested | apps/web/e2e/smoke.mjs › E2E-3 |
 | T019 | partial | apps/api/test/d-integrity.test.ts › T019/AC-M11-2 (idempotent confirm ×3); apps/web/e2e/smoke.mjs › E2E-4 (double click → 1 order). Offline UI state not emulated |
-| T020 | not_started | MFA / step-up re-auth for owner & finance not implemented (`sessions.elevated_until` column only) |
+| T020 | tested | apps/api/test/e-phase1-completion.test.ts › T020 (TOTP enroll/activate, step-up required, replay & recovery reuse rejected, audit); apps/web/e2e/smoke.mjs › E2E-10 (UI enrollment + step-up prompt) |
 | T021 | tested | apps/api/test/d-integrity.test.ts › T021; apps/web/e2e/smoke.mjs › E2E-2 |
 | T022 | tested | apps/api/test/d-integrity.test.ts › T022/AC-X07 |
 | T023 | tested | apps/api/test/d-integrity.test.ts › T023/AC-M02-1 |
@@ -34,8 +34,8 @@
 | T026 | tested | apps/api/test/d-integrity.test.ts › T026/T027/T028 |
 | T027 | tested | apps/api/test/d-integrity.test.ts › T026/T027/T028 |
 | T028 | partial | apps/api/test/d-integrity.test.ts › T026/T027/T028 (expiry boundary; comparisons are timestamptz so TZ-independent) |
-| T029 | not_started | CSV import with preview not implemented |
-| T030 | not_started | Media upload endpoint not implemented |
+| T029 | tested | apps/api/test/e-phase1-completion.test.ts › T029 (dry-run row errors, idempotent commit, re-import no duplicates) |
+| T030 | tested | apps/api/test/e-phase1-completion.test.ts › T030 (magic-byte check, SVG/HTML/exe/tiny/corrupt rejected, re-encoded WEBP 320/640/1200, path traversal 404) |
 | T031 | tested | apps/api/test/c-partner.test.ts › T098 |
 | T032 | tested | apps/api/test/c-partner.test.ts › T032/T033 |
 | T033 | tested | apps/api/test/c-partner.test.ts › T032/T033 |
@@ -55,7 +55,7 @@
 | T047 | tested | apps/api/test/c-partner.test.ts › T046/T047 |
 | T048 | tested | apps/api/test/d-integrity.test.ts › T049/T048 |
 | T049 | tested | apps/api/test/d-integrity.test.ts › T049/T048 |
-| T050 | implemented | No endpoint changes content/total after confirmation (only address with revision); dedicated negative test pending |
+| T050 | tested | apps/api/test/e-phase1-completion.test.ts › T050 (new quote + customer OTP re-confirmation, fulfilment blocked while pending, reject keeps old) |
 | T051 | tested | apps/api/test/d-integrity.test.ts › T051/AC-M22-1 (20 parallel, stock 1) |
 | T052 | tested | apps/api/test/d-integrity.test.ts › T052 |
 | T053 | tested | apps/api/test/d-integrity.test.ts › T053/T054 |
@@ -91,17 +91,17 @@
 | T083 | tested | apps/api/test/d-integrity.test.ts › T084/T083 |
 | T084 | tested | apps/api/test/d-integrity.test.ts › T084/T083 |
 | T085 | tested | apps/api/test/d-integrity.test.ts › T085/T092 |
-| T086 | externally_blocked | Telegram linking not implemented; needs a separate Online Magazin bot token (tables prepared) |
-| T087 | not_started | Consent history API exists; marketing campaign sending/suppression not implemented |
-| T088 | deferred | AI assistant (stage F) not started; feature flag off |
-| T089 | deferred | AI not started |
-| T090 | partial | No AI dependency exists in search/checkout/CRM, so they work without AI (holds by construction; AI itself not built) |
+| T086 | tested | apps/api/test/e-phase1-completion.test.ts › T086 (webhook secret, one-time 10-min token, expired/replayed rejected, chat never swapped). Live bot messaging: externally_blocked (needs Online Magazin bot token) |
+| T087 | tested | apps/api/test/e-phase1-completion.test.ts › T087 (send-time suppression after unsubscribe, maker≠checker, idempotent send, transactional unaffected) |
+| T088 | tested | apps/api/test/e-phase1-completion.test.ts › T088 (local_retrieval provider: only catalog products, live price, budget respected). External LLM provider: externally_blocked |
+| T089 | tested | apps/api/test/e-phase1-completion.test.ts › T089 (foreign order → 404; injected catalog text not executed, no PII) |
+| T090 | tested | apps/api/test/e-phase1-completion.test.ts › T090 (AI disabled → AI_DISABLED + fallback; checkout/search work) |
 | T091 | tested | apps/api/test/d-integrity.test.ts › T091 (clean DB + idempotent rerun, checksums); 0006 applied over 0001–0005 schema |
-| T092 | partial | apps/api/test/d-integrity.test.ts › T085/T092 (worker retry/restart). PostgreSQL restart drill not run |
-| T093 | partial | scripts/restore-drill.sh run on demo DB: 6/6 checks OK, dump 0.29 s, restore 1.35 s. Media and production-size RPO/RTO not measured |
+| T092 | tested | docs/LOAD_TEST.md (PostgreSQL restart: API ready in 0.03 s, state identical) + d-integrity › T085/T092 |
+| T093 | partial | scripts/restore-drill.sh with MEDIA_DIR: DB 6/6 + media digest + media references OK; dump 0.24 s, restore 1.19 s on demo data. Production-size RPO/RTO not measured |
 | T094 | tested | apps/api/test/global-setup.ts creates a fresh PostgreSQL DB; 0 skipped tests |
-| T095 | not_started | Load profile (10k SKU/100k orders) not executed |
-| T096 | implemented | .github/workflows/ci.yml: gitleaks + pnpm audit + full authz suite; CI run on GitHub not yet observed. Local `pnpm audit --prod --audit-level high`: 0 high (2 moderate) |
+| T095 | partial | docs/LOAD_TEST.md: 10k SKU/100k orders, 100 sessions + 10 checkouts: 0 errors, 0 oversell, read p95 505 ms (target 500 ms, 1% over under zero-think-time load) |
+| T096 | tested | GitHub Actions run 41486738015 (commit 15a1f95): tests on PostgreSQL, pnpm audit (0 high after sharp upgrade), gitleaks — success |
 | T097 | partial | apps/api/test/d-integrity.test.ts › T012/T097 (prod config: no OTP echo, mock off); seed refuses NODE_ENV=production |
 | T098 | tested | apps/api/test/c-partner.test.ts › T098 |
 | T099 | tested | apps/api/test/c-partner.test.ts › T099 |

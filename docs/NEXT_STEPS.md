@@ -1,13 +1,11 @@
-# NEXT STEPS (устувор тартибда)
+# NEXT STEPS
 
-1. **Owner қарорлари (Appendix B):** комиссия қоидалари, attribution муддати, hold, payout минимал/режим, етказиш ҳудудлари → `POST /admin/policies` + approve.
-2. **Payme sandbox:** merchant кабинетида test kassa, `PAYME_KEY`; Payme test suite'ни ўтказиш → биринчи live провайдер (§17).
-3. **SMS провайдер** (OTP ва мижоз тасдиғи учун зарур) — адаптер интерфейси тайёр (`notifications` + worker).
-4. **T020** owner/finance MFA ва муҳим амал олдидан step-up OTP.
-5. **T029/T030** CSV импорт (preview, сатр хатолари, SKU дубликатсиз) ва медиа upload (MIME/ҳажм/ўлчам, SVG рад).
-6. **T050** тасдиқланган буюртма таркибини ўзгартириш оқими (янги quote + мижоз қайта тасдиғи) ва негатив тест.
-7. **T087** маркетинг юбориш + suppression; **T086** Telegram бот (алоҳида токен).
-8. Docker image'ни тармоқ рухсати бор муҳитда қуриш, GitHub Actions CI'ни яшил қилиш.
-9. Load test (L1 профил), PostgreSQL restart drill, медиа backup.
-10. Фискал провайдер ва ҳуқуқий матнлар (оферта, қайтариш, privacy, ҳамкор шартномаси) — мутахассис текшируви.
-11. Stage F: read-only AI ёрдамчи (feature flag, бюджет, fallback).
+Кодда бажариладиган Phase 1 иши тугалланди. Қолганлари ташқи қарор/калит ёки production муҳитини талаб қилади:
+
+1. **Owner қарорлари (Appendix B)** — `/admin` → policies: комиссия қоидалари (ҳар маҳсулот), attribution муддати, hold, payout минимал ва тасдиқ режими, етказиш ҳудудлари/тарифлари. Demo қийматлар production'да ишламайди.
+2. **Payme:** merchant кабинетида test kassa → `PAYME_MERCHANT_ID`, `PAYME_KEY`, `PAYME_MODE=sandbox` → Payme test suite → live. Click: `CLICK_SERVICE_ID`, `CLICK_SECRET_KEY`.
+3. **SMS провайдер** (OTP ва мижоз тасдиғи учун) — адаптерни `apps/api/src/worker.ts` dev adapter ўрнига улаш.
+4. **Telegram:** алоҳида Online Magazin боти → `TELEGRAM_BOT_USERNAME`, `TELEGRAM_WEBHOOK_SECRET`, webhook URL.
+5. **Фискал провайдер** ва **ҳуқуқий матнлар** (оферта, қайтариш, privacy, ҳамкор шартномаси) — мутахассис текшируви.
+6. **Production муҳит:** домен/TLS, `MFA_ENC_KEY`, `OM_DB_PASSWORD`, backup жадвали ва offsite нусха, production ҳажмида RPO/RTO ўлчови.
+7. Ихтиёрий: ташқи LLM провайдери (калит, бюджет, маълумот сиёсати тасдиғидан кейин), қўлда screen-reader текшируви, ҳақиқий мобил қурилмада синов.

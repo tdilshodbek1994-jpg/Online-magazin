@@ -32,7 +32,7 @@ export function registerMedia(app: FastifyInstance, deps: Deps): void {
     if (buf.length === 0 || buf.length > MAX_BYTES) throw badRequest('MEDIA_SIZE_INVALID');
     const mime = sniff(buf);
     if (!mime) throw badRequest('MEDIA_TYPE_NOT_ALLOWED');
-    let meta: sharp.Metadata;
+    let meta: Awaited<ReturnType<ReturnType<typeof sharp>["metadata"]>>;
     try {
       meta = await sharp(buf, { limitInputPixels: 6000 * 6000 }).metadata();
     } catch {

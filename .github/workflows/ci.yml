@@ -11,7 +11,8 @@ jobs:
         image: postgres:16.6-bookworm
         env: { POSTGRES_PASSWORD: postgres }
         ports: ["5432:5432"]
-        options: --health-cmd pg_isready --health-interval 5s --health-retries 20
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-retries 20
     steps:
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 }
@@ -27,7 +28,7 @@ jobs:
         run: pnpm --filter @om/shared test
       - name: Integration tests on real PostgreSQL (release gate — no skips allowed)
         env: { TEST_PG_ADMIN_URL: "postgres://postgres:postgres@localhost:5432/postgres" }
-        run: pnpm --filter @om/api test -- --reporter=default --reporter=junit --outputFile=api-junit.xml
+        run: pnpm --filter @om/api exec vitest run --reporter=default --reporter=junit --outputFile=api-junit.xml
       - name: Web build
         run: pnpm --filter @om/web build
       - name: Dependency audit (high/critical)

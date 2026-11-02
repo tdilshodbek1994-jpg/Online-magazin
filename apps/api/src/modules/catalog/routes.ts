@@ -124,12 +124,13 @@ export function registerCatalog(app: FastifyInstance, deps: Deps): void {
     requirePerm(actor, 'catalog.write');
     const internal = can(actor, 'catalog.read_internal');
     const rows = await many(db, `
-      SELECT p.id, p.slug, p.name, p.status, p.version, p.updated_at,
-             (SELECT json_agg(json_build_object('sku_id', s.id, 'sku_code', s.sku_code, 'variant', s.variant, 'status', s.status, 'price_minor', o.price_minor::text, 'offer_version', o.version,
+      SELECT p.id, p.slug, p.name, p.description, p.category_id, p.warranty_months, b.name AS brand, p.status, p.version, p.updated_at,
+             (SELECT '/media/' || ma.storage_key FROM media_assets ma WHERE ma.product_id=p.id AND ma.status='approved' ORDER BY ma.sort LIMIT 1) AS image,
+             (SELECT json_agg(json_build_object('sku_id', s.id, 'sku_code', s.sku_code, 'variant', s.variant, 'status', s.status, 'price_minor', o.price_minor::text, 'compare_at_minor', o.compare_at_minor::text, 'offer_version', o.version,
                      'cost_minor', CASE WHEN $3 THEN s.cost_minor::text END, 'on_hand', sb.on_hand_sellable, 'reserved', sb.reserved) ORDER BY s.sku_code)
-                FROM skus s LEFT JOIN offers o ON o.sku_id=s.id LEFT JOIN stock_balances sb ON sb.sku_id=s.id WHERE s.product_id=p.id) AS skus,
+                FROM skus s LEFT JOIN offers o ON o.sku_id=s.id LEFT JOIN stock_balances sb ON sb.sku_id=s.id WHERE s.product_id=p.id AND s.status='active') AS skus,
              (SELECT json_build_object('kind', kind, 'rate_bps', rate_bps, 'fixed_minor', fixed_minor::text, 'version', version) FROM commission_rules cr WHERE cr.product_id=p.id AND (cr.effective_to IS NULL OR cr.effective_to > now()) ORDER BY version DESC LIMIT 1) AS commission_rule
-        FROM products p WHERE ($1::text IS NULL OR p.search_doc LIKE '%' || $1 || '%') AND ($2::text IS NULL OR p.status=$2)
+        FROM products p LEFT JOIN brands b ON b.id=p.brand_id WHERE ($1::text IS NULL OR p.search_doc LIKE '%' || $1 || '%') AND ($2::text IS NULL OR p.status=$2)
        ORDER BY p.updated_at DESC LIMIT 200`, [query.q ? normalizeSearch(query.q) : null, query.status ?? null, internal]);
     return { items: rows };
   });
@@ -153,9 +154,34 @@ export function registerCatalog(app: FastifyInstance, deps: Deps): void {
           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id`,
         [org, body.category_id, brandId, slug, JSON.stringify(body.name), JSON.stringify(body.description), body.model ?? null, body.warranty_months ?? null,
          searchDoc(body.name as Record<string, string>, [body.brand ?? '', body.model ?? '', ...body.skus.map((s) => s.sku_code)]), actor.userId]);
-      for (const s of body.skus) await insertSku(tx, p.id, org, s, actor.userId!);
+      const skus: { sku_id: string; offer_id: string; sku_code: string }[] = [];
+      for (const s of body.skus) skus.push({ ...(await insertSku(tx, p.id, org, s, actor.userId!)), sku_code: s.sku_code });
       await audit(tx, actor, 'product.created', { type: 'product', id: p.id }, { after: { slug, skus: body.skus.map((s) => s.sku_code) } });
-      return { id: p.id, slug };
+      return { id: p.id, slug, version: 1, skus };
+    });
+  });
+
+  route(app, deps, {
+    method: 'PATCH', url: '/admin/products/:id', tags: T, summary: 'Edit name / description / category / brand / warranty (expected_version)', params: zIdParam,
+    body: z.object({ expected_version: z.number().int(), name: zLocalized.optional(), description: z.object({ 'uz-Latn': z.string().max(10000).optional(), 'uz-Cyrl': z.string().max(10000).optional() }).optional(),
+      category_id: z.string().uuid().optional(), brand: z.string().max(80).nullable().optional(), warranty_months: z.number().int().min(0).max(120).nullable().optional() }),
+  }, async ({ actor, db, params, body }) => {
+    requirePerm(actor, 'catalog.write');
+    return withTx(db, async (tx) => {
+      const p = await maybeOne<{ version: number; name: Record<string, string>; description: Record<string, string>; brand_id: string | null; model: string | null }>(tx, `SELECT version, name, description, brand_id, model FROM products WHERE id=$1 FOR UPDATE`, [params.id]);
+      if (!p) throw notFound('PRODUCT');
+      if (p.version !== body.expected_version) throw conflict('VERSION_CONFLICT', { current_version: p.version });
+      if (body.category_id && !(await maybeOne(tx, `SELECT 1 FROM categories WHERE id=$1`, [body.category_id]))) throw badRequest('CATEGORY_UNKNOWN');
+      let brandId: string | null | undefined;
+      if (body.brand !== undefined) brandId = body.brand ? (await one<{ id: string }>(tx, `INSERT INTO brands (slug, name) VALUES ($1,$2) ON CONFLICT (slug) DO UPDATE SET name=brands.name RETURNING id`, [slugify(body.brand) || 'brand', body.brand])).id : null;
+      const name = body.name ?? p.name;
+      const skuCodes = (await tx.query(`SELECT sku_code FROM skus WHERE product_id=$1`, [params.id])).rows.map((r: { sku_code: string }) => r.sku_code);
+      const r = await one(tx, `UPDATE products SET name=$2, description=COALESCE($3, description), category_id=COALESCE($4, category_id), brand_id=CASE WHEN $5 THEN $6 ELSE brand_id END,
+          warranty_months=CASE WHEN $7 THEN $8 ELSE warranty_months END, search_doc=$9, version=version+1, updated_at=now() WHERE id=$1 RETURNING id, version`,
+        [params.id, JSON.stringify(name), body.description ? JSON.stringify(body.description) : null, body.category_id ?? null, brandId !== undefined, brandId ?? null,
+         body.warranty_months !== undefined, body.warranty_months ?? null, searchDoc(name as Record<string, string>, [body.brand ?? '', p.model ?? '', ...skuCodes])]);
+      await audit(tx, actor, 'product.updated', { type: 'product', id: params.id }, { before: { name: p.name }, after: { name } });
+      return r;
     });
   });
 
@@ -261,7 +287,8 @@ export function registerCatalog(app: FastifyInstance, deps: Deps): void {
 async function insertSku(tx: import('../../platform/db.js').Tx, productId: string, org: string, s: { sku_code: string; barcode?: string; variant: Record<string, string>; price_minor: string; compare_at_minor?: string; cost_minor?: string; weight_g?: number }, actorId: string) {
   const variantKey = Object.keys(s.variant).sort().map((k) => `${k}=${s.variant[k]}`).join('|') || 'default';
   const sku = await one<{ id: string }>(tx, `INSERT INTO skus (product_id, sku_code, barcode, variant, variant_key, weight_g, cost_minor) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
-    [productId, s.sku_code, s.barcode ?? null, JSON.stringify(s.variant), variantKey, s.weight_g ?? null, s.cost_minor ?? null]);
+    [productId, s.sku_code, s.barcode ?? null, JSON.stringify(s.variant), variantKey, s.weight_g ?? null, s.cost_minor ?? null])
+    .catch((e: { code?: string; constraint?: string }) => { if (e.code === '23505') throw conflict(String(e.constraint ?? '').includes('variant') ? 'VARIANT_DUPLICATE' : 'SKU_CODE_TAKEN'); throw e; });
   const o = await one<{ id: string }>(tx, `INSERT INTO offers (sku_id, merchant_org_id, price_minor, compare_at_minor) VALUES ($1,$2,$3,$4) RETURNING id`, [sku.id, org, s.price_minor, s.compare_at_minor ?? null]);
   await tx.query(`INSERT INTO offer_versions (offer_id, version, price_minor, compare_at_minor, changed_by, reason) VALUES ($1,1,$2,$3,$4,'created')`, [o.id, s.price_minor, s.compare_at_minor ?? null, actorId]);
   const wh = await tx.query(`SELECT id FROM warehouses WHERE code='MAIN'`);

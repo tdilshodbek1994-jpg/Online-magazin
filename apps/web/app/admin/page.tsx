@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Async } from '@/components/Header';
 import { api, getToken, som } from '@/lib/api';
 import { pick, useI18n } from '@/lib/i18n';
+import { ProductEditor } from './ProductEditor';
 
 const today = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tashkent' }).format(new Date());
 
@@ -79,66 +80,56 @@ const STATUS_UZ: Record<string, string> = { published: 'Sotuvda', draft: 'Qorala
 function Products({ act, lang }: { act: any; lang: any }) {
   const { data, st, load } = useLoad<any>('/admin/products');
   const cats = useLoad<any>('/categories');
-  const [f, setF] = useState({ latn: '', cyrl: '', category: '', sku: '', price: '', cost: '', stock: '', ruleKind: 'percent', rule: '' });
-  const [showNew, setShowNew] = useState(false);
+  const [editor, setEditor] = useState<{ product?: any } | null>(null);
   const [q, setQ] = useState('');
-  const items = (data?.items ?? []).filter((p: any) => !q || pick(p.name, lang).toLowerCase().includes(q.toLowerCase()) || (p.skus ?? []).some((s: any) => s.sku_code.toLowerCase().includes(q.toLowerCase())));
+  const [status, setStatus] = useState('all');
+  const all: any[] = data?.items ?? [];
+  const items = all.filter((p) => (status === 'all' || p.status === status) && (!q || pick(p.name, lang).toLowerCase().includes(q.toLowerCase()) || (p.skus ?? []).some((s: any) => s.sku_code.toLowerCase().includes(q.toLowerCase()))));
+  const count = (k: string) => all.filter((p) => p.status === k).length;
   return (
     <section style={{ marginTop: 12 }}>
-      <div className="spread"><h2>Mahsulotlar <span className="muted">{data ? `${data.items.length} ta` : ''}</span></h2><button className="btn" onClick={() => setShowNew(!showNew)}>{showNew ? 'Yopish' : '+ Yangi mahsulot'}</button></div>
-      {showNew && (
-        <div className="card" style={{ marginTop: 10 }}>
-          <div className="form-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))' }}>
-            <div><label htmlFor="nl">Nomi (lotin)</label><input id="nl" value={f.latn} onChange={(e) => setF({ ...f, latn: e.target.value })} /></div>
-            <div><label htmlFor="nc">Номи (кирилл)</label><input id="nc" value={f.cyrl} onChange={(e) => setF({ ...f, cyrl: e.target.value })} /></div>
-            <div><label htmlFor="ct">Kategoriya</label><select id="ct" value={f.category} onChange={(e) => setF({ ...f, category: e.target.value })}><option value="">—</option>{cats.data?.items.map((c: any) => <option key={c.id} value={c.id}>{pick(c.name, lang)}</option>)}</select></div>
-            <div><label htmlFor="sk">SKU (artikul)</label><input id="sk" value={f.sku} onChange={(e) => setF({ ...f, sku: e.target.value })} /></div>
-            <div><label htmlFor="pr">Narx (so‘m)</label><input id="pr" inputMode="numeric" value={f.price} onChange={(e) => setF({ ...f, price: e.target.value.replace(/\D/g, '') })} /></div>
-            <div><label htmlFor="co">Tannarx (ichki)</label><input id="co" inputMode="numeric" value={f.cost} onChange={(e) => setF({ ...f, cost: e.target.value.replace(/\D/g, '') })} /></div>
-          </div>
-          <p className="muted small">Qoralama yaratilgach: kirim (qoldiq), rasm, komissiya qoidasini qo‘shing va «E’lon qilish»ni bosing.</p>
-          <button className="btn" onClick={() => act(() => api('/admin/products', { method: 'POST', body: { name: { 'uz-Latn': f.latn, ...(f.cyrl ? { 'uz-Cyrl': f.cyrl } : {}) }, category_id: f.category, skus: [{ sku_code: f.sku, price_minor: String(BigInt(f.price || '0') * 100n), ...(f.cost ? { cost_minor: String(BigInt(f.cost) * 100n) } : {}) }] } }), () => { setShowNew(false); void load(); })}>Qoralama yaratish</button>
-        </div>
-      )}
-      <form className="search plain" role="search" style={{ marginTop: 10 }} onSubmit={(e) => e.preventDefault()}>
+      <div className="spread"><h2>Mahsulotlar <span className="muted">{data ? `${all.length} ta` : ''}</span></h2><button className="btn" onClick={() => setEditor({})}>+ Yangi mahsulot</button></div>
+      <div className="chips" role="group" aria-label="Holat" style={{ marginTop: 8 }}>
+        {[['all', `Barchasi (${all.length})`], ['published', `Sotuvda (${count('published')})`], ['draft', `Qoralama (${count('draft')})`], ['archived', `Arxiv (${count('archived')})`]].map(([k, l]) => <button key={k} type="button" className={`chip ${status === k ? 'on' : ''}`} aria-pressed={status === k} onClick={() => setStatus(k!)}>{l}</button>)}
+      </div>
+      <form className="search plain" role="search" onSubmit={(e) => e.preventDefault()}>
         <label htmlFor="pq-admin" className="sr-only">Mahsulot qidirish</label>
-        <input id="pq-admin" type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Nomi yoki SKU…" />
+        <input id="pq-admin" type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Nomi yoki artikul…" />
       </form>
       <Async loading={st.loading} error={st.error} onRetry={load}>
+        {items.length === 0 && <div className="empty"><p>Mahsulot yo‘q</p><button className="btn" onClick={() => setEditor({})}>+ Birinchi mahsulotni qo‘shish</button></div>}
         <div className="slist">
           {items.map((p: any) => {
             const stock = (p.skus ?? []).reduce((a: number, s: any) => a + (s.on_hand ?? 0) - (s.reserved ?? 0), 0);
+            const prices = (p.skus ?? []).map((s: any) => BigInt(s.price_minor ?? '0'));
+            const min = prices.length ? prices.reduce((a: bigint, b: bigint) => (b < a ? b : a)) : 0n;
             return (
-              <article key={p.id} className="scard">
-                <div className="spread">
-                  <h3>{pick(p.name, lang)}</h3>
-                  <span className={`pill ${p.status === 'published' ? 'b-delivered' : p.status === 'archived' ? 'b-cancelled' : 'b-shipping'}`}>{STATUS_UZ[p.status] ?? p.status}</span>
-                </div>
-                <div className="muted small">Mavjud: <b className={stock > 5 ? 'ok-t' : 'no-t'}>{stock} dona</b> · Komissiya: <b>{p.commission_rule ? (p.commission_rule.kind === 'percent' ? `${p.commission_rule.rate_bps / 100}%` : som(p.commission_rule.fixed_minor) + '/dona') : 'yo‘q'}</b></div>
-                <div className="sku-list">
-                  {(p.skus ?? []).map((s: any) => (
-                    <div key={s.sku_id} className="sku-row">
-                      <div><b>{Object.values(s.variant ?? {}).join(' / ') || s.sku_code}</b> <span className="muted small">{s.sku_code}</span></div>
-                      <div>{som(s.price_minor)}</div>
-                      <div className="small">Omborda {s.on_hand ?? 0} · band {s.reserved ?? 0}</div>
-                      <button className="btn secondary sm" onClick={() => { const qn = prompt('Nechta kirim qilinadi?'); if (qn) act(() => api(`/admin/skus/${s.sku_id}/stock`, { method: 'POST', body: { kind: 'receipt', qty: Number(qn), reason: 'kirim', ref: crypto.randomUUID() } }), load); }}>+ Kirim</button>
-                    </div>
-                  ))}
+              <article key={p.id} className="scard prod-card">
+                <div className="prod-top">
+                  {p.image ? <img src={p.image} alt="" width={72} height={72} /> : <div className="ph sm" aria-hidden />}
+                  <div className="prod-info">
+                    <div className="spread"><h3>{pick(p.name, lang)}</h3><span className={`pill ${p.status === 'published' ? 'b-delivered' : p.status === 'archived' ? 'b-cancelled' : 'b-shipping'}`}>{STATUS_UZ[p.status] ?? p.status}</span></div>
+                    <div className="small"><b>{som(min.toString())}</b>{(p.skus ?? []).length > 1 ? ` dan · ${(p.skus ?? []).length} variant` : ''}</div>
+                    <div className="muted small">Mavjud: <b className={stock > 5 ? 'ok-t' : 'no-t'}>{stock} dona</b> · Komissiya: <b>{p.commission_rule ? (p.commission_rule.kind === 'percent' ? `${p.commission_rule.rate_bps / 100}%` : som(p.commission_rule.fixed_minor) + '/dona') : 'yo‘q'}</b></div>
+                  </div>
                 </div>
                 <div className="row" style={{ gap: 8 }}>
-                  <label className="btn secondary sm" style={{ display: 'inline-flex', alignItems: 'center' }}>+ Rasm<input type="file" accept="image/jpeg,image/png,image/webp" style={{ display: 'none' }} onChange={(e) => { const fl = e.target.files?.[0]; if (!fl) return; const rd = new FileReader(); rd.onload = () => act(() => api(`/admin/products/${p.id}/media`, { method: 'POST', body: { filename: fl.name, content_base64: String(rd.result).split(',')[1], alt: { 'uz-Latn': pick(p.name, 'uz-Latn' as any) }, rights_source: 'owner upload' } }), load); rd.readAsDataURL(fl); }} /></label>
-                  <button className="btn secondary sm" onClick={() => { const v = prompt('Komissiya: foiz (masalan 10) yoki "f:30000" (dona uchun so‘m)'); if (!v) return; const body = v.startsWith('f:') ? { kind: 'fixed_per_unit', fixed_minor: String(BigInt(v.slice(2)) * 100n) } : { kind: 'percent', rate_bps: Math.round(Number(v) * 100) }; act(() => api(`/admin/products/${p.id}/commission-rules`, { method: 'POST', body }), load); }}>Komissiya</button>
-                  {p.status !== 'published' && <button className="btn sm" onClick={() => act(() => api(`/admin/products/${p.id}/status`, { method: 'POST', body: { status: 'published', expected_version: p.version } }), load)}>E’lon qilish</button>}
-                  {p.status === 'published' && <button className="btn secondary sm" onClick={() => act(() => api(`/admin/products/${p.id}/status`, { method: 'POST', body: { status: 'archived', expected_version: p.version } }), load)}>Arxivga</button>}
+                  <button className="btn sm" onClick={() => setEditor({ product: p })}>✏️ Tahrirlash</button>
+                  {p.status !== 'published' && <button className="btn secondary sm" onClick={() => act(() => api(`/admin/products/${p.id}/status`, { method: 'POST', body: { status: 'published', expected_version: p.version } }), load)}>E’lon qilish</button>}
+                  {p.status === 'published' && <button className="btn secondary sm" onClick={() => { if (confirm('Mahsulot sotuvdan olinsinmi (arxiv)?')) act(() => api(`/admin/products/${p.id}/status`, { method: 'POST', body: { status: 'archived', expected_version: p.version } }), load); }}>Sotuvdan olish</button>}
                   <a className="btn secondary sm" href={`/p/${p.slug}`} target="_blank" rel="noopener noreferrer">Ko‘rish</a>
                 </div>
-                <ProductMedia productId={p.id} />
-                <ProductVideos productId={p.id} />
+                <details className="prod-more">
+                  <summary>Rasmlar va videolar</summary>
+                  <ProductMedia productId={p.id} />
+                  <ProductVideos productId={p.id} />
+                </details>
               </article>
             );
           })}
         </div>
       </Async>
+      {editor && <ProductEditor product={editor.product} categories={cats.data?.items ?? []} lang={lang} onClose={() => setEditor(null)} onSaved={load} />}
     </section>
   );
 }

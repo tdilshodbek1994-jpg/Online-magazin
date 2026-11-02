@@ -63,6 +63,20 @@ describe('Admin overview', () => {
     expect((await api(t, 'GET', '/admin/partners/performance', { token: star.token })).status).toBe(403);
   });
 
+  it('product editor: create returns sku ids; PATCH edits name/description/brand with optimistic version', async () => {
+    const cat = (await api(t, 'GET', '/categories')).json.items[0];
+    const code = `ED-${randomUUID().slice(0, 6)}`;
+    const c = await api(t, 'POST', '/admin/products', { token: s.catalog.token, body: { name: { 'uz-Latn': 'Eski nom' }, category_id: cat.id, skus: [{ sku_code: code, price_minor: '1000000', variant: { rang: 'qora' } }] } });
+    expect(c.status).toBe(200);
+    expect(c.json.skus[0]).toMatchObject({ sku_code: code, sku_id: expect.any(String) });
+    const e = await api(t, 'PATCH', `/admin/products/${c.json.id}`, { token: s.catalog.token, body: { expected_version: 1, name: { 'uz-Latn': 'Yangi nom' }, description: { 'uz-Latn': 'Tavsif' }, brand: 'BrendX', warranty_months: 6 } });
+    expect(e.status).toBe(200);
+    expect((await api(t, 'PATCH', `/admin/products/${c.json.id}`, { token: s.catalog.token, body: { expected_version: 1, name: { 'uz-Latn': 'Eskirgan ekran' } } })).status).toBe(409);
+    const list = await api(t, 'GET', `/admin/products?q=${encodeURIComponent('yangi nom')}`, { token: s.catalog.token });
+    expect(list.json.items[0]).toMatchObject({ id: c.json.id, brand: 'BrendX', warranty_months: 6, description: { 'uz-Latn': 'Tavsif' } });
+    expect((await api(t, 'PATCH', `/admin/products/${c.json.id}`, { token: s.operator.token, body: { expected_version: 2, name: { 'uz-Latn': 'x' } } })).status).toBe(403);
+  });
+
   it('customers and couriers cannot read the overview', async () => {
     const c = await mkUser(t);
     expect((await api(t, 'GET', '/admin/orders', { token: c.token })).status).toBe(403);

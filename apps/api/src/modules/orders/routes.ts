@@ -43,10 +43,17 @@ export function registerOrders(app: FastifyInstance, deps: Deps): void {
       const rows = await many(db, `
         SELECT o.id, o.number, o.channel, o.commercial_status, o.confirmation_status, o.payment_status, o.fulfillment_status, o.payment_method, o.payable_minor::text,
                o.customer_phone, o.assigned_operator_id, o.callback_at, o.problem_reason, o.duplicate_signal, o.created_at, o.version,
-               EXTRACT(EPOCH FROM now()-o.created_at)::int AS age_seconds, u.display_name AS operator_name
+               EXTRACT(EPOCH FROM now()-o.created_at)::int AS age_seconds, u.display_name AS operator_name,
+               o.contact_snapshot->>'name' AS customer_name, o.address_snapshot->>'district' AS district, (o.address_snapshot->>'quick'='true' AND o.address_snapshot->>'house'='-') AS quick_pending,
+               (SELECT string_agg((ol.product_snapshot->'name'->>'uz-Latn') || ' × ' || (ol.qty - ol.canceled_qty), ', ') FROM order_lines ol WHERE ol.order_id=o.id AND ol.qty > ol.canceled_qty) AS items_text
           FROM orders o LEFT JOIN users u ON u.id=o.assigned_operator_id WHERE ${QUEUES[query.queue]} ORDER BY o.callback_at NULLS LAST, o.created_at LIMIT $1`, [query.limit]);
       return { items: rows };
     });
+
+  route(app, deps, { method: 'GET', url: '/ops/couriers', tags: T, summary: 'Active couriers for hand-over' }, async ({ actor, db }) => {
+    requirePerm(actor, 'orders.read_all');
+    return { items: await many(db, `SELECT u.id, u.display_name, u.phone_e164 FROM users u JOIN memberships m ON m.user_id=u.id AND m.role_code='courier' AND m.revoked_at IS NULL AND (m.expires_at IS NULL OR m.expires_at > now()) GROUP BY u.id ORDER BY u.display_name`) };
+  });
 
   route(app, deps, { method: 'GET', url: '/ops/orders/:id', tags: T, summary: 'Order card with timeline', params: zIdParam }, async ({ actor, db, params }) => {
     requirePerm(actor, 'orders.read_all');

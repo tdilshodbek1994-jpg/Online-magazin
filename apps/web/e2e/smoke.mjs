@@ -120,7 +120,7 @@ await step('E2E-9', 'operator sees the new guest order in the "Yangi" queue', as
   await login('+998900000002');
   await page.goto(BASE + '/ops');
   await page.getByRole('tab', { name: /Yangi/ }).waitFor();
-  await page.getByRole('cell', { name: 'web', exact: true }).first().waitFor();
+  await page.locator('.ops-card').filter({ hasText: 'Sayt' }).first().waitFor();
 });
 
 await step('E2E-10/T020', 'owner enrolls TOTP in UI; sensitive admin action asks step-up and succeeds', async () => {

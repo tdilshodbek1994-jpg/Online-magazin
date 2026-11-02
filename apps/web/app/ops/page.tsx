@@ -15,6 +15,8 @@ export default function Ops() {
   const [st, setSt] = useState<{ loading: boolean; error: any }>({ loading: true, error: null });
   const [msg, setMsg] = useState<string | null>(null);
   const [courier, setCourier] = useState('');
+  const [couriers, setCouriers] = useState<any[]>([]);
+  useEffect(() => { api('/ops/couriers').then((r) => setCouriers(r.items)).catch(() => {}); }, []);
   const load = useCallback(async () => {
     try {
       const [c, l] = await Promise.all([api('/ops/queues'), api(`/ops/orders?queue=${queue}`)]);
@@ -29,44 +31,93 @@ export default function Ops() {
   return (
     <>
       <h1>Operator xonasi</h1>
-      <div className="row" role="tablist">{QUEUES.map(([k, l]) => <button key={k} role="tab" aria-selected={queue === k} className={`btn ${queue === k ? '' : 'secondary'}`} onClick={() => setQueue(k)}>{l} ({counts[k] ?? 0})</button>)}</div>
+      <div className="chips ops-queues" role="tablist">{QUEUES.map(([k, l]) => <button key={k} role="tab" aria-selected={queue === k} className={`chip ${queue === k ? 'on' : ''}`} onClick={() => setQueue(k)}>{l} <span className="q-count">{counts[k] ?? 0}</span></button>)}</div>
       {msg && <div className="notice" role="status">{msg}</div>}
       <Async loading={st.loading} error={st.error} onRetry={load}>
-        <div className="table-wrap"><table><thead><tr><th>№</th><th>Kanal</th><th>Holat</th><th>Summa</th><th>Kechikish</th><th>Mas’ul</th></tr></thead><tbody>
-          {items.map((o) => <tr key={o.id}><td><button className="btn secondary" onClick={() => open(o.id)}>{o.number}</button>{o.duplicate_signal && <span className="badge"> dublikat?</span>}</td><td>{o.channel}</td><td>{o.commercial_status} · {o.confirmation_status} · {o.fulfillment_status} · {o.payment_status}{o.problem_reason ? ` · ${o.problem_reason}` : ''}</td><td>{som(o.payable_minor)}</td><td>{Math.round(o.age_seconds / 60)} daq</td><td>{o.operator_name ?? '—'}</td></tr>)}
-        </tbody></table></div>
+        {items.length === 0 && <div className="empty">Bu navbatda buyurtma yo‘q 🎉</div>}
+        <div className="slist">
+          {items.map((o) => (
+            <button key={o.id} type="button" className={`scard ops-card ${sel?.id === o.id ? 'sel' : ''}`} onClick={() => open(o.id)}>
+              <div className="spread">
+                <b>{o.number}</b>
+                <span className="row" style={{ gap: 6 }}>
+                  {o.quick_pending && <span className="pill b-shipping">⚡ manzil yo‘q</span>}
+                  {o.duplicate_signal && <span className="pill b-returned">⚠️ dublikat</span>}
+                  {o.callback_at && <span className="pill b-accepted">📞 {new Date(o.callback_at).toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tashkent' })}</span>}
+                  <span className="pill">{CHANNEL_UZ[o.channel] ?? o.channel}</span>
+                </span>
+              </div>
+              <div className="small">{o.customer_name ?? '—'} · {o.customer_phone} {o.district ? `· ${o.district}` : ''}</div>
+              <div className="small muted">{o.items_text}</div>
+              <div className="spread small"><b>{som(o.payable_minor)} <span className="muted">{o.payment_method === 'cod' ? 'naqd' : 'onlayn'}</span></b><span className="muted">⏱ {age(o.age_seconds)} · {o.operator_name ?? 'egasiz'}</span></div>
+            </button>
+          ))}
+        </div>
       </Async>
       {sel && (
-        <section className="card" style={{ marginTop: 12 }}>
-          <div className="spread"><h2>{sel.number}</h2><button className="btn secondary" onClick={() => setSel(null)}>×</button></div>
-          <p>{sel.contact_snapshot?.name} · <a href={`tel:${sel.customer_phone}`}>{sel.customer_phone}</a> · {sel.address_snapshot?.district}, {sel.address_snapshot?.street} {sel.address_snapshot?.house}</p>
-          {sel.address_snapshot?.quick && <p className="notice">⚡ Tez buyurtma: mijoz faqat ism va telefon qoldirgan. Qo‘ng‘iroqda aniq manzilni so‘rab, pastda saqlang — manzilsiz tasdiqlab bo‘lmaydi.</p>}
-          {!['shipped', 'delivered', 'returned'].includes(sel.fulfillment_status) && <AddressEditor order={sel} onSave={(address) => act(() => api(`/ops/orders/${sel.id}/address`, { method: 'PATCH', body: { expected_version: sel.version, address, reason: 'operator qo‘ng‘iroq' } }))} />}
-          <p>Hamkor: {sel.partner_code ?? '—'} ({sel.attribution?.reason ?? '—'}) · Holat: {sel.commercial_status} / {sel.confirmation_status} / {sel.fulfillment_status} / {sel.payment_status}</p>
-          {sel.lines.map((l: any) => <div key={l.id} className="spread"><span>{pick(l.product_snapshot.name, lang)} × {l.qty}</span><span>{som(l.line_net_minor)}</span></div>)}
-          <div className="spread" style={{ fontWeight: 700 }}><span>Jami</span><span>{som(sel.payable_minor)}</span></div>
-          <div className="row" style={{ marginTop: 12 }}>
-            <button className="btn secondary" onClick={() => act(() => api(`/ops/orders/${sel.id}/claim`, { method: 'POST' }))}>Olish</button>
-            <button className="btn" onClick={() => act(() => api(`/ops/orders/${sel.id}/calls`, { method: 'POST', body: { outcome: 'confirmed', confirmed_total_minor: sel.payable_minor, note: 'telefonda tasdiqladi' } }))}>Tasdiqladi ({som(sel.payable_minor)})</button>
-            <button className="btn secondary" onClick={() => act(() => api(`/ops/orders/${sel.id}/calls`, { method: 'POST', body: { outcome: 'no_answer' } }))}>Javob bermadi</button>
-            <button className="btn secondary" onClick={() => act(() => api(`/ops/orders/${sel.id}/calls`, { method: 'POST', body: { outcome: 'call_later' } }))}>Keyin</button>
-            <button className="btn danger" onClick={() => act(() => api(`/ops/orders/${sel.id}/calls`, { method: 'POST', body: { outcome: 'rejected' } }))}>Rad etdi</button>
-          </div>
-          <div className="row" style={{ marginTop: 12 }}>
-            <button className="btn secondary" onClick={() => act(() => api(`/ops/orders/${sel.id}/pick`, { method: 'POST' }))}>Yig‘ish</button>
-            <button className="btn secondary" onClick={() => act(() => api(`/ops/orders/${sel.id}/pack`, { method: 'POST' }))}>Qadoqlandi</button>
-            <input placeholder="Kuryer user id" value={courier} onChange={(e) => setCourier(e.target.value)} style={{ maxWidth: 320 }} />
-            <button className="btn secondary" onClick={() => act(() => api(`/ops/orders/${sel.id}/ship`, { method: 'POST', body: { courier_user_id: courier } }))}>Kuryerga topshirish</button>
-          </div>
-          <h3>Timeline</h3>
-          <ul>{sel.timeline.map((e: any) => <li key={e.id}>{new Date(e.created_at).toLocaleString('uz-UZ', { timeZone: 'Asia/Tashkent' })} · {e.dimension}: {e.from_status ?? '∅'} → {e.to_status} · {e.actor_name ?? e.actor_kind} {e.reason ? `(${e.reason})` : ''}</li>)}</ul>
-          <h3>Qo‘ng‘iroqlar</h3>
-          <ul>{sel.calls.map((c: any) => <li key={c.id}>{c.outcome} · {c.operator_name} · {c.note ?? ''}</li>)}</ul>
-        </section>
+        <div className="sheet-backdrop" onClick={() => setSel(null)}>
+          <section className="sheet ops-sheet" role="dialog" aria-modal="true" aria-label={`Buyurtma ${sel.number}`} onClick={(e) => e.stopPropagation()}>
+            <div className="spread"><h2>{sel.number}</h2><button className="icon-btn" aria-label="Yopish" onClick={() => setSel(null)}>✕</button></div>
+            <div className="req-grid">
+              <div><span>Mijoz</span>{sel.contact_snapshot?.name ?? '—'}</div>
+              <div><span>Telefon</span><a href={`tel:${sel.customer_phone}`} className="call-link">📞 {sel.customer_phone}</a></div>
+              <div><span>Manzil</span>{[sel.address_snapshot?.district, sel.address_snapshot?.street, sel.address_snapshot?.house].filter((x) => x && x !== '-').join(', ') || '—'}</div>
+              <div><span>Hamkor</span>{sel.partner_name ? `${sel.partner_name} (${sel.partner_code})` : '—'}</div>
+            </div>
+            <div className="pills"><span className="pill">{STATUS_UZ[sel.commercial_status] ?? sel.commercial_status}</span><span className="pill">{FUL_UZ[sel.fulfillment_status] ?? sel.fulfillment_status}</span><span className="pill">{sel.payment_method === 'cod' ? 'Naqd' : 'Onlayn'} · {PAY_UZ[sel.payment_status] ?? sel.payment_status}</span></div>
+            {sel.address_snapshot?.quick && sel.address_snapshot?.house === '-' && <p className="notice">⚡ Tez buyurtma: qo‘ng‘iroqda aniq manzilni so‘rab, pastda saqlang — manzilsiz tasdiqlab bo‘lmaydi.</p>}
+            {!['shipped', 'delivered', 'returned'].includes(sel.fulfillment_status) && <AddressEditor order={sel} onSave={(address) => act(() => api(`/ops/orders/${sel.id}/address`, { method: 'PATCH', body: { expected_version: sel.version, address, reason: 'operator qo‘ng‘iroq' } }))} />}
+            <div className="ops-lines">
+              {sel.lines.map((l: any) => <div key={l.id} className="spread small"><span>{pick(l.product_snapshot.name, lang)}{l.product_snapshot.variant && Object.values(l.product_snapshot.variant).length ? ` (${Object.values(l.product_snapshot.variant).join('/')})` : ''} × {l.qty - (l.canceled_qty ?? 0)}</span><span>{som(l.line_net_minor)}</span></div>)}
+              <div className="spread" style={{ fontWeight: 700 }}><span>Jami (yetkazish bilan)</span><span>{som(sel.payable_minor)}</span></div>
+            </div>
+            {sel.commercial_status === 'awaiting_confirmation' && (
+              <div className="ops-actions">
+                <b>Qo‘ng‘iroq natijasi</b>
+                {!sel.assigned_operator_id && <button className="btn secondary" onClick={() => act(() => api(`/ops/orders/${sel.id}/claim`, { method: 'POST' }))}>Buyurtmani olish</button>}
+                <button className="btn big" onClick={() => act(() => api(`/ops/orders/${sel.id}/calls`, { method: 'POST', body: { outcome: 'confirmed', confirmed_total_minor: sel.payable_minor, note: 'telefonda tasdiqladi' } }))}>✅ Tasdiqladi — {som(sel.payable_minor)}</button>
+                <div className="ops-grid">
+                  <button className="btn secondary" onClick={() => act(() => api(`/ops/orders/${sel.id}/calls`, { method: 'POST', body: { outcome: 'no_answer' } }))}>Javob bermadi</button>
+                  <button className="btn secondary" onClick={() => act(() => api(`/ops/orders/${sel.id}/calls`, { method: 'POST', body: { outcome: 'call_later' } }))}>Keyin qo‘ng‘iroq</button>
+                  <button className="btn danger" onClick={() => { if (confirm('Mijoz rad etdimi? Buyurtma bekor qilinadi.')) act(() => api(`/ops/orders/${sel.id}/calls`, { method: 'POST', body: { outcome: 'rejected' } })); }}>Rad etdi</button>
+                </div>
+              </div>
+            )}
+            {sel.commercial_status === 'confirmed' && ['reserved', 'picking', 'packed', 'unallocated'].includes(sel.fulfillment_status) && (
+              <div className="ops-actions">
+                <b>Ombor va yetkazish</b>
+                <div className="ops-grid">
+                  <button className="btn secondary" disabled={sel.fulfillment_status !== 'reserved'} onClick={() => act(() => api(`/ops/orders/${sel.id}/pick`, { method: 'POST' }))}>1. Yig‘ishni boshlash</button>
+                  <button className="btn secondary" disabled={sel.fulfillment_status !== 'picking'} onClick={() => act(() => api(`/ops/orders/${sel.id}/pack`, { method: 'POST' }))}>2. Qadoqlandi</button>
+                </div>
+                <label htmlFor="courier-sel">3. Kuryer</label>
+                <select id="courier-sel" value={courier} onChange={(e) => setCourier(e.target.value)}><option value="">— kuryerni tanlang —</option>{couriers.map((c) => <option key={c.id} value={c.id}>{c.display_name ?? c.phone_e164}</option>)}</select>
+                <button className="btn" disabled={!courier || sel.fulfillment_status !== 'packed'} onClick={() => act(() => api(`/ops/orders/${sel.id}/ship`, { method: 'POST', body: { courier_user_id: courier } }))}>🚚 Kuryerga topshirish</button>
+              </div>
+            )}
+            {['awaiting_confirmation', 'confirmed'].includes(sel.commercial_status) && !['shipped', 'delivered'].includes(sel.fulfillment_status) && (
+              <details><summary className="muted small">Buyurtmani bekor qilish</summary>
+                <div className="row" style={{ gap: 8, marginTop: 8 }}>
+                  {[['customer_request', 'Mijoz so‘radi'], ['no_contact', 'Bog‘lanib bo‘lmadi'], ['duplicate', 'Dublikat'], ['out_of_stock', 'Mahsulot tugagan'], ['fraud_suspected', 'Shubhali']].map(([k, l]) => <button key={k} className="btn danger sm" onClick={() => { if (confirm(`Bekor qilinsinmi: ${l}?`)) act(() => api(`/ops/orders/${sel.id}/cancel`, { method: 'POST', body: { reason: k } })); }}>{l}</button>)}
+                </div>
+              </details>
+            )}
+            <details><summary className="muted small">Tarix ({sel.timeline.length}) va qo‘ng‘iroqlar ({sel.calls.length})</summary>
+              <ul className="small">{sel.timeline.map((e: any) => <li key={e.id}>{new Date(e.created_at).toLocaleString('uz-UZ', { timeZone: 'Asia/Tashkent', dateStyle: 'short', timeStyle: 'short' })} · {e.dimension}: {e.from_status ?? '∅'} → {e.to_status} · {e.actor_name ?? e.actor_kind} {e.reason ? `(${e.reason})` : ''}</li>)}</ul>
+              <ul className="small">{sel.calls.map((c: any) => <li key={c.id}>📞 {c.outcome} · {c.operator_name} {c.note ? `· ${c.note}` : ''}</li>)}</ul>
+            </details>
+          </section>
+        </div>
       )}
     </>
   );
 }
+
+const CHANNEL_UZ: Record<string, string> = { web: 'Sayt', partner_assisted: 'Hamkor kiritgan', operator: 'Operator' };
+const STATUS_UZ: Record<string, string> = { awaiting_confirmation: 'Tasdiq kutilmoqda', confirmed: 'Tasdiqlangan', cancelled: 'Bekor qilingan', completed: 'Yakunlangan', draft: 'Qoralama' };
+const FUL_UZ: Record<string, string> = { unallocated: 'Ajratilmagan', reserved: 'Band qilingan', picking: 'Yig‘ilmoqda', packed: 'Qadoqlangan', shipped: 'Kuryerda', delivered: 'Yetkazildi', failed: 'Yetkazilmadi', returned: 'Qaytdi' };
+const PAY_UZ: Record<string, string> = { unpaid: 'to‘lanmagan', pending: 'kutilmoqda', paid: 'to‘langan', partially_refunded: 'qisman qaytarilgan', refunded: 'qaytarilgan', unknown: 'noma’lum' };
+const age = (s: number) => (s < 3600 ? `${Math.max(1, Math.round(s / 60))} daq` : s < 86400 ? `${Math.round(s / 3600)} soat` : `${Math.round(s / 86400)} kun`);
 
 function AddressEditor({ order, onSave }: { order: any; onSave: (a: Record<string, string>) => void }) {
   const a = order.address_snapshot ?? {};

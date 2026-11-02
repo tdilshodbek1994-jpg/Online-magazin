@@ -101,6 +101,31 @@ export function registerAdmin(app: FastifyInstance, deps: Deps): void {
     return { ok: true };
   });
 
+  // ---------- Promo codes (§10): transactional limit, explicit validity window with timezone offset ----------
+  route(app, deps, { method: 'GET', url: '/admin/promotions', tags: T, summary: 'Promotions' }, async ({ actor, db }) => {
+    requirePerm(actor, 'catalog.write');
+    return { items: await many(db, `SELECT id, code, name, kind, value_bps, value_minor::text, min_subtotal_minor::text, starts_at, ends_at, max_redemptions, redemptions_reserved, status FROM promotions ORDER BY created_at DESC LIMIT 200`) };
+  });
+  route(app, deps, { method: 'POST', url: '/admin/promotions', tags: T, summary: 'Create promo code (ISO times with offset, e.g. 2026-11-03T00:00:00+05:00)',
+    body: z.object({ code: z.string().regex(/^[A-Z0-9]{4,20}$/), name: zLocalized, kind: z.enum(['cart_percent', 'cart_fixed', 'free_delivery']), value_bps: z.number().int().min(1).max(10000).optional(), value_minor: z.string().regex(/^[1-9]\d{0,15}$/).optional(),
+      min_subtotal_minor: z.string().regex(/^\d{1,16}$/).default('0'), starts_at: z.string().datetime({ offset: true }), ends_at: z.string().datetime({ offset: true }), max_redemptions: z.number().int().min(1).optional(), funding_owner: z.enum(['platform', 'brand']).default('platform') }) },
+  async ({ actor, db, body }) => {
+    requirePerm(actor, 'catalog.write');
+    if (new Date(body.ends_at) <= new Date(body.starts_at)) throw badRequest('PROMO_WINDOW_INVALID');
+    if ((body.kind === 'cart_percent') !== (body.value_bps !== undefined) || (body.kind === 'cart_fixed') !== (body.value_minor !== undefined)) throw badRequest('PROMO_SHAPE_INVALID');
+    const r = await one(db, `INSERT INTO promotions (code, name, kind, value_bps, value_minor, min_subtotal_minor, funding_owner, starts_at, ends_at, max_redemptions) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id, starts_at, ends_at`,
+      [body.code, JSON.stringify(body.name), body.kind, body.value_bps ?? null, body.value_minor ?? null, body.min_subtotal_minor, body.funding_owner, body.starts_at, body.ends_at, body.max_redemptions ?? null]);
+    await audit(db, actor, 'promotion.created', { type: 'promotion', id: (r as { id: string }).id }, { after: body });
+    return r;
+  });
+  route(app, deps, { method: 'POST', url: '/admin/promotions/:id/pause', tags: T, summary: 'Pause promotion', params: zIdParam }, async ({ actor, db, params }) => {
+    requirePerm(actor, 'catalog.write');
+    const r = await db.query(`UPDATE promotions SET status='paused', version=version+1 WHERE id=$1 RETURNING id`, [params.id]);
+    if (!r.rowCount) throw notFound('PROMOTION');
+    await audit(db, actor, 'promotion.paused', { type: 'promotion', id: params.id });
+    return { ok: true };
+  });
+
   route(app, deps, { method: 'GET', url: '/admin/audit', tags: T, summary: 'Audit log', query: z.object({ target_type: z.string().optional(), target_id: z.string().optional(), limit: z.coerce.number().int().min(1).max(500).default(100) }) },
     async ({ actor, db, query }) => {
       requirePerm(actor, 'audit.read');

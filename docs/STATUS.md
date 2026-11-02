@@ -21,6 +21,6 @@
 | PostgreSQL restart, backup/restore (DB + media) | tested (demo ҳажмда) |
 | Docker images + Compose | tested: api/web image қурилди, compose'да 5 сервис ишлади |
 
-**Тестлар:** shared 19/19, API 73/73, браузер E2E 11/11 (axe-core билан), 0 skipped. **Қабул матрицаси:** 92 tested, 5 partial, 3 manual.
+**Тестлар:** shared 19/19, API 75/75, браузер E2E 12/12 (axe-core билан), 0 skipped. **Қабул матрицаси:** 95 tested, 2 partial, 3 manual.
 **Deploy:** фақат development сандбокс. Production'га ҳеч нарса deploy қилинмаган, `main`га merge қилинмаган.
 **Owner қарорисиз ёқилмайдиган қийматлар:** комиссия ставкалари, attribution муддати, hold, payout минимал/режим, етказиш тарифлари, ҳуқуқий матнлар — ҳаммаси demo (`is_demo`).

@@ -269,3 +269,33 @@ describe('AI budget parser', () => {
     expect(parseBudget('iphone 17 pro')).toBeNull();
   });
 });
+
+describe('T028 / T097', () => {
+  it('T028: promo window given in Asia/Tashkent offset is stored as the exact UTC instant and enforced at checkout boundaries', async () => {
+    const tt = await setupApp();
+    const st = await staff(tt);
+    const code = `TZ${randomUUID().slice(0, 6).toUpperCase().replace(/[^A-Z0-9]/g, 'X')}`;
+    const r = await api(tt, 'POST', '/admin/promotions', { token: st.catalog.token, body: { code, name: { 'uz-Latn': 'Yarim tun' }, kind: 'cart_percent', value_bps: 1000, starts_at: '2026-01-01T00:00:00+05:00', ends_at: '2026-11-03T00:00:00+05:00', max_redemptions: 5 } });
+    expect(r.status).toBe(200);
+    expect(new Date(r.json.ends_at).toISOString()).toBe('2026-11-02T19:00:00.000Z');
+    expect(new Date(r.json.starts_at).toISOString()).toBe('2025-12-31T19:00:00.000Z');
+    expect((await api(tt, 'POST', '/admin/promotions', { token: st.catalog.token, body: { code: code + 'B', name: { 'uz-Latn': 'x' }, kind: 'cart_percent', value_bps: 10, starts_at: '2026-11-03T00:00:00+05:00', ends_at: '2026-11-02T23:00:00+05:00' } })).json.code).toBe('PROMO_WINDOW_INVALID');
+    // Boundary evaluation is instant-based: shift the window around "now" and check acceptance.
+    const { mkProduct, placeOrder } = await import('./helpers.js');
+    const p = await mkProduct(tt, { prices: [100_000] });
+    await tt.db.query(`UPDATE promotions SET ends_at = now() + interval '5 seconds' WHERE code=$1`, [code]);
+    const c1 = await mkUser(tt);
+    expect((await placeOrder(tt, { token: c1.token, phone: c1.phone }, [{ sku_id: p.skuIds[0]!, qty: 1 }], { promo: code })).status).toBe(201);
+    await tt.db.query(`UPDATE promotions SET ends_at = now() - interval '1 millisecond' WHERE code=$1`, [code]);
+    const c2 = await mkUser(tt);
+    await expect(placeOrder(tt, { token: c2.token, phone: c2.phone }, [{ sku_id: p.skuIds[0]!, qty: 1 }], { promo: code })).rejects.toThrow(/PROMO_NOT_APPLICABLE/);
+    expect((await api(tt, 'POST', '/admin/promotions', { token: (await mkUser(tt, ['partner'])).token, body: { code: 'HACK1234', name: { 'uz-Latn': 'x' }, kind: 'cart_percent', value_bps: 9000, starts_at: '2026-01-01T00:00:00Z', ends_at: '2027-01-01T00:00:00Z' } })).status).toBe(403);
+  });
+
+  it('T097: demo seed refuses to run with NODE_ENV=production', async () => {
+    const { spawnSync } = await import('node:child_process');
+    const r = spawnSync('npx', ['tsx', 'src/seed.ts'], { env: { ...process.env, NODE_ENV: 'production', DATABASE_URL: process.env.TEST_DATABASE_URL, MFA_ENC_KEY: 'x'.repeat(40) }, encoding: 'utf8', timeout: 60000 });
+    expect(r.status).toBe(1);
+    expect(r.stderr).toContain('seed refused');
+  });
+});

@@ -14,11 +14,12 @@ export default function Admin() {
   return (
     <>
       <h1>Boshqaruv paneli</h1>
-      <div className="row" role="tablist">{[['summary', 'Hisobot'], ['products', 'Mahsulotlar'], ['import', 'CSV import'], ['partners', 'Hamkorlar'], ['payouts', 'To‘lovlar (payout)'], ['finance', 'Moliya'], ['integrations', 'Integratsiyalar']].map(([k, l]) => <button key={k} role="tab" aria-selected={tab === k} className={`btn ${tab === k ? '' : 'secondary'}`} onClick={() => setTab(k)}>{l}</button>)}</div>
+      <div className="row" role="tablist">{[['summary', 'Hisobot'], ['products', 'Mahsulotlar'], ['import', 'CSV import'], ['promos', 'Promokodlar'], ['partners', 'Hamkorlar'], ['payouts', 'To‘lovlar (payout)'], ['finance', 'Moliya'], ['integrations', 'Integratsiyalar']].map(([k, l]) => <button key={k} role="tab" aria-selected={tab === k} className={`btn ${tab === k ? '' : 'secondary'}`} onClick={() => setTab(k)}>{l}</button>)}</div>
       {msg && <div className="notice" role="status">{msg}</div>}
       {tab === 'summary' && <Summary />}
       {tab === 'products' && <Products act={act} lang={lang} />}
       {tab === 'import' && <Import />}
+      {tab === 'promos' && <Promos act={act} />}
       {tab === 'partners' && <Partners act={act} />}
       {tab === 'payouts' && <Payouts act={act} />}
       {tab === 'finance' && <Finance act={act} />}
@@ -207,6 +208,28 @@ function Import() {
         </div>
       )}
       {res && <div className="notice ok" role="status">Yozildi: {res.committed_rows} qator {res.replayed ? '(avval yozilgan)' : ''}</div>}
+    </section>
+  );
+}
+
+function Promos({ act }: { act: any }) {
+  const { data, st, load } = useLoad<any>('/admin/promotions');
+  const [f, setF] = useState({ code: '', percent: '', from: '', to: '', max: '' });
+  return (
+    <section className="card" style={{ marginTop: 12 }}>
+      <p className="muted">Vaqtlar Asia/Tashkent (+05:00) bo‘yicha kiritiladi; limit tranzaksion tekshiriladi.</p>
+      <div className="row" style={{ alignItems: 'flex-end' }}>
+        <div><label htmlFor="pc">Kod</label><input id="pc" value={f.code} onChange={(e) => setF({ ...f, code: e.target.value.toUpperCase() })} /></div>
+        <div><label htmlFor="pp">Chegirma %</label><input id="pp" inputMode="numeric" value={f.percent} onChange={(e) => setF({ ...f, percent: e.target.value.replace(/\D/g, '') })} /></div>
+        <div><label htmlFor="pf">Boshlanish</label><input id="pf" type="datetime-local" value={f.from} onChange={(e) => setF({ ...f, from: e.target.value })} /></div>
+        <div><label htmlFor="pt">Tugash</label><input id="pt" type="datetime-local" value={f.to} onChange={(e) => setF({ ...f, to: e.target.value })} /></div>
+        <div><label htmlFor="pm">Limit</label><input id="pm" inputMode="numeric" value={f.max} onChange={(e) => setF({ ...f, max: e.target.value.replace(/\D/g, '') })} /></div>
+        <button className="btn" onClick={() => act(() => api('/admin/promotions', { method: 'POST', body: { code: f.code, name: { 'uz-Latn': f.code }, kind: 'cart_percent', value_bps: Number(f.percent) * 100, starts_at: `${f.from}:00+05:00`, ends_at: `${f.to}:00+05:00`, ...(f.max ? { max_redemptions: Number(f.max) } : {}) } }), load)}>Yaratish</button>
+      </div>
+      <Async loading={st.loading} error={st.error} onRetry={load}>
+        <table><tbody>{data?.items.map((p: any) => <tr key={p.id}><td><code>{p.code}</code></td><td>{p.kind} {p.value_bps ? p.value_bps / 100 + '%' : som(p.value_minor)}</td><td>{new Date(p.starts_at).toLocaleString('uz-UZ', { timeZone: 'Asia/Tashkent' })} → {new Date(p.ends_at).toLocaleString('uz-UZ', { timeZone: 'Asia/Tashkent' })}</td><td>{p.redemptions_reserved}/{p.max_redemptions ?? '∞'}</td><td>{p.status}</td>
+          <td>{p.status === 'active' && <button className="btn secondary" onClick={() => act(() => api(`/admin/promotions/${p.id}/pause`, { method: 'POST' }), load)}>To‘xtatish</button>}</td></tr>)}</tbody></table>
+      </Async>
     </section>
   );
 }

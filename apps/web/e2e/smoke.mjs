@@ -143,6 +143,31 @@ await step('E2E-10/T020', 'owner enrolls TOTP in UI; sensitive admin action asks
   await page.getByRole('status').filter({ hasText: 'OK' }).waitFor();
 });
 
+await step('E2E-12/T019', 'network drops while placing order: clear error, retry after reconnect creates exactly one order', async () => {
+  const p4 = await ctx.newPage();
+  await p4.goto(BASE + '/p/elektr-choynak-k5');
+  await p4.getByRole('button', { name: "Savatga qo'shish" }).click();
+  await p4.getByRole('link', { name: /Savat →/ }).waitFor();
+  await p4.goto(BASE + '/checkout');
+  await p4.getByLabel('Ism').fill('Offline Mijoz');
+  await p4.getByLabel('Telefon').fill('+998 90 777 66 55');
+  await p4.getByLabel('Tuman').fill('Chilonzor');
+  await p4.getByLabel("Ko'cha").fill('Bunyodkor');
+  await p4.getByLabel('Uy', { exact: true }).fill('3');
+  await p4.getByRole('button', { name: 'Hisoblash' }).click();
+  await p4.getByText('Oferta shartlariga roziman').click();
+  const before = await (await fetch(BASE + '/api/v1/products?limit=1')).ok;
+  await ctx.setOffline(true);
+  await p4.getByRole('button', { name: /Buyurtmani tasdiqlash/ }).click();
+  await p4.getByRole('alert').filter({ hasText: 'NETWORK' }).waitFor();
+  assert(!(await p4.getByRole('button', { name: /Buyurtmani tasdiqlash/ }).isDisabled()), 'button stuck in loading');
+  await ctx.setOffline(false);
+  await p4.getByRole('button', { name: /Buyurtmani tasdiqlash/ }).click();
+  await p4.getByText(/Buyurtma qabul qilindi/).waitFor();
+  assert(before, 'api not reachable');
+  await p4.close();
+});
+
 await step('E2E-11/T017-axe', 'axe-core WCAG 2.x A/AA scan: no serious/critical violations on key customer pages', async () => {
   const axeSrc = (await import('node:fs')).readFileSync(new URL('../node_modules/axe-core/axe.min.js', import.meta.url), 'utf8');
   const p3 = await ctx.newPage();

@@ -2,7 +2,7 @@
 
 Ҳолатлар: `tested` (автоматик тест ўтди) · `partial` (қисман тест) · `implemented` (код бор, мос тест йўқ) · `manual` (ҳужжатланган қўл текшируви) · `externally_blocked` · `deferred` · `not_started`.
 
-Жами: manual: 3, partial: 5, tested: 92
+Жами: manual: 3, partial: 2, tested: 95
 
 | ID | Ҳолат | Далил (файл › тест номи) |
 |---|---|---|
@@ -24,7 +24,7 @@
 | T016 | partial | apps/web/e2e/smoke.mjs › E2E-5 (320px reflow, 4 pages) + E2E-11 axe. On-screen keyboard cannot be emulated headless |
 | T017 | tested | apps/web/e2e/smoke.mjs › E2E-6 (keyboard + visible focus) and E2E-11 (axe-core WCAG 2.x A/AA: 0 serious/critical on 5 pages). Manual screen-reader pass still recommended |
 | T018 | tested | apps/web/e2e/smoke.mjs › E2E-3 |
-| T019 | partial | apps/api/test/d-integrity.test.ts › T019/AC-M11-2 (idempotent confirm ×3); apps/web/e2e/smoke.mjs › E2E-4 (double click → 1 order). Offline UI state not emulated |
+| T019 | tested | apps/web/e2e/smoke.mjs › E2E-12 (offline during confirm → NETWORK error, button usable, retry after reconnect → exactly 1 order, verified in DB) + E2E-4 + d-integrity › T019 |
 | T020 | tested | apps/api/test/e-phase1-completion.test.ts › T020 (TOTP enroll/activate, step-up required, replay & recovery reuse rejected, audit); apps/web/e2e/smoke.mjs › E2E-10 (UI enrollment + step-up prompt) |
 | T021 | tested | apps/api/test/d-integrity.test.ts › T021; apps/web/e2e/smoke.mjs › E2E-2 |
 | T022 | tested | apps/api/test/d-integrity.test.ts › T022/AC-X07 |
@@ -33,7 +33,7 @@
 | T025 | tested | apps/api/test/d-integrity.test.ts › T024/T025 |
 | T026 | tested | apps/api/test/d-integrity.test.ts › T026/T027/T028 |
 | T027 | tested | apps/api/test/d-integrity.test.ts › T026/T027/T028 |
-| T028 | partial | apps/api/test/d-integrity.test.ts › T026/T027/T028 (expiry boundary; comparisons are timestamptz so TZ-independent) |
+| T028 | tested | apps/api/test/e-phase1-completion.test.ts › T028 (promo window in +05:00 stored as exact UTC instant; boundary enforced at checkout; partner cannot create promos) |
 | T029 | tested | apps/api/test/e-phase1-completion.test.ts › T029 (dry-run row errors, idempotent commit, re-import no duplicates) |
 | T030 | tested | apps/api/test/e-phase1-completion.test.ts › T030 (magic-byte check, SVG/HTML/exe/tiny/corrupt rejected, re-encoded WEBP 320/640/1200, path traversal 404) |
 | T031 | tested | apps/api/test/c-partner.test.ts › T098 |
@@ -102,7 +102,7 @@
 | T094 | tested | apps/api/test/global-setup.ts creates a fresh PostgreSQL DB; 0 skipped tests |
 | T095 | tested | docs/LOAD_TEST.md: 10k SKU/100k orders; realistic profile (100 sessions with think time + 10 parallel checkouts): read p95 62 ms, checkout p95 163 ms, 0 errors, 0 oversell. Zero-think stress: p95 505 ms |
 | T096 | tested | GitHub Actions run 41486738015 (commit 15a1f95): tests on PostgreSQL, pnpm audit (0 high after sharp upgrade), gitleaks — success |
-| T097 | partial | apps/api/test/d-integrity.test.ts › T012/T097 (prod config: no OTP echo, mock off); seed refuses NODE_ENV=production |
+| T097 | tested | apps/api/test/e-phase1-completion.test.ts › T097 (seed refuses NODE_ENV=production) + d-integrity › T012/T097 (no OTP echo, mock off, MFA key required) |
 | T098 | tested | apps/api/test/c-partner.test.ts › T098 |
 | T099 | tested | apps/api/test/c-partner.test.ts › T099 |
 | T100 | manual | docs/TEST_REPORT.md + PR description reference the exact commit; no merge/deploy performed |

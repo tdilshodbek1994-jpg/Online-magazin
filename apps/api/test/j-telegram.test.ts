@@ -108,4 +108,16 @@ describe('Partner notifications (Telegram + cabinet list)', () => {
     expect((await api(t, 'DELETE', '/me/telegram', { token: p.token })).status).toBe(200);
     expect((await api(t, 'GET', '/me/telegram', { token: p.token })).json.linked).toBe(false);
   });
+
+  it('plain /start (no token) gets a how-to-link reply instead of silence', async () => {
+    process.env.TELEGRAM_BOT_TOKEN = '123456:TEST_TOKEN_abcdefghijklmnopqrstuvwxyz';
+    process.env.TELEGRAM_WEBHOOK_SECRET = 'whsecret_1234567890';
+    const calls: any[] = [];
+    vi.stubGlobal('fetch', vi.fn(async (_u: string, init: any) => { calls.push(JSON.parse(init.body)); return new Response(JSON.stringify({ ok: true, result: { message_id: 1 } })); }));
+    const chat = 800000000 + Math.floor(Math.random() * 99_999_999);
+    const r = await api(t, 'POST', '/webhooks/telegram', { headers: { 'x-telegram-bot-api-secret-token': 'whsecret_1234567890' }, body: { message: { text: '/start', chat: { id: chat } } } });
+    expect(r.json.linked).toBe(false);
+    await new Promise((res) => setTimeout(res, 20));
+    expect(calls.find((c) => c.chat_id === chat)?.text).toContain('Telegram\'ni ulash');
+  });
 });

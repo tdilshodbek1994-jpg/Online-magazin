@@ -59,6 +59,27 @@ describe('Quick order (name + phone)', () => {
   });
 });
 
+describe('Duplicate signal', () => {
+  it('second order of the same SKU from the same phone within 24h is flagged; partner sees it under Dublikat', async () => {
+    const partner = await mkPartner(t);
+    const prod = await mkProduct(t, { prices: [20_000], stock: [10], rule: { kind: 'percent', bps: 1000 } });
+    const st = await api(t, 'POST', '/partner/streams', { token: partner.token, body: { product_id: prod.productId, name: 'TG' } });
+    const phone = nextPhone();
+    const ids: string[] = [];
+    for (let i = 0; i < 2; i++) {
+      const guest = guestTok();
+      await api(t, 'POST', '/referrals/touch', { guest, body: { code: st.json.code } });
+      ids.push((await quick(guest, { sku_id: prod.skuIds[0], name: 'Ali', phone })).json.order_id);
+    }
+    const flags = (await t.db.query(`SELECT id, duplicate_signal FROM orders WHERE id = ANY($1::uuid[])`, [ids])).rows;
+    expect(flags.find((f) => f.id === ids[0]).duplicate_signal).toBe(false);
+    expect(flags.find((f) => f.id === ids[1]).duplicate_signal).toBe(true);
+    const req = await api(t, 'GET', '/partner/requests?status=duplicate', { token: partner.token });
+    expect(req.json.counts.duplicate).toBe(1);
+    expect(req.json.items.map((x: any) => x.id)).toEqual([ids[1]]);
+  });
+});
+
 describe('Admin image management', () => {
   it('lists and removes a product image; storefront stops showing it; catalog managers only', async () => {
     const prod = await mkProduct(t, { prices: [10_000], stock: [1] });

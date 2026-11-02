@@ -234,6 +234,12 @@ export async function createOrder(tx: Tx, cfg: AppConfig, actor: Actor, input: C
   await statusEvent(tx, order.id, 'commercial', null, verified ? 'confirmed' : 'awaiting_confirmation', actor, 'order_created');
   await emit(tx, { type: 'OrderPlaced', aggregateType: 'order', aggregateId: order.id, aggregateVersion: order.version, payload: { number: order.number, channel: input.channel, payable_minor: fresh.payable.toString() } });
   await queueNotification(tx, { userId: input.customerUserId, phone: input.customerPhone, channel: 'sms', purpose: 'transactional', template: 'order_received', locale: 'uz-Latn', params: { number: order.number }, dedupeKey: `order_received:${order.id}` });
+  // Duplicate signal (operator "Dublikat"): same phone ordered the same SKU in the last 24h and that order is still alive.
+  await tx.query(
+    `UPDATE orders SET duplicate_signal=true WHERE id=$1 AND EXISTS (
+       SELECT 1 FROM orders o2 JOIN order_lines l2 ON l2.order_id=o2.id
+        WHERE o2.id <> $1 AND o2.customer_phone=$2 AND o2.created_at > now() - interval '24 hours' AND o2.commercial_status <> 'cancelled'
+          AND l2.sku_id IN (SELECT sku_id FROM order_lines WHERE order_id=$1))`, [order.id, input.customerPhone]);
   return { id: order.id, number: order.number };
 }
 

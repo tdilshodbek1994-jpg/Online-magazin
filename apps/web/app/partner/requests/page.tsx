@@ -30,7 +30,7 @@ function Requests() {
         <button className="search-btn" aria-label="Izlash">Izlash</button>
       </form>
       <Chips items={PERIODS} value={period} onChange={setPeriod} label="Davr" />
-      <Chips items={[['all', `Barchasi (${c.total ?? 0})`], ...BUCKET_ORDER.map((b) => [b, `${BUCKET_LABEL[b]} (${c[b] ?? 0})`] as [string, string])]} value={status} onChange={setStatus} label="Holat" />
+      <Chips items={[['all', `Barchasi (${c.total ?? 0})`], ...BUCKET_ORDER.map((b) => [b, `${BUCKET_LABEL[b]} (${c[b] ?? 0})`] as [string, string]), ['callback', `Qayta qo‘ng‘iroq (${c.callback ?? 0})`], ['duplicate', `Dublikat (${c.duplicate ?? 0})`]]} value={status} onChange={setStatus} label="Holat" />
       {err && <div className="notice" role="alert">{err.code}</div>}
       {!data && !err && <div className="loading" role="status"><span className="spinner" aria-hidden />Yuklanmoqda…</div>}
       {data && data.items.length === 0 && <div className="empty">Ma’lumot topilmadi</div>}
@@ -39,7 +39,11 @@ function Requests() {
           <article key={o.id} className="scard">
             <div className="spread">
               <b>{o.masked_number}</b>
-              <span className={`pill b-${o.bucket}`}>{BUCKET_LABEL[o.bucket]}</span>
+              <span className="row" style={{ gap: 6 }}>
+                {o.callback && <span className="pill b-accepted">📞 Qayta qo‘ng‘iroq</span>}
+                {o.duplicate && <span className="pill b-shipping">⚠️ Dublikat</span>}
+                <span className={`pill b-${o.bucket}`}>{BUCKET_LABEL[o.bucket]}</span>
+              </span>
             </div>
             <div className="req-grid">
               <div><span>Mijoz</span>{o.customer} · {o.customer_phone}</div>

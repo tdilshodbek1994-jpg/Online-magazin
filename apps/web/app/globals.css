@@ -417,7 +417,12 @@ button.stat { font: inherit; text-align: left; cursor: pointer; }
 .seller-list { display: grid; gap: 8px; }
 .seller-row { display: grid; gap: 6px; padding: 10px; border-radius: 12px; background: var(--surface-2); }
 .tg-card { margin-top: 12px; display: grid; grid-template-columns: auto 1fr auto; gap: 10px 12px; align-items: center; padding: 14px; border-radius: var(--radius); background: var(--surface); border: 1px solid #93c5fd; }
-.tg-card > span { font-size: 26px; }
+.tg-card > span:first-child { font-size: 26px; }
+@media (max-width: 760px) { .tg-card { grid-template-columns: auto 1fr; } .tg-card > :nth-child(3) { grid-column: 1 / -1; justify-self: start; } }
 .tg-card.ok { border-color: #86efac; }
 .notif { grid-template-columns: auto 1fr; display: grid; align-items: start; }
 .notif-ico { font-size: 24px; }
+.support-btn { display: inline-flex; margin-top: 8px; padding: 6px 12px; border-radius: 999px; background: #fbbf24; color: #111827; font-weight: 700; text-decoration: none; font-size: 14px; min-height: 36px; align-items: center; }
+.day-card { border-color: #a78bfa; }
+.prose h2 { margin-top: 18px; font-size: 18px; }
+.prose li { margin: 6px 0; }

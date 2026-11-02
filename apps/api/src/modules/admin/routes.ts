@@ -142,7 +142,10 @@ export function registerAdmin(app: FastifyInstance, deps: Deps): void {
   // Public, read-only: which optional features the UI may show (no secrets).
   route(app, deps, { method: 'GET', url: '/features', tags: T, summary: 'Public feature availability' }, async ({ db }) => {
     const r = await many<{ key: string; enabled: boolean }>(db, `SELECT key, enabled FROM feature_flags WHERE key IN ('ai.enabled')`);
-    return Object.fromEntries(r.map((x) => [x.key, x.enabled]));
+    // Support contact is configuration (SUPPORT_TELEGRAM=@username or https://t.me/...), never hard-coded.
+    const sup = (process.env.SUPPORT_TELEGRAM ?? '').trim();
+    const support = sup ? (sup.startsWith('https://') ? sup : `https://t.me/${sup.replace(/^@/, '')}`) : null;
+    return { ...Object.fromEntries(r.map((x) => [x.key, x.enabled])), support_telegram: support };
   });
 
   route(app, deps, { method: 'GET', url: '/admin/audit', tags: T, summary: 'Audit log', query: z.object({ target_type: z.string().optional(), target_id: z.string().optional(), limit: z.coerce.number().int().min(1).max(500).default(100) }) },

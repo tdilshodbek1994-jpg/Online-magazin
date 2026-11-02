@@ -26,6 +26,9 @@ export default function PartnerDashboard() {
   const [period, setPeriod] = useState('today');
   const [d, setD] = useState<any>(null);
   const [err, setErr] = useState<any>(null);
+  const [day, setDay] = useState<any>(null);
+  const [support, setSupport] = useState<string | null>(null);
+  useEffect(() => { api('/partner/leaderboard?period=today').then((r) => setDay(r.items[0] ?? null)).catch(() => {}); api('/features').then((f) => setSupport(f.support_telegram ?? null)).catch(() => {}); }, [me]);
   useEffect(() => {
     if (!me || me.status === 'pending' || me.status === 'rejected') return;
     setErr(null);
@@ -44,6 +47,7 @@ export default function PartnerDashboard() {
             <div>
               <h1>{me.display_name}</h1>
               <div className="muted-inv">Hamkor kodi: <code>{me.code}</code>{me.status !== 'active' && <span className="badge"> {me.status}</span>}</div>
+              {support && <a className="support-btn" href={support} target="_blank" rel="noopener noreferrer">✈️ Qo‘llab-quvvatlash</a>}
             </div>
           </section>
 
@@ -58,6 +62,11 @@ export default function PartnerDashboard() {
           </section>
 
           <TelegramConnect />
+
+          <section className="rank-card day-card">
+            <div className="rank-badge">👑</div>
+            <div><b>Kun admini</b><div className="muted">{day ? `${day.name}${day.me ? ' (siz!)' : ''} — bugun ${day.delivered} yetkazilgan / ${day.total} buyurtma` : 'Bugun hali yetakchi yo‘q — birinchi bo‘ling!'}</div></div>
+          </section>
 
           {d?.month_rank && (
             <section className="rank-card">
@@ -96,6 +105,7 @@ export default function PartnerDashboard() {
             <Link href="/partner/payouts" className="tile-link"><span>💳</span>Balans tarixi va to‘lovlar</Link>
             <Link href="/partner/top" className="tile-link"><span>🏆</span>TOP hamkorlar</Link>
             <Link href="/partner/notifications" className="tile-link"><span>🔔</span>Bildirishnomalar</Link>
+            <Link href="/partner/about" className="tile-link"><span>📘</span>Dastur haqida</Link>
           </div>
         </>
       )}

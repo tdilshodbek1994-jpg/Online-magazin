@@ -85,7 +85,13 @@ export function duration(secs: number | null | undefined): string {
 /** Shown instead of partner pages when nobody is logged in: a clear next step, not a raw error code. */
 export function PartnerGuard({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<'checking' | 'in' | 'out'>('checking');
-  useEffect(() => { try { setState(localStorage.getItem('om_token') ? 'in' : 'out'); } catch { setState('out'); } }, []);
+  useEffect(() => {
+    let tok: string | null = null;
+    try { tok = localStorage.getItem('om_token'); } catch {}
+    if (!tok) { setState('out'); return; }
+    // An expired/revoked session must lead to the login card, not a raw UNAUTHENTICATED error.
+    api('/me').then(() => setState('in')).catch((e) => { if (e?.status === 401) { try { localStorage.removeItem('om_token'); } catch {} setState('out'); } else setState('in'); });
+  }, []);
   if (state === 'checking') return null;
   if (state === 'out') return (
     <div className="card login-cta">

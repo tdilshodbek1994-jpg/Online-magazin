@@ -7,7 +7,7 @@ import { many, maybeOne, one, withTx } from '../../platform/db.js';
 import { AppError, conflict, forbidden, notFound } from '../../platform/errors.js';
 import { type Deps, route, zIdParam } from '../../platform/http.js';
 import { queueNotification } from './service.js';
-import { renderText } from './telegram.js';
+import { renderText, sendTelegram } from './telegram.js';
 
 const LATEST_CONSENT = `(SELECT c.granted FROM consents c WHERE c.user_id=u.id AND c.purpose='marketing' AND c.channel IN ($CH,'any') ORDER BY c.created_at DESC, c.id DESC LIMIT 1)`;
 
@@ -95,10 +95,22 @@ export function registerMessaging(app: FastifyInstance, deps: Deps): void {
     const got = Buffer.from(String(req.headers['x-telegram-bot-api-secret-token'] ?? ''));
     if (got.length !== Buffer.byteLength(secret) || !timingSafeEqual(got, Buffer.from(secret))) throw forbidden();
     const upd = req.body as { message?: { text?: string; chat?: { id?: number } } };
-    const m = /^\/start\s+([A-Za-z0-9_-]{10,64})$/.exec(upd.message?.text ?? '');
+    const text = (upd.message?.text ?? '').trim();
+    const m = /^\/start\s+([A-Za-z0-9_-]{10,64})$/.exec(text);
     const chatId = upd.message?.chat?.id;
-    if (!m || !chatId) return { ok: true, linked: false };
-    return withTx(deps.db, async (tx) => {
+    // Never leave the user in silence: explain how to link when the message carries no (valid) token.
+    const help = (reason: string) => {
+      const token = process.env.TELEGRAM_BOT_TOKEN;
+      if (token && chatId) {
+        const msg = reason === 'chat_linked_to_other_account'
+          ? 'Bu Telegram boshqa UzShop hisobiga ulangan. Avval o‘sha hisob kabinetida «Uzish»ni bosing.'
+          : 'Salom! Bu UzShop hamkorlari uchun bildirishnoma boti.\n\nUlash uchun: uzshop.net → Hamkor kabineti → «Telegram\'ni ulash» → «Botni ochish» tugmasini bosing (havola 10 daqiqa amal qiladi).';
+        void sendTelegram(token, chatId, msg).catch(() => {});
+      }
+    };
+    if (!chatId) return { ok: true, linked: false };
+    if (!m) { if (text.startsWith('/start') || text.startsWith('/help')) help('no_token'); return { ok: true, linked: false }; }
+    const res = await withTx(deps.db, async (tx) => {
       const t = await maybeOne<{ user_id: string }>(tx, `UPDATE telegram_link_tokens SET consumed_at=now(), chat_id=$2 WHERE token_hash=$1 AND consumed_at IS NULL AND expires_at > now() RETURNING user_id`, [hashToken(m[1]!), chatId]);
       if (!t) return { ok: true, linked: false, reason: 'token_invalid_expired_or_used' };
       const other = await maybeOne<{ user_id: string }>(tx, `SELECT user_id FROM telegram_links WHERE chat_id=$1`, [chatId]);
@@ -108,5 +120,7 @@ export function registerMessaging(app: FastifyInstance, deps: Deps): void {
       await queueNotification(tx, { userId: t.user_id, channel: 'telegram', purpose: 'transactional', template: 'telegram.linked', locale: 'uz-Latn', params: {}, dedupeKey: `tglinked:${t.user_id}:${Date.now()}` });
       return { ok: true, linked: true };
     });
+    if (!res.linked) help((res as { reason?: string }).reason ?? 'token_invalid');
+    return res;
   });
 }

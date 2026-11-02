@@ -199,17 +199,20 @@ export function registerPartnerCabinet(app: FastifyInstance, deps: Deps): void {
 
   route(app, deps, {
     method: 'GET', url: '/partner/requests', tags: T, summary: 'My orders ("so\'rovlar") with status buckets, masked customer, region',
-    query: z.object({ status: z.enum(['all', ...BUCKETS]).default('all'), period: zPeriod, q: z.string().max(60).optional(), limit: z.coerce.number().int().min(1).max(100).default(50), offset: z.coerce.number().int().min(0).default(0) }),
+    query: z.object({ status: z.enum(['all', 'callback', 'duplicate', ...BUCKETS]).default('all'), period: zPeriod, q: z.string().max(60).optional(), limit: z.coerce.number().int().min(1).max(100).default(50), offset: z.coerce.number().int().min(0).default(0) }),
   }, async ({ actor, db, query }) => {
     const p = await myPartner(db, actor, false);
     const params: unknown[] = [p.id];
     const where = [`o.attributed_partner_id=$1`, periodSql('o.created_at', query.period)];
-    if (query.status !== 'all') { params.push(query.status); where.push(`${BUCKET_SQL}=$${params.length}`); }
+    if (query.status === 'callback') where.push(`o.callback_at IS NOT NULL AND ${BUCKET_SQL}='new'`);
+    else if (query.status === 'duplicate') where.push(`o.duplicate_signal`);
+    else if (query.status !== 'all') { params.push(query.status); where.push(`${BUCKET_SQL}=$${params.length}`); }
     if (query.q) { params.push(`%${query.q}%`); where.push(`(o.number ILIKE $${params.length} OR EXISTS (SELECT 1 FROM order_lines ol WHERE ol.order_id=o.id AND ol.product_snapshot::text ILIKE $${params.length}))`); }
     const tally = counts(await many(db, `SELECT ${BUCKET_SQL} AS bucket, COUNT(*)::int AS n FROM orders o WHERE o.attributed_partner_id=$1 AND ${periodSql('o.created_at', query.period)} GROUP BY 1`, [p.id]));
+    const extra = await one<{ callback: number; duplicate: number }>(db, `SELECT COUNT(*) FILTER (WHERE o.callback_at IS NOT NULL AND ${BUCKET_SQL}='new')::int AS callback, COUNT(*) FILTER (WHERE o.duplicate_signal)::int AS duplicate FROM orders o WHERE o.attributed_partner_id=$1 AND ${periodSql('o.created_at', query.period)}`, [p.id]);
     params.push(query.limit, query.offset);
     const rows = await many(db, `
-      SELECT o.id, 'OM-***' || right(o.number, 3) AS masked_number, o.channel, ${BUCKET_SQL} AS bucket, o.created_at, o.delivered_at,
+      SELECT o.id, 'OM-***' || right(o.number, 3) AS masked_number, o.channel, ${BUCKET_SQL} AS bucket, o.created_at, o.delivered_at, (o.callback_at IS NOT NULL) AS callback, o.duplicate_signal AS duplicate,
              o.contact_snapshot->>'name' AS cname, coalesce(o.customer_phone, o.contact_snapshot->>'phone') AS cphone,
              o.address_snapshot->>'district' AS district, o.address_snapshot->>'region_code' AS region,
              l.name AS stream_name, l.code AS stream_code,
@@ -217,7 +220,7 @@ export function registerPartnerCabinet(app: FastifyInstance, deps: Deps): void {
              (SELECT COALESCE(SUM(a.target_minor),0)::text FROM commission_accruals a WHERE a.order_id=o.id) AS commission_minor
         FROM orders o LEFT JOIN referral_links l ON l.id::text = o.attribution->>'link_id'
        WHERE ${where.join(' AND ')} ORDER BY o.created_at DESC LIMIT $${params.length - 1} OFFSET $${params.length}`, params);
-    return { counts: tally, items: rows.map(({ cname, cphone, ...r }) => ({ ...r, customer: maskName(cname), customer_phone: maskTail(cphone) })) };
+    return { counts: { ...tally, ...extra }, items: rows.map(({ cname, cphone, ...r }) => ({ ...r, customer: maskName(cname), customer_phone: maskTail(cphone) })) };
   });
 
   route(app, deps, { method: 'GET', url: '/partner/leaderboard', tags: T, summary: 'Top partners by delivered orders (names masked)', query: z.object({ period: z.enum(['today', 'week', 'month']).default('month') }) },

@@ -4,7 +4,7 @@ export interface AppConfig {
   port: number;
   databaseUrl: string;
   sessionTtlHours: number;
-  otp: { ttlSeconds: number; resendIntervalSeconds: number; maxAttempts: number; devEcho: boolean };
+  otp: { ttlSeconds: number; resendIntervalSeconds: number; maxAttempts: number; hourlyLimit: number; devEcho: boolean };
   reservationTtlMinutes: number;
   quoteTtlMinutes: number;
   payments: {
@@ -33,6 +33,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
       ttlSeconds: num(env.OTP_TTL_SECONDS, 300),
       resendIntervalSeconds: num(env.OTP_RESEND_SECONDS, 60),
       maxAttempts: num(env.OTP_MAX_ATTEMPTS, 5),
+      hourlyLimit: num(env.OTP_HOURLY_LIMIT, 5),
       // Dev/test only: return the code in the API response because no SMS provider is connected.
       devEcho: mode !== 'production' && env.OTP_DEV_ECHO !== 'false',
     },

@@ -48,17 +48,21 @@ export function registerCatalog(app: FastifyInstance, deps: Deps): void {
     }
     if (query.q) {
       const tokens = tokenize(query.q);
-      // Synonyms (e.g. quloqchin <-> наушники) expand each token; numbers/models stay exact (T: 128 != 256).
+      const conds: string[] = [];
+      // Synonyms (e.g. quloqchin <-> naushnik) expand each token; numbers/models stay exact (128 != 256).
       for (const tok of tokens.slice(0, 8)) {
         params.push(tok);
         const i = params.length;
         params.push('(^|[^a-z0-9])' + tok + (/^\d+$/.test(tok) ? '([^0-9]|$)' : ''));
         const pi = params.length;
-        where.push(`(p.search_doc ~ $${pi} OR EXISTS (SELECT 1 FROM search_synonyms ss WHERE ss.term=$${i} AND p.search_doc LIKE '%' || ss.synonym || '%')
-                     OR EXISTS (SELECT 1 FROM skus s2 WHERE s2.product_id=p.id AND (lower(s2.sku_code)=$${i} OR s2.barcode=$${i})))`);
+        conds.push(`(p.search_doc ~ $${pi} OR EXISTS (SELECT 1 FROM search_synonyms ss WHERE ss.term=$${i} AND p.search_doc LIKE '%' || ss.synonym || '%'))`);
       }
+      params.push(query.q.trim().toLowerCase());
+      const raw = params.length;
+      const skuExact = `EXISTS (SELECT 1 FROM skus s2 WHERE s2.product_id=p.id AND (lower(s2.sku_code)=$${raw} OR s2.barcode=$${raw}))`;
+      where.push(conds.length ? `((${conds.join(' AND ')}) OR ${skuExact})` : skuExact);
     }
-    const order = query.sort === 'price_asc' ? 'min_price ASC NULLS LAST' : query.sort === 'price_desc' ? 'min_price DESC NULLS LAST' : 'p.published_at DESC NULLS LAST';
+    const order = query.sort === 'price_asc' ? 'min_price ASC NULLS LAST' : query.sort === 'price_desc' ? 'min_price DESC NULLS LAST' : 'published_at DESC NULLS LAST';
     params.push(query.limit, query.offset);
     const rows = await many(db, `
       SELECT * FROM (

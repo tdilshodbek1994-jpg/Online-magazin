@@ -74,3 +74,19 @@ describe('Stage B — first full sale: product → order → operator → wareho
     expect(q.json.payable.amount_minor).toBe('32000000');
   });
 });
+
+describe('Search (§09, AC-M07-1, T005-search)', () => {
+  it('finds by cyrillic/latin/apostrophe/SKU, keeps model numbers exact, empty result ok', async () => {
+    const tt = await setupApp();
+    const p = await mkProduct(tt, { name: 'Simsiz quloqchin Z9 128 GB', prices: [10_000] });
+    await tt.db.query(`UPDATE products SET search_doc=$2 WHERE id=$1`, [p.productId, 'simsiz quloqchin z9 128 gb']);
+    const ids = async (q: string) => (await api(tt, 'GET', `/products?q=${encodeURIComponent(q)}`)).json.items.map((x: any) => x.id);
+    expect(await ids('қулоқчин')).toContain(p.productId);
+    expect(await ids('QULOQCHIN z9')).toContain(p.productId);
+    expect(await ids('quloqchin 256')).not.toContain(p.productId);
+    expect(await ids('quloqchin 128')).toContain(p.productId);
+    expect(await ids(`${p.slug}-0`)).toContain(p.productId);
+    expect((await api(tt, 'GET', '/products?q=zzzznotfound&sort=price_asc')).json.items).toEqual([]);
+    expect((await api(tt, 'GET', '/products?sort=new')).status).toBe(200);
+  });
+});

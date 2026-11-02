@@ -32,7 +32,7 @@ export function registerIdentity(app: FastifyInstance, deps: Deps): void {
           throw new AppError(429, 'OTP_RESEND_TOO_SOON', {}, true, { retry_after_seconds: cfg.otp.resendIntervalSeconds - last.age });
         }
         const hourly = await one<{ n: number }>(tx, `SELECT COUNT(*)::int AS n FROM otp_challenges WHERE phone_e164=$1 AND created_at > now() - interval '1 hour'`, [phone]);
-        if (hourly.n >= 5) throw new AppError(429, 'OTP_HOURLY_LIMIT', {}, true);
+        if (hourly.n >= cfg.otp.hourlyLimit) throw new AppError(429, 'OTP_HOURLY_LIMIT', {}, true);
         const code = String(randomInt(0, 1_000_000)).padStart(6, '0');
         const ch = await one<{ id: string }>(tx, `INSERT INTO otp_challenges (phone_e164, purpose, code_hash, max_attempts, expires_at, ip)
             VALUES ($1,$2,'\\x00',$3, now() + make_interval(secs => $4), $5) RETURNING id`, [phone, body.purpose, cfg.otp.maxAttempts, cfg.otp.ttlSeconds, req.ip]);

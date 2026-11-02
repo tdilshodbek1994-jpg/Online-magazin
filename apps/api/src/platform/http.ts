@@ -66,13 +66,9 @@ export function route<B extends z.ZodType = z.ZodUnknown, Q extends z.ZodType = 
   app.route({
     method: def.method,
     url: def.url,
-    schema: {
-      tags: def.tags,
-      summary: def.summary,
-      body: jsonSchema(def.body),
-      querystring: jsonSchema(def.query),
-      params: jsonSchema(def.params),
-    },
+    schema: Object.fromEntries(
+      Object.entries({ tags: def.tags, summary: def.summary, body: jsonSchema(def.body), querystring: jsonSchema(def.query), params: jsonSchema(def.params) }).filter(([, v]) => v !== undefined),
+    ),
     handler: async (req, reply) => {
       const ctx: Ctx<z.infer<B>, z.infer<Q>, z.infer<P>> = {
         actor: req.actor,

@@ -1,0 +1,254 @@
+import { normalizeSearch, slugify, tokenize } from '@om/shared';
+import type { FastifyInstance } from 'fastify';
+import { z } from 'zod';
+import { audit } from '../../platform/audit.js';
+import { can, requirePerm } from '../../platform/auth.js';
+import { many, maybeOne, one, withTx } from '../../platform/db.js';
+import { badRequest, conflict, notFound, unprocessable } from '../../platform/errors.js';
+import { type Deps, route, zIdParam, zLocalized } from '../../platform/http.js';
+import { moveStock } from '../inventory/service.js';
+import { m } from '../orders/service.js';
+
+export async function ownerOrgId(q: { query: (s: string) => Promise<{ rows: { id: string }[] }> }): Promise<string> {
+  const r = await q.query(`SELECT id FROM organizations WHERE kind='platform_owner'`);
+  if (!r.rows[0]) throw new Error('owner organization missing (run seed)');
+  return r.rows[0].id;
+}
+
+function searchDoc(name: Record<string, string>, extra: string[]): string {
+  return normalizeSearch([...Object.values(name), ...extra].join(' '));
+}
+
+const PUBLIC_PRODUCT_SQL = `
+  SELECT p.id, p.slug, p.name, p.description, p.model, p.warranty_months, b.name AS brand, c.slug AS category_slug, c.name AS category_name,
+         (SELECT json_agg(json_build_object('id', ma.id, 'url', '/media/' || ma.storage_key, 'alt', ma.alt) ORDER BY ma.sort) FROM media_assets ma WHERE ma.product_id=p.id AND ma.status='approved') AS media,
+         (SELECT json_agg(json_build_object('sku_id', s.id, 'sku_code', s.sku_code, 'variant', s.variant, 'price_minor', o.price_minor::text, 'compare_at_minor', o.compare_at_minor::text,
+                 'available', GREATEST(0, COALESCE(sb.on_hand_sellable - sb.reserved - sb.safety_buffer, 0))) ORDER BY s.sku_code)
+            FROM skus s JOIN offers o ON o.sku_id=s.id AND o.status='active' LEFT JOIN stock_balances sb ON sb.sku_id=s.id
+           WHERE s.product_id=p.id AND s.status='active') AS variants
+    FROM products p JOIN categories c ON c.id=p.category_id LEFT JOIN brands b ON b.id=p.brand_id`;
+
+export function registerCatalog(app: FastifyInstance, deps: Deps): void {
+  const T = ['catalog'];
+
+  // ---------- Public (no cost, internal notes or commission rules — §08) ----------
+  route(app, deps, { method: 'GET', url: '/categories', tags: T, summary: 'Category tree' }, async ({ db }) => ({
+    items: await many(db, `SELECT id, parent_id, slug, name, sort FROM categories WHERE status='active' ORDER BY sort, slug`),
+  }));
+
+  route(app, deps, {
+    method: 'GET', url: '/products', tags: T, summary: 'Catalog list / search (cyrillic+latin, SKU)',
+    query: z.object({ q: z.string().max(200).optional(), category: z.string().max(120).optional(), sort: z.enum(['new', 'price_asc', 'price_desc']).default('new'), in_stock: z.coerce.boolean().optional(), limit: z.coerce.number().int().min(1).max(60).default(24), offset: z.coerce.number().int().min(0).max(10000).default(0) }),
+  }, async ({ db, query }) => {
+    const params: unknown[] = [];
+    const where = [`p.status='published'`];
+    if (query.category) {
+      params.push(query.category);
+      where.push(`c.id IN (WITH RECURSIVE t AS (SELECT id FROM categories WHERE slug=$${params.length} UNION ALL SELECT c2.id FROM categories c2 JOIN t ON c2.parent_id=t.id) SELECT id FROM t)`);
+    }
+    if (query.q) {
+      const tokens = tokenize(query.q);
+      // Synonyms (e.g. quloqchin <-> наушники) expand each token; numbers/models stay exact (T: 128 != 256).
+      for (const tok of tokens.slice(0, 8)) {
+        params.push(tok);
+        const i = params.length;
+        params.push('(^|[^a-z0-9])' + tok + (/^\d+$/.test(tok) ? '([^0-9]|$)' : ''));
+        const pi = params.length;
+        where.push(`(p.search_doc ~ $${pi} OR EXISTS (SELECT 1 FROM search_synonyms ss WHERE ss.term=$${i} AND p.search_doc LIKE '%' || ss.synonym || '%')
+                     OR EXISTS (SELECT 1 FROM skus s2 WHERE s2.product_id=p.id AND (lower(s2.sku_code)=$${i} OR s2.barcode=$${i})))`);
+      }
+    }
+    const order = query.sort === 'price_asc' ? 'min_price ASC NULLS LAST' : query.sort === 'price_desc' ? 'min_price DESC NULLS LAST' : 'p.published_at DESC NULLS LAST';
+    params.push(query.limit, query.offset);
+    const rows = await many(db, `
+      SELECT * FROM (
+        SELECT p.id, p.slug, p.name, b.name AS brand, p.published_at,
+               (SELECT MIN(o.price_minor) FROM skus s JOIN offers o ON o.sku_id=s.id AND o.status='active' WHERE s.product_id=p.id AND s.status='active') AS min_price,
+               (SELECT COALESCE(SUM(GREATEST(0, sb.on_hand_sellable - sb.reserved - sb.safety_buffer)),0) FROM skus s JOIN stock_balances sb ON sb.sku_id=s.id WHERE s.product_id=p.id AND s.status='active') AS available,
+               (SELECT '/media/' || storage_key FROM media_assets ma WHERE ma.product_id=p.id AND ma.status='approved' ORDER BY sort LIMIT 1) AS image
+          FROM products p JOIN categories c ON c.id=p.category_id LEFT JOIN brands b ON b.id=p.brand_id
+         WHERE ${where.join(' AND ')}) x
+      ${query.in_stock ? 'WHERE available > 0' : ''}
+      ORDER BY ${order} LIMIT $${params.length - 1} OFFSET $${params.length}`, params);
+    return { items: rows.map((r) => ({ ...r, min_price: r.min_price ? m(r.min_price as string) : null, available: Number(r.available) })) };
+  });
+
+  route(app, deps, { method: 'GET', url: '/products/:slug', tags: T, summary: 'Product page', params: z.object({ slug: z.string().max(140) }) }, async ({ db, params }) => {
+    const p = await maybeOne(db, `${PUBLIC_PRODUCT_SQL} WHERE p.slug=$1 AND p.status='published'`, [params.slug]);
+    if (!p) {
+      const red = await maybeOne<{ slug: string }>(db, `SELECT p.slug FROM slug_redirects r JOIN products p ON p.id=r.entity_id WHERE r.entity_type='product' AND r.old_slug=$1`, [params.slug]);
+      if (red) return { redirect: red.slug };
+      throw notFound('PRODUCT');
+    }
+    return p;
+  });
+
+  // ---------- Admin (catalog.write) ----------
+  const zSku = z.object({
+    sku_code: z.string().min(2).max(64).regex(/^[A-Za-z0-9._-]+$/),
+    barcode: z.string().max(32).optional(),
+    variant: z.record(z.string(), z.string().max(60)).default({}),
+    price_minor: z.string().regex(/^[1-9]\d{0,15}$/),
+    compare_at_minor: z.string().regex(/^[1-9]\d{0,15}$/).optional(),
+    cost_minor: z.string().regex(/^\d{1,16}$/).optional(),
+    weight_g: z.number().int().positive().optional(),
+  });
+  const zProduct = z.object({
+    name: zLocalized,
+    description: z.object({ 'uz-Latn': z.string().max(10000).optional(), 'uz-Cyrl': z.string().max(10000).optional(), ru: z.string().max(10000).optional() }).default({}),
+    category_id: z.string().uuid(),
+    brand: z.string().max(80).optional(),
+    model: z.string().max(80).optional(),
+    warranty_months: z.number().int().min(0).max(120).optional(),
+    slug: z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/).max(120).optional(),
+    skus: z.array(zSku).min(1).max(50),
+  });
+
+  route(app, deps, { method: 'GET', url: '/admin/products', tags: T, summary: 'Admin product list (incl. drafts)', query: z.object({ q: z.string().optional(), status: z.string().optional() }) }, async ({ actor, db, query }) => {
+    requirePerm(actor, 'catalog.write');
+    const internal = can(actor, 'catalog.read_internal');
+    const rows = await many(db, `
+      SELECT p.id, p.slug, p.name, p.status, p.version, p.updated_at,
+             (SELECT json_agg(json_build_object('sku_id', s.id, 'sku_code', s.sku_code, 'variant', s.variant, 'status', s.status, 'price_minor', o.price_minor::text, 'offer_version', o.version,
+                     'cost_minor', CASE WHEN $3 THEN s.cost_minor::text END, 'on_hand', sb.on_hand_sellable, 'reserved', sb.reserved) ORDER BY s.sku_code)
+                FROM skus s LEFT JOIN offers o ON o.sku_id=s.id LEFT JOIN stock_balances sb ON sb.sku_id=s.id WHERE s.product_id=p.id) AS skus,
+             (SELECT json_build_object('kind', kind, 'rate_bps', rate_bps, 'fixed_minor', fixed_minor::text, 'version', version) FROM commission_rules cr WHERE cr.product_id=p.id AND (cr.effective_to IS NULL OR cr.effective_to > now()) ORDER BY version DESC LIMIT 1) AS commission_rule
+        FROM products p WHERE ($1::text IS NULL OR p.search_doc LIKE '%' || $1 || '%') AND ($2::text IS NULL OR p.status=$2)
+       ORDER BY p.updated_at DESC LIMIT 200`, [query.q ? normalizeSearch(query.q) : null, query.status ?? null, internal]);
+    return { items: rows };
+  });
+
+  route(app, deps, { method: 'POST', url: '/admin/products', tags: T, summary: 'Create product with SKUs (draft)', body: zProduct }, async ({ actor, db, body }) => {
+    // Partners have no catalog.write: owner_only mode (AC-M01-1, T003).
+    requirePerm(actor, 'catalog.write');
+    return withTx(db, async (tx) => {
+      const org = await ownerOrgId(tx);
+      const cat = await maybeOne(tx, `SELECT id FROM categories WHERE id=$1`, [body.category_id]);
+      if (!cat) throw badRequest('CATEGORY_UNKNOWN', { 'body.category_id': 'validation.category' });
+      let brandId: string | null = null;
+      if (body.brand) {
+        const b = await one<{ id: string }>(tx, `INSERT INTO brands (slug, name) VALUES ($1,$2) ON CONFLICT (slug) DO UPDATE SET name=brands.name RETURNING id`, [slugify(body.brand) || 'brand', body.brand]);
+        brandId = b.id;
+      }
+      const baseSlug = body.slug ?? slugify(body.name['uz-Latn'] ?? body.name['uz-Cyrl'] ?? body.name.ru ?? 'product');
+      const slugTaken = await maybeOne(tx, `SELECT 1 FROM products WHERE slug=$1`, [baseSlug]);
+      const slug = slugTaken ? `${baseSlug}-${Date.now().toString(36)}` : baseSlug;
+      const p = await one<{ id: string }>(tx, `INSERT INTO products (owner_org_id, category_id, brand_id, slug, name, description, model, warranty_months, search_doc, created_by)
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id`,
+        [org, body.category_id, brandId, slug, JSON.stringify(body.name), JSON.stringify(body.description), body.model ?? null, body.warranty_months ?? null,
+         searchDoc(body.name as Record<string, string>, [body.brand ?? '', body.model ?? '', ...body.skus.map((s) => s.sku_code)]), actor.userId]);
+      for (const s of body.skus) await insertSku(tx, p.id, org, s, actor.userId!);
+      await audit(tx, actor, 'product.created', { type: 'product', id: p.id }, { after: { slug, skus: body.skus.map((s) => s.sku_code) } });
+      return { id: p.id, slug };
+    });
+  });
+
+  route(app, deps, { method: 'POST', url: '/admin/products/:id/status', tags: T, summary: 'Publish / archive (draft|active|archived)', params: zIdParam, body: z.object({ status: z.enum(['draft', 'published', 'archived']), expected_version: z.number().int() }) },
+    async ({ actor, db, params, body }) => {
+      requirePerm(actor, 'catalog.write');
+      return withTx(db, async (tx) => {
+        const p = await maybeOne<{ version: number; status: string }>(tx, `SELECT version, status FROM products WHERE id=$1 FOR UPDATE`, [params.id]);
+        if (!p) throw notFound('PRODUCT');
+        if (p.version !== body.expected_version) throw conflict('VERSION_CONFLICT', { current_version: p.version });
+        if (body.status === 'published') {
+          const ok = await maybeOne(tx, `SELECT 1 FROM skus s JOIN offers o ON o.sku_id=s.id WHERE s.product_id=$1 AND s.status='active' AND o.status='active' LIMIT 1`, [params.id]);
+          if (!ok) throw unprocessable('PRODUCT_HAS_NO_SELLABLE_SKU');
+        }
+        const r = await one(tx, `UPDATE products SET status=$2, version=version+1, updated_at=now(), published_at = CASE WHEN $2='published' THEN COALESCE(published_at, now()) ELSE published_at END WHERE id=$1 RETURNING id, status, version`, [params.id, body.status]);
+        await audit(tx, actor, 'product.status', { type: 'product', id: params.id }, { before: { status: p.status }, after: { status: body.status } });
+        return r;
+      });
+    });
+
+  route(app, deps, { method: 'POST', url: '/admin/products/:id/skus', tags: T, summary: 'Add SKU', params: zIdParam, body: zSku }, async ({ actor, db, params, body }) => {
+    requirePerm(actor, 'catalog.write');
+    return withTx(db, async (tx) => {
+      const org = await ownerOrgId(tx);
+      if (!(await maybeOne(tx, `SELECT 1 FROM products WHERE id=$1`, [params.id]))) throw notFound('PRODUCT');
+      return insertSku(tx, params.id, org, body, actor.userId!);
+    });
+  });
+
+  route(app, deps, { method: 'POST', url: '/admin/skus/:id/archive', tags: T, summary: 'Archive SKU (never physically deleted, §08)', params: zIdParam }, async ({ actor, db, params }) => {
+    requirePerm(actor, 'catalog.write');
+    const r = await db.query(`UPDATE skus SET status='archived', version=version+1 WHERE id=$1 RETURNING id`, [params.id]);
+    if (!r.rowCount) throw notFound('SKU');
+    await audit(db, actor, 'sku.archived', { type: 'sku', id: params.id });
+    return { ok: true };
+  });
+
+  route(app, deps, { method: 'POST', url: '/admin/skus/:id/price', tags: T, summary: 'Change price (versioned, old orders keep snapshot)', params: zIdParam,
+    body: z.object({ price_minor: z.string().regex(/^[1-9]\d{0,15}$/), compare_at_minor: z.string().regex(/^[1-9]\d{0,15}$/).nullable().optional(), expected_version: z.number().int(), reason: z.string().max(300).optional() }) },
+  async ({ actor, db, params, body }) => {
+    requirePerm(actor, 'catalog.write');
+    return withTx(db, async (tx) => {
+      const o = await maybeOne<{ id: string; version: number; price_minor: string }>(tx, `SELECT id, version, price_minor FROM offers WHERE sku_id=$1 FOR UPDATE`, [params.id]);
+      if (!o) throw notFound('OFFER');
+      if (o.version !== body.expected_version) throw conflict('VERSION_CONFLICT', { current_version: o.version });
+      const r = await one<{ version: number }>(tx, `UPDATE offers SET price_minor=$2, compare_at_minor=$3, version=version+1, updated_at=now() WHERE id=$1 RETURNING version`, [o.id, body.price_minor, body.compare_at_minor ?? null]);
+      await tx.query(`INSERT INTO offer_versions (offer_id, version, price_minor, compare_at_minor, changed_by, reason) VALUES ($1,$2,$3,$4,$5,$6)`, [o.id, r.version, body.price_minor, body.compare_at_minor ?? null, actor.userId, body.reason ?? null]);
+      await audit(tx, actor, 'offer.price_changed', { type: 'offer', id: o.id }, { before: { price_minor: o.price_minor }, after: { price_minor: body.price_minor }, reason: body.reason });
+      return { offer_version: r.version };
+    });
+  });
+
+  route(app, deps, { method: 'POST', url: '/admin/skus/:id/stock', tags: T, summary: 'Stock receipt / adjustment / write-off (movement journal)', params: zIdParam,
+    body: z.object({ kind: z.enum(['receipt', 'adjustment', 'to_damaged']), qty: z.number().int().refine((v) => v !== 0), reason: z.string().min(2).max(300), ref: z.string().min(4).max(80) }) },
+  async ({ actor, db, params, body }) => {
+    requirePerm(actor, 'inventory.write');
+    return withTx(db, async (tx) => {
+      const org = await ownerOrgId(tx);
+      if (!(await maybeOne(tx, `SELECT 1 FROM skus WHERE id=$1`, [params.id]))) throw notFound('SKU');
+      if (body.kind === 'receipt' && body.qty < 0) throw badRequest('RECEIPT_QTY_POSITIVE');
+      if (body.kind === 'to_damaged') {
+        await moveStock(tx, { skuId: params.id, merchantOrgId: org, kind: 'to_damaged', bucket: 'on_hand_sellable', qty: -Math.abs(body.qty), refType: 'manual', refId: body.ref, actorId: actor.userId, reason: body.reason });
+        await moveStock(tx, { skuId: params.id, merchantOrgId: org, kind: 'to_damaged', bucket: 'damaged', qty: Math.abs(body.qty), refType: 'manual', refId: body.ref, actorId: actor.userId, reason: body.reason });
+      } else {
+        const applied = await moveStock(tx, { skuId: params.id, merchantOrgId: org, kind: body.kind, bucket: 'on_hand_sellable', qty: body.qty, refType: 'manual', refId: body.ref, actorId: actor.userId, reason: body.reason });
+        if (!applied) return { ok: true, replayed: true };
+      }
+      // Reserved goods cannot be adjusted away silently (§15).
+      const sb = await one<{ on_hand_sellable: number; reserved: number }>(tx, `SELECT on_hand_sellable, reserved FROM stock_balances WHERE sku_id=$1`, [params.id]);
+      if (sb.on_hand_sellable < sb.reserved) throw conflict('ADJUSTMENT_BELOW_RESERVED');
+      await audit(tx, actor, 'stock.' + body.kind, { type: 'sku', id: params.id }, { after: { qty: body.qty, ref: body.ref }, reason: body.reason });
+      return { ok: true, on_hand: sb.on_hand_sellable, reserved: sb.reserved };
+    });
+  });
+
+  route(app, deps, { method: 'POST', url: '/admin/products/:id/commission-rules', tags: T, summary: 'New commission rule version (percent XOR fixed)', params: zIdParam,
+    body: z.object({ kind: z.enum(['percent', 'fixed_per_unit']), rate_bps: z.number().int().min(1).max(10000).optional(), fixed_minor: z.string().regex(/^[1-9]\d{0,15}$/).optional(), effective_from: z.string().datetime().optional() }) },
+  async ({ actor, db, params, body }) => {
+    requirePerm(actor, 'commission_rules.write');
+    if ((body.kind === 'percent') !== (body.rate_bps !== undefined) || (body.kind === 'fixed_per_unit') !== (body.fixed_minor !== undefined)) throw badRequest('COMMISSION_RULE_SHAPE');
+    return withTx(db, async (tx) => {
+      if (!(await maybeOne(tx, `SELECT 1 FROM products WHERE id=$1`, [params.id]))) throw notFound('PRODUCT');
+      await tx.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`rule:${params.id}`]);
+      const from = body.effective_from ? new Date(body.effective_from) : new Date();
+      await tx.query(`UPDATE commission_rules SET effective_to=$2 WHERE product_id=$1 AND effective_to IS NULL AND effective_from < $2`, [params.id, from]);
+      const v = await one<{ v: number }>(tx, `SELECT COALESCE(MAX(version),0)+1 AS v FROM commission_rules WHERE product_id=$1`, [params.id]);
+      const r = await one(tx, `INSERT INTO commission_rules (product_id, version, kind, rate_bps, fixed_minor, effective_from, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id, version`,
+        [params.id, v.v, body.kind, body.rate_bps ?? null, body.fixed_minor ?? null, from, actor.userId]);
+      await audit(tx, actor, 'commission_rule.created', { type: 'product', id: params.id }, { after: body });
+      return r;
+    });
+  });
+
+  route(app, deps, { method: 'POST', url: '/admin/categories', tags: T, summary: 'Create category', body: z.object({ slug: z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/), name: zLocalized, parent_id: z.string().uuid().nullable().optional() }) },
+    async ({ actor, db, body }) => {
+      requirePerm(actor, 'catalog.write');
+      const r = await one(db, `INSERT INTO categories (slug, name, parent_id) VALUES ($1,$2,$3) RETURNING id, slug`, [body.slug, JSON.stringify(body.name), body.parent_id ?? null]);
+      await audit(db, actor, 'category.created', { type: 'category', id: (r as { id: string }).id });
+      return r;
+    });
+}
+
+async function insertSku(tx: import('../../platform/db.js').Tx, productId: string, org: string, s: { sku_code: string; barcode?: string; variant: Record<string, string>; price_minor: string; compare_at_minor?: string; cost_minor?: string; weight_g?: number }, actorId: string) {
+  const variantKey = Object.keys(s.variant).sort().map((k) => `${k}=${s.variant[k]}`).join('|') || 'default';
+  const sku = await one<{ id: string }>(tx, `INSERT INTO skus (product_id, sku_code, barcode, variant, variant_key, weight_g, cost_minor) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
+    [productId, s.sku_code, s.barcode ?? null, JSON.stringify(s.variant), variantKey, s.weight_g ?? null, s.cost_minor ?? null]);
+  const o = await one<{ id: string }>(tx, `INSERT INTO offers (sku_id, merchant_org_id, price_minor, compare_at_minor) VALUES ($1,$2,$3,$4) RETURNING id`, [sku.id, org, s.price_minor, s.compare_at_minor ?? null]);
+  await tx.query(`INSERT INTO offer_versions (offer_id, version, price_minor, compare_at_minor, changed_by, reason) VALUES ($1,1,$2,$3,$4,'created')`, [o.id, s.price_minor, s.compare_at_minor ?? null, actorId]);
+  const wh = await tx.query(`SELECT id FROM warehouses WHERE code='MAIN'`);
+  await tx.query(`INSERT INTO stock_balances (sku_id, merchant_org_id, warehouse_id) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING`, [sku.id, org, wh.rows[0].id]);
+  return { sku_id: sku.id, offer_id: o.id };
+}

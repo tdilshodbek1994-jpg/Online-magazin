@@ -9,12 +9,13 @@ import type { Db } from './platform/db.js';
 import { AppError } from './platform/errors.js';
 import type { Deps } from './platform/http.js';
 import { registerIdentity } from './modules/identity/routes.js';
-import { registerConfig } from './modules/config/routes.js';
 import { registerCatalog } from './modules/catalog/routes.js';
-import { registerInventory } from './modules/inventory/routes.js';
 import { registerCheckout } from './modules/checkout/routes.js';
 import { registerOrders } from './modules/orders/routes.js';
+import { registerPartners } from './modules/partners/routes.js';
+import { registerReturns } from './modules/returns/routes.js';
 import { registerPayments } from './modules/payments/routes.js';
+import { registerSupport } from './modules/support/routes.js';
 import { registerAdmin } from './modules/admin/routes.js';
 
 declare module 'fastify' {
@@ -102,12 +103,13 @@ export async function buildApp(cfg: AppConfig, db: Db): Promise<FastifyInstance>
   await app.register(
     async (api) => {
       registerIdentity(api, deps);
-      registerConfig(api, deps);
       registerCatalog(api, deps);
-      registerInventory(api, deps);
       registerCheckout(api, deps);
       registerOrders(api, deps);
+      registerPartners(api, deps);
+      registerReturns(api, deps);
       registerPayments(api, deps);
+      registerSupport(api, deps);
       registerAdmin(api, deps);
     },
     { prefix: '/api/v1' },

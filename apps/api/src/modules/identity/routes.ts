@@ -63,9 +63,11 @@ export function registerIdentity(app: FastifyInstance, deps: Deps): void {
         // Single use: only one verify can consume the challenge (AC-M02-1).
         const consumed = await tx.query(`UPDATE otp_challenges SET consumed_at=now() WHERE id=$1 AND consumed_at IS NULL RETURNING id`, [ch.id]);
         if (!consumed.rowCount) throw new AppError(400, 'OTP_INVALID_OR_EXPIRED');
-        let user = await maybeOne<{ id: string; locale: string; status: string }>(tx, `SELECT id, locale, status FROM users WHERE phone_e164=$1 AND status <> 'closed' FOR UPDATE`, [ch.phone_e164]);
+        const existing = await maybeOne<{ id: string; locale: string; status: string }>(tx, `SELECT id, locale, status FROM users WHERE phone_e164=$1 AND status <> 'closed' FOR UPDATE`, [ch.phone_e164]);
         let created = false;
-        if (!user) {
+        let user: { id: string; locale: string; status: string };
+        if (existing) user = existing;
+        else {
           user = await one(tx, `INSERT INTO users (phone_e164, phone_verified_at) VALUES ($1, now()) RETURNING id, locale, status`, [ch.phone_e164]);
           await tx.query(`INSERT INTO phone_history (user_id, new_phone, method) VALUES ($1,$2,'initial')`, [user.id, ch.phone_e164]);
           await tx.query(`INSERT INTO memberships (user_id, role_code) VALUES ($1, 'customer')`, [user.id]);

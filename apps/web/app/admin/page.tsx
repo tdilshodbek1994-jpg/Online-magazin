@@ -14,10 +14,11 @@ export default function Admin() {
   return (
     <>
       <h1>Boshqaruv paneli</h1>
-      <div className="row" role="tablist">{[['summary', 'Hisobot'], ['products', 'Mahsulotlar'], ['partners', 'Hamkorlar'], ['payouts', 'To‘lovlar (payout)'], ['finance', 'Moliya'], ['integrations', 'Integratsiyalar']].map(([k, l]) => <button key={k} role="tab" aria-selected={tab === k} className={`btn ${tab === k ? '' : 'secondary'}`} onClick={() => setTab(k)}>{l}</button>)}</div>
+      <div className="row" role="tablist">{[['summary', 'Hisobot'], ['products', 'Mahsulotlar'], ['import', 'CSV import'], ['partners', 'Hamkorlar'], ['payouts', 'To‘lovlar (payout)'], ['finance', 'Moliya'], ['integrations', 'Integratsiyalar']].map(([k, l]) => <button key={k} role="tab" aria-selected={tab === k} className={`btn ${tab === k ? '' : 'secondary'}`} onClick={() => setTab(k)}>{l}</button>)}</div>
       {msg && <div className="notice" role="status">{msg}</div>}
       {tab === 'summary' && <Summary />}
       {tab === 'products' && <Products act={act} lang={lang} />}
+      {tab === 'import' && <Import />}
       {tab === 'partners' && <Partners act={act} />}
       {tab === 'payouts' && <Payouts act={act} />}
       {tab === 'finance' && <Finance act={act} />}
@@ -94,6 +95,7 @@ function Products({ act, lang }: { act: any; lang: any }) {
               <td>{(p.skus ?? []).map((s: any) => <div key={s.sku_id}>{s.sku_code}: {som(s.price_minor)} · {s.on_hand ?? 0} (band {s.reserved ?? 0})
                 <button className="btn secondary" onClick={() => { const q = prompt('Kirim soni'); if (q) act(() => api(`/admin/skus/${s.sku_id}/stock`, { method: 'POST', body: { kind: 'receipt', qty: Number(q), reason: 'kirim', ref: crypto.randomUUID() } }), load); }}>+ kirim</button></div>)}</td>
               <td>{p.commission_rule ? (p.commission_rule.kind === 'percent' ? `${p.commission_rule.rate_bps / 100}%` : som(p.commission_rule.fixed_minor) + '/dona') : '—'}
+                <label className="btn secondary" style={{ display: 'inline-flex', alignItems: 'center' }}>Rasm<input type="file" accept="image/jpeg,image/png,image/webp" style={{ display: 'none' }} onChange={(e) => { const f = e.target.files?.[0]; if (!f) return; const rd = new FileReader(); rd.onload = () => act(() => api(`/admin/products/${p.id}/media`, { method: 'POST', body: { filename: f.name, content_base64: String(rd.result).split(',')[1], alt: { 'uz-Latn': pick(p.name, 'uz-Latn' as any) }, rights_source: 'owner upload' } }), load); rd.readAsDataURL(f); }} /></label>
                 <button className="btn secondary" onClick={() => { const v = prompt('Foiz (masalan 10) yoki "f:30000" (dona uchun so‘m)'); if (!v) return; const body = v.startsWith('f:') ? { kind: 'fixed_per_unit', fixed_minor: String(BigInt(v.slice(2)) * 100n) } : { kind: 'percent', rate_bps: Math.round(Number(v) * 100) }; act(() => api(`/admin/products/${p.id}/commission-rules`, { method: 'POST', body }), load); }}>Qoida</button></td>
               <td>{p.status !== 'published' && <button className="btn" onClick={() => act(() => api(`/admin/products/${p.id}/status`, { method: 'POST', body: { status: 'published', expected_version: p.version } }), load)}>E’lon qilish</button>}
                 {p.status === 'published' && <button className="btn secondary" onClick={() => act(() => api(`/admin/products/${p.id}/status`, { method: 'POST', body: { status: 'archived', expected_version: p.version } }), load)}>Arxiv</button>}</td>
@@ -178,6 +180,33 @@ function Integrations() {
       <Async loading={st.loading} error={st.error} onRetry={load}>
         <table><tbody>{data?.items.map((i: any) => <tr key={i.key}><td>{i.key}</td><td><span className="badge test">{i.mode}</span></td><td>{i.live_verified ? 'live ✓' : 'live tekshirilmagan'}</td><td className="muted">{i.note}</td></tr>)}</tbody></table>
       </Async>
+    </section>
+  );
+}
+
+function Import() {
+  const [csv, setCsv] = useState('sku_code,product_slug,name_uz_latn,name_uz_cyrl,category_slug,price_som,cost_som,stock_receipt,brand,variant\n');
+  const [pv, setPv] = useState<any>(null);
+  const [res, setRes] = useState<any>(null);
+  const [err, setErr] = useState<string | null>(null);
+  return (
+    <section className="card" style={{ marginTop: 12 }}>
+      <p className="muted">Avval tekshiruv (hech narsa yozilmaydi), keyin tasdiqlash. Qayta import SKU dublikatini yaratmaydi.</p>
+      {err && <div className="notice" role="alert">{err}</div>}
+      <label htmlFor="csv">CSV</label>
+      <textarea id="csv" rows={8} value={csv} onChange={(e) => { setCsv(e.target.value); setPv(null); }} />
+      <input type="file" accept=".csv,text/csv" onChange={(e) => { const f = e.target.files?.[0]; if (f) f.text().then((t) => { setCsv(t); setPv(null); }); }} />
+      <div className="row" style={{ marginTop: 8 }}>
+        <button className="btn secondary" onClick={async () => { setErr(null); setRes(null); try { setPv(await api('/admin/imports/products/preview', { method: 'POST', body: { csv } })); } catch (e: any) { setErr(e.code); } }}>Tekshirish</button>
+        {pv && pv.valid_rows > 0 && <button className="btn" onClick={async () => { try { setRes(await api(`/admin/imports/${pv.batch_id}/commit`, { method: 'POST' })); } catch (e: any) { setErr(e.code); } }}>Tasdiqlash ({pv.valid_rows} qator)</button>}
+      </div>
+      {pv && (
+        <div style={{ marginTop: 8 }}>
+          <p>Jami {pv.total_rows} · to‘g‘ri {pv.valid_rows} · xato {pv.rejected_rows} · o‘zgarishlar: {Object.entries(pv.changes).map(([k, v]) => `${k}: ${v}`).join(', ') || '—'} · qabul qilinadigan qoldiq: {pv.stock_units_to_receive}</p>
+          {pv.errors.length > 0 && <table><thead><tr><th>Qator</th><th>Maydon</th><th>Xato</th></tr></thead><tbody>{pv.errors.map((e: any, i: number) => <tr key={i}><td>{e.line}</td><td>{e.field}</td><td>{e.code}</td></tr>)}</tbody></table>}
+        </div>
+      )}
+      {res && <div className="notice ok" role="status">Yozildi: {res.committed_rows} qator {res.replayed ? '(avval yozilgan)' : ''}</div>}
     </section>
   );
 }

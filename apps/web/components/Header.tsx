@@ -11,7 +11,7 @@ export function Header() {
   const [logged, setLogged] = useState(false);
   useEffect(() => {
     if (!getToken()) return;
-    api('/me').then((m) => { setLogged(true); setPerms(m.permissions); setRoles(m.roles.map((r: any) => r.role)); }).catch(() => setToken(null));
+    api('/me').then((m) => { setLogged(true); setPerms(m.permissions); setRoles(m.roles.map((r: any) => r.role)); }).catch((e) => { if (e?.status === 401) setToken(null); }); // network errors/aborts never log the user out
   }, []);
   return (
     <header className="top">
@@ -20,6 +20,8 @@ export function Header() {
         <nav className="links" aria-label="Asosiy">
           <Link href="/cart">{t('cart')}</Link>
           {logged && <Link href="/account">{t('myOrders')}</Link>}
+          {(roles.includes('owner') || roles.includes('finance')) && <Link href="/account/security">MFA</Link>}
+          {roles.includes('courier') && <Link href="/courier">Kuryer</Link>}
           {roles.includes('partner') && <Link href="/partner">{t('partner')}</Link>}
           {perms.includes('orders.read_all') && <Link href="/ops">{t('ops')}</Link>}
           {(perms.includes('catalog.write') || perms.includes('reports.read') || perms.includes('payouts.prepare')) && <Link href="/admin">{t('admin')}</Link>}

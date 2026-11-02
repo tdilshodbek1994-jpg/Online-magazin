@@ -26,7 +26,7 @@ export const setToken = (t: string | null) => {
   } catch {}
 };
 
-export async function api<T = any>(path: string, opts: { method?: string; body?: unknown; idem?: string } = {}): Promise<T> {
+export async function api<T = any>(path: string, opts: { method?: string; body?: unknown; idem?: string; noStepUp?: boolean } = {}): Promise<T> {
   const headers: Record<string, string> = { 'x-guest-token': guestToken() };
   const tok = getToken();
   if (tok) headers.authorization = `Bearer ${tok}`;
@@ -39,6 +39,15 @@ export async function api<T = any>(path: string, opts: { method?: string; body?:
     throw { code: 'NETWORK', status: 0, retryable: true } as ApiError;
   }
   const json = await res.json().catch(() => ({}));
+  // Owner/finance: sensitive actions need a fresh TOTP step-up (T020). Ask once, then retry the same request.
+  if (res.status === 403 && json.code === 'STEP_UP_REQUIRED' && !opts.noStepUp && typeof window !== 'undefined') {
+    const code = window.prompt('Xavfsizlik: autentifikator ilovasidagi 6 xonali kodni kiriting (yoki tiklash kodi)');
+    if (code) {
+      const body = /^\d{6}$/.test(code.trim()) ? { code: code.trim() } : { recovery_code: code.trim() };
+      await api('/auth/step-up', { method: 'POST', body, noStepUp: true });
+      return api<T>(path, { ...opts, noStepUp: true });
+    }
+  }
   if (!res.ok) throw { ...json, status: res.status } as ApiError;
   return json as T;
 }

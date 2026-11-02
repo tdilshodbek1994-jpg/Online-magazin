@@ -37,9 +37,11 @@ describe('T020 — owner/finance MFA and step-up', () => {
     expect(secretStored).not.toContain(en.json.secret);
   });
 
-  it('operator actions do not require step-up (only owner/finance)', async () => {
+  it('operator actions and read-only owner/finance screens do not require step-up', async () => {
     const op = await mkUser(t, ['operator'], undefined, false);
     expect((await api(t, 'GET', '/ops/queues', { token: op.token })).status).toBe(200);
+    const ow = await mkUser(t, ['owner'], undefined, false);
+    for (const u of ['/admin/partners', '/admin/payouts', '/finance/remittances', '/finance/exceptions', '/admin/policies', '/admin/staff']) expect((await api(t, 'GET', u, { token: ow.token })).status).toBe(200);
   });
 
   it('T020 sessions: user can list and revoke own sessions', async () => {

@@ -278,7 +278,7 @@ export function registerPartners(app: FastifyInstance, deps: Deps): void {
 
   // ---------- Admin: partners, payouts, attribution corrections ----------
   route(app, deps, { method: 'GET', url: '/admin/partners', tags: ['admin'], summary: 'Partners' }, async ({ actor, db }) => {
-    requirePerm(actor, 'partners.manage'); requireStepUp(actor);
+    requirePerm(actor, 'partners.manage');
     return { items: await many(db, `SELECT p.id, p.code, p.display_name, p.status, p.status_reason, p.created_at, p.payout_destination->>'masked' AS destination, p.payout_destination_verified_at, b.available_minor::text, b.pending_minor::text, b.debt_minor::text
         FROM partners p LEFT JOIN partner_balances b ON b.partner_id=p.id ORDER BY p.created_at DESC`) };
   });

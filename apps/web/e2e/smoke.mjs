@@ -2,6 +2,15 @@
 // Usage: node apps/web/e2e/smoke.mjs   (uses the pre-installed Playwright Chromium)
 import { createRequire } from 'node:module';
 const { chromium } = createRequire(import.meta.url)('playwright');
+import { createHmac } from 'node:crypto';
+const B32 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+function totp(secret, step = Math.floor(Date.now() / 30000)) {
+  let bits = 0, val = 0; const bytes = [];
+  for (const c of secret) { val = (val << 5) | B32.indexOf(c); bits += 5; if (bits >= 8) { bytes.push((val >>> (bits - 8)) & 255); bits -= 8; } }
+  const msg = Buffer.alloc(8); msg.writeBigUInt64BE(BigInt(step));
+  const h = createHmac('sha1', Buffer.from(bytes)).update(msg).digest(); const o = h[h.length - 1] & 15;
+  return String((h.readUInt32BE(o) & 0x7fffffff) % 1000000).padStart(6, '0');
+}
 
 const BASE = process.env.WEB_URL ?? 'http://localhost:3000';
 const results = [];
@@ -14,6 +23,7 @@ const assert = (c, m) => { if (!c) throw new Error(m); };
 const browser = await chromium.launch();
 const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
 const page = await ctx.newPage();
+if (process.env.E2E_DEBUG) page.on('response', (r) => { if (r.url().includes('/api/v1/') && r.status() >= 400) console.log('  resp', r.status(), r.request().method(), r.url().replace(BASE, '')); });
 
 await step('E2E-1/T005s', 'home loads and cyrillic search finds latin product', async () => {
   await page.goto(BASE + '/');
@@ -109,6 +119,28 @@ await step('E2E-9', 'operator sees the new guest order in the "Yangi" queue', as
   await page.goto(BASE + '/ops');
   await page.getByRole('tab', { name: /Yangi/ }).waitFor();
   await page.getByRole('cell', { name: 'web', exact: true }).first().waitFor();
+});
+
+await step('E2E-10/T020', 'owner enrolls TOTP in UI; sensitive admin action asks step-up and succeeds', async () => {
+  await page.getByRole('button', { name: 'Chiqish' }).click();
+  await page.waitForURL(BASE + '/');
+  await login('+998900000001');
+  await page.goto(BASE + '/account/security');
+  await page.getByRole('button', { name: 'Autentifikatorni ulash' }).click();
+  const secret = (await page.locator('code').first().textContent()).trim();
+  await page.getByLabel('Ilovadagi kod').fill(totp(secret));
+  await page.getByRole('button', { name: 'Faollashtirish' }).click();
+  await page.getByText(/Tiklash kodlari/).waitFor();
+  await page.goto(BASE + '/admin');
+  await page.getByRole('tab', { name: 'Hamkorlar' }).click();
+  await page.getByText('DEMO777').waitFor();
+  let prompts = 0;
+  page.on('dialog', async (d) => { prompts++; await d.accept(d.message().includes('Xavfsizlik') ? totp(secret, Math.floor(Date.now() / 30000) + 1) : 'E2E tekshiruv'); });
+  await page.getByRole('button', { name: 'To‘xtatish' }).click();
+  await page.getByRole('status').filter({ hasText: 'OK' }).waitFor();
+  assert(prompts === 2, `expected reason + step-up prompts, got ${prompts}`);
+  await page.getByRole('button', { name: 'Tasdiqlash' }).first().click();
+  await page.getByRole('status').filter({ hasText: 'OK' }).waitFor();
 });
 
 await browser.close();

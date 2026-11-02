@@ -14,6 +14,7 @@ import { registerMedia, registerMediaServe } from './modules/catalog/media.js';
 import { registerImports } from './modules/catalog/imports.js';
 import { registerCheckout } from './modules/checkout/routes.js';
 import { registerOrders } from './modules/orders/routes.js';
+import { registerAmendments } from './modules/orders/amendments.js';
 import { registerPartners } from './modules/partners/routes.js';
 import { registerReturns } from './modules/returns/routes.js';
 import { registerPayments } from './modules/payments/routes.js';
@@ -113,6 +114,7 @@ export async function buildApp(cfg: AppConfig, db: Db): Promise<FastifyInstance>
       registerMedia(api, deps);
       registerCheckout(api, deps);
       registerOrders(api, deps);
+      registerAmendments(api, deps);
       registerPartners(api, deps);
       registerReturns(api, deps);
       registerPayments(api, deps);

@@ -13,6 +13,7 @@ import { postJournal } from '../finance/journal.js';
 import { consumeOnDispatch } from '../inventory/service.js';
 import { queueNotification } from '../notifications/service.js';
 import { cancelOrder, confirmOrder, statusEvent } from './service.js';
+import { assertNoPendingAmendment } from './amendments.js';
 
 const QUEUES: Record<string, string> = {
   new: `o.commercial_status='awaiting_confirmation' AND o.assigned_operator_id IS NULL AND o.callback_at IS NULL`,
@@ -153,6 +154,7 @@ export function registerOrders(app: FastifyInstance, deps: Deps): void {
       if (o.fulfillment_status === to) return { ok: true, noop: true };
       if (o.commercial_status !== 'confirmed' || !from.includes(o.fulfillment_status)) throw conflict('INVALID_FULFILLMENT_TRANSITION', { from: o.fulfillment_status, to });
       if (o.payment_method === 'online' && o.payment_status !== 'paid') throw conflict('ONLINE_PAYMENT_NOT_CONFIRMED');
+      await assertNoPendingAmendment(tx, params.id);
       await tx.query(`INSERT INTO shipments (order_id, status) VALUES ($1,$2) ON CONFLICT (order_id) DO UPDATE SET status=$2, version=shipments.version+1, updated_at=now()`, [params.id, to]);
       await tx.query(`UPDATE orders SET fulfillment_status=$2, version=version+1, updated_at=now() WHERE id=$1`, [params.id, to]);
       await statusEvent(tx, params.id, 'fulfillment', o.fulfillment_status, to, actor, null);

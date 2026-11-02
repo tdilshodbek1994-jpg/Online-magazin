@@ -15,6 +15,7 @@ import { postJournal } from '../finance/journal.js';
 import { queueNotification } from '../notifications/service.js';
 import { cancelOrder, confirmOrder, createOrder, m, priceLines, pricedToJson, storeQuote } from '../orders/service.js';
 import { isBotUserAgent, visitorHash } from './attribution.js';
+import { applyAmendment, rejectAmendment } from '../orders/amendments.js';
 
 /** The partner is always derived from the authenticated user — never from payload (§12, T039). */
 async function myPartner(tx: { query: Tx['query'] }, actor: Actor, requireActive = true) {
@@ -168,8 +169,13 @@ export function registerPartners(app: FastifyInstance, deps: Deps): void {
     async ({ db, params }) => {
       const c = await maybeOne<{ order_id: string; status: string; expires_at: string }>(db, `SELECT order_id, status, expires_at FROM order_confirmations WHERE token_hash=$1 AND method='customer_otp'`, [hashToken(params.token)]);
       if (!c || c.status !== 'pending' || new Date(c.expires_at) < new Date()) throw notFound('CONFIRMATION');
-      const o = await one(db, `SELECT number, payable_minor::text, subtotal_minor::text, delivery_minor::text, discount_minor::text, address_snapshot, payment_method FROM orders WHERE id=$1`, [c.order_id]);
-      const lines = await many(db, `SELECT product_snapshot, qty, unit_price_minor::text, line_net_minor::text FROM order_lines WHERE order_id=$1`, [c.order_id]);
+      const am = await maybeOne<{ new_quote_id: string }>(db, `SELECT a.new_quote_id FROM order_amendments a JOIN order_confirmations oc ON oc.id=a.confirmation_id WHERE oc.token_hash=$1 AND a.status='awaiting_customer'`, [hashToken(params.token)]);
+      const o = am
+        ? await one(db, `SELECT o.number, q.payable_minor::text, q.subtotal_minor::text, q.delivery_minor::text, (q.cart_discount_minor + q.delivery_discount_minor)::text AS discount_minor, o.address_snapshot, o.payment_method, true AS is_amendment FROM orders o JOIN checkout_quotes q ON q.id=$2 WHERE o.id=$1`, [c.order_id, am.new_quote_id])
+        : await one(db, `SELECT number, payable_minor::text, subtotal_minor::text, delivery_minor::text, discount_minor::text, address_snapshot, payment_method FROM orders WHERE id=$1`, [c.order_id]);
+      const lines = am
+        ? await many(db, `SELECT product_snapshot, qty, unit_price_minor::text, line_net_minor::text FROM quote_lines WHERE quote_id=$1`, [am.new_quote_id])
+        : await many(db, `SELECT product_snapshot, qty, unit_price_minor::text, line_net_minor::text FROM order_lines WHERE order_id=$1 AND canceled_qty < qty`, [c.order_id]);
       const shop = await maybeOne<{ name: string }>(db, `SELECT name FROM organizations WHERE kind='platform_owner'`);
       return { shop_name: shop?.name, order: o, lines };
     });
@@ -183,7 +189,11 @@ export function registerPartners(app: FastifyInstance, deps: Deps): void {
         const used = await tx.query(`UPDATE order_confirmations SET consumed_at=now(), status=$2 WHERE id=$1 AND consumed_at IS NULL RETURNING id`, [c.id, body.decision === 'confirm' ? 'verified' : 'rejected']);
         if (!used.rowCount) throw new AppError(400, 'CONFIRMATION_INVALID_OR_EXPIRED');
         const sys: Actor = { ...actor, kind: 'anonymous' };
-        if (body.decision === 'confirm') await confirmOrder(tx, cfg, sys, c.order_id, 'customer_otp', { confirmation_id: c.id });
+        const am = await maybeOne<{ id: string }>(tx, `SELECT id FROM order_amendments WHERE confirmation_id=$1 AND status='awaiting_customer'`, [c.id]);
+        if (am) {
+          if (body.decision === 'confirm') await applyAmendment(tx, cfg, sys, am.id);
+          else await rejectAmendment(tx, sys, am.id);
+        } else if (body.decision === 'confirm') await confirmOrder(tx, cfg, sys, c.order_id, 'customer_otp', { confirmation_id: c.id });
         else await cancelOrder(tx, sys, c.order_id, 'customer_rejected_confirmation', true);
         // Confirming an order grants no account access: no session is issued here (T043).
         return { ok: true, decision: body.decision };

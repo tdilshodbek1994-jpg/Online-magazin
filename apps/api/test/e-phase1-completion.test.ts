@@ -114,3 +114,40 @@ describe('T030 — media upload validation', () => {
     expect(pub.json.media[0].url).toContain('-w640.webp');
   });
 });
+
+describe('T050 — changing a confirmed order requires customer re-confirmation', () => {
+  it('amendment keeps old content until the customer confirms; fulfilment blocked meanwhile; reject keeps old; commission follows new lines', async () => {
+    const tt = await setupApp();
+    const st = await staff(tt);
+    const { mkProduct, mkPartner, placeOrder, balances } = await import('./helpers.js');
+    const p = await mkPartner(tt);
+    const prod = await mkProduct(tt, { prices: [100_000], stock: [10], rule: { kind: 'fixed_per_unit', fixed: 10_000 } });
+    const c = await mkUser(tt);
+    const o = await placeOrder(tt, { token: c.token, phone: c.phone }, [{ sku_id: prod.skuIds[0]!, qty: 1 }], { referral_code: p.code });
+    const id = o.json.order_id;
+    const before = (await tt.db.query(`SELECT payable_minor FROM orders WHERE id=$1`, [id])).rows[0].payable_minor;
+    const am = await api(tt, 'POST', `/ops/orders/${id}/amendments`, { token: st.operator.token, body: { lines: [{ sku_id: prod.skuIds[0], qty: 3 }], reason: 'Mijoz 3 ta so‘radi' } });
+    expect(am.status).toBe(200);
+    expect(am.json.new_quote.payable.amount_minor).toBe(String(3 * 10000000 + 2000000));
+    expect((await tt.db.query(`SELECT payable_minor FROM orders WHERE id=$1`, [id])).rows[0].payable_minor).toBe(before);
+    expect((await api(tt, 'POST', `/ops/orders/${id}/pick`, { token: st.warehouse.token })).json.code).toBe('AMENDMENT_PENDING');
+    expect((await api(tt, 'POST', `/ops/orders/${id}/amendments`, { token: st.operator.token, body: { lines: [{ sku_id: prod.skuIds[0], qty: 2 }], reason: 'second' } })).json.code).toBe('AMENDMENT_ALREADY_PENDING');
+    const view = await api(tt, 'GET', `/confirm/${am.json.dev_customer_link_token}`);
+    expect(view.json.order.is_amendment).toBe(true);
+    expect(view.json.lines[0].qty).toBe(3);
+    const ok = await api(tt, 'POST', `/confirm/${am.json.dev_customer_link_token}`, { body: { decision: 'confirm', code: am.json.dev_customer_code } });
+    expect(ok.status).toBe(200);
+    const after = (await tt.db.query(`SELECT payable_minor FROM orders WHERE id=$1`, [id])).rows[0].payable_minor;
+    expect(after).toBe(String(3 * 10000000 + 2000000));
+    expect((await tt.db.query(`SELECT reserved FROM stock_balances WHERE sku_id=$1`, [prod.skuIds[0]])).rows[0].reserved).toBe(3);
+    expect(await balances(tt, p.partnerId)).toMatchObject({ e: '3000000' });
+    const lines = (await tt.db.query(`SELECT qty, canceled_qty FROM order_lines WHERE order_id=$1 ORDER BY qty`, [id])).rows;
+    expect(lines).toEqual([{ qty: 1, canceled_qty: 1 }, { qty: 3, canceled_qty: 0 }]); // old snapshot kept
+    // Second amendment rejected by customer → nothing changes.
+    const am2 = await api(tt, 'POST', `/ops/orders/${id}/amendments`, { token: st.operator.token, body: { lines: [{ sku_id: prod.skuIds[0], qty: 1 }], reason: 'kamaytirish' } });
+    await api(tt, 'POST', `/confirm/${am2.json.dev_customer_link_token}`, { body: { decision: 'reject', code: am2.json.dev_customer_code } });
+    expect((await tt.db.query(`SELECT payable_minor, commercial_status FROM orders WHERE id=$1`, [id])).rows[0]).toEqual({ payable_minor: after, commercial_status: 'confirmed' });
+    expect((await api(tt, 'POST', `/ops/orders/${id}/pick`, { token: st.warehouse.token })).status).toBe(200);
+    expect((await api(tt, 'POST', `/ops/orders/${id}/amendments`, { token: st.operator.token, body: { lines: [{ sku_id: prod.skuIds[0], qty: 1 }], reason: 'late' } })).json.code).toBe('ORDER_NOT_AMENDABLE');
+  });
+});

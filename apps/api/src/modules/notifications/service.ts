@@ -7,7 +7,7 @@ import { enqueueJob } from '../../platform/outbox.js';
  */
 export async function queueNotification(
   q: Queryable,
-  n: { userId?: string | null; phone?: string | null; channel: 'sms' | 'in_app'; purpose: 'otp' | 'transactional' | 'marketing' | 'security'; template: string; locale: string; params: Record<string, unknown>; dedupeKey?: string },
+  n: { userId?: string | null; phone?: string | null; channel: 'sms' | 'in_app' | 'telegram'; purpose: 'otp' | 'transactional' | 'marketing' | 'security'; template: string; locale: string; params: Record<string, unknown>; dedupeKey?: string },
 ): Promise<void> {
   const r = await q.query(
     `INSERT INTO notifications (user_id, phone_e164, channel, purpose, template, locale, params, dedupe_key)

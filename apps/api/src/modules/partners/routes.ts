@@ -13,6 +13,7 @@ import { zContact, zDeliveryAddress } from '../checkout/routes.js';
 import { accrueForOrder, rebuildBalances, recalcOrder, releaseMatured, transfer } from '../commissions/service.js';
 import { postJournal } from '../finance/journal.js';
 import { queueNotification } from '../notifications/service.js';
+import { notifyPartner } from '../notifications/telegram.js';
 import { cancelOrder, confirmOrder, createOrder, m, priceLines, pricedToJson, storeQuote } from '../orders/service.js';
 import { isBotUserAgent, visitorHash } from './attribution.js';
 import { applyAmendment, rejectAmendment } from '../orders/amendments.js';
@@ -353,6 +354,8 @@ export function registerPartners(app: FastifyInstance, deps: Deps): void {
         await transfer(tx, { partnerId: r.partner_id, from: 'reserved', to: 'paid', amount, sourceType: 'payout', sourceId: params.id, effectKey: 'paid', actorId: actor.userId });
         await postJournal(tx, `payout_paid:${params.id}`, 'payout_paid', [{ account: 'partner_payable', debit: amount }, { account: 'cash_bank', credit: amount }]);
         await tx.query(`UPDATE payout_requests SET status='paid', paid_reference=$2, paid_evidence=$3, version=version+1, updated_at=now() WHERE id=$1`, [params.id, body.reference, body.evidence ?? null]);
+        const dest = await maybeOne<{ masked: string | null }>(tx, `SELECT payout_destination->>'masked' AS masked FROM partners WHERE id=$1`, [r.partner_id]);
+        await notifyPartner(tx, r.partner_id, 'partner.payout_paid', { amount_minor: r.amount_minor, destination: dest?.masked ?? null }, `p:paid:${params.id}`);
       } else if (body.outcome === 'rejected') {
         await transfer(tx, { partnerId: r.partner_id, from: 'reserved', to: 'available', amount, sourceType: 'payout', sourceId: params.id, effectKey: 'release', actorId: actor.userId, reason: body.reason });
         await tx.query(`UPDATE payout_requests SET status='rejected', reject_reason=$2, version=version+1, updated_at=now() WHERE id=$1`, [params.id, body.reason ?? null]);

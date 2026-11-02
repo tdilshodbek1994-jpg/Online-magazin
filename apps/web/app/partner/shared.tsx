@@ -98,3 +98,31 @@ export function PartnerGuard({ children }: { children: React.ReactNode }) {
   );
   return <>{children}</>;
 }
+
+/** Connect the partner's Telegram to receive order / delivery / payment messages. */
+export function TelegramConnect() {
+  const [s, setS] = useState<any>(null);
+  const [link, setLink] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const load = () => api('/me/telegram').then(setS).catch(() => {});
+  useEffect(() => { void load(); }, []);
+  if (!s) return null;
+  if (s.linked) return (
+    <div className="tg-card ok">
+      <span aria-hidden>✅</span>
+      <div><b>Telegram ulangan</b><div className="muted small">Yangi buyurtma, yetkazish va to‘lovlar haqida xabar keladi.</div></div>
+      <button className="btn secondary sm" onClick={async () => { if (confirm('Telegram xabarlari o‘chirilsinmi?')) { await api('/me/telegram', { method: 'DELETE' }).catch(() => {}); void load(); } }}>Uzish</button>
+    </div>
+  );
+  return (
+    <div className="tg-card">
+      <span aria-hidden>✈️</span>
+      <div><b>Telegram xabarlarini yoqing</b><div className="muted small">Har bir yangi buyurtma va pul tushganini darhol bilib turasiz.</div></div>
+      {!s.bot_configured ? <span className="muted small">Bot hali sozlanmagan (admin)</span>
+        : link ? <a className="btn sm tg" href={link} target="_blank" rel="noopener noreferrer" onClick={() => setTimeout(load, 8000)}>Botni ochish</a>
+        : <button className="btn sm tg" onClick={async () => { setErr(null); try { const r = await api('/me/telegram/link-token', { method: 'POST' }); setLink(r.deep_link); if (r.deep_link) window.open(r.deep_link, '_blank', 'noopener'); } catch (e: any) { setErr(e.code); } }}>Telegram'ni ulash</button>}
+      {link && <div className="muted small" style={{ gridColumn: '1 / -1' }}>Botda «Start» tugmasini bosing, keyin bu sahifani yangilang. Havola 10 daqiqa amal qiladi.</div>}
+      {err && <span className="field-error">{err}</span>}
+    </div>
+  );
+}

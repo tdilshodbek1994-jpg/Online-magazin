@@ -1,6 +1,7 @@
 import { divRoundHalfUp } from '@om/shared';
 import type { Queryable, Tx } from '../../platform/db.js';
 import { postJournal } from '../finance/journal.js';
+import { maskedNumber, notifyPartner } from '../notifications/telegram.js';
 
 export type Bucket = 'external' | 'estimated' | 'pending' | 'available' | 'reserved' | 'paid' | 'debt';
 const COL: Record<Exclude<Bucket, 'external'>, string> = {
@@ -113,6 +114,13 @@ export async function accrueForOrder(tx: Tx, orderId: string, partnerId: string)
       await transfer(tx, { partnerId, from: 'external', to: 'estimated', amount: target, sourceType: 'accrual', sourceId: ins.rows[0].id, effectKey: 'v1:estimated', reason: 'order_created' });
     }
   }
+  const info = await tx.query(
+    `SELECT o.number, l.name AS stream,
+            (SELECT string_agg((ol.product_snapshot->'name'->>'uz-Latn') || ' × ' || ol.qty, ', ') FROM order_lines ol WHERE ol.order_id=o.id) AS products,
+            (SELECT COALESCE(SUM(target_minor),0)::text FROM commission_accruals WHERE order_id=o.id AND state <> 'superseded') AS amount
+       FROM orders o LEFT JOIN referral_links l ON l.id::text = o.attribution->>'link_id' WHERE o.id=$1`, [orderId]);
+  const i = info.rows[0];
+  if (i) await notifyPartner(tx, partnerId, 'partner.order_new', { number: maskedNumber(i.number), products: i.products, stream: i.stream, amount_minor: i.amount }, `p:new:${orderId}`);
 }
 
 /**
@@ -160,6 +168,14 @@ export async function recalcOrder(tx: Tx, orderId: string, reason: string, actor
       [a.id, newTarget.toString(), v],
     );
   }
+  // Tell the partner once when the whole order no longer earns anything (cancel / full return).
+  const left = await tx.query(`SELECT partner_id, COUNT(*) FILTER (WHERE state <> 'reversed')::int AS live, COUNT(*)::int AS n FROM commission_accruals WHERE order_id=$1 AND state <> 'superseded' GROUP BY partner_id`, [orderId]);
+  for (const r of left.rows) {
+    if (r.n > 0 && r.live === 0) {
+      const num = await tx.query(`SELECT number FROM orders WHERE id=$1`, [orderId]);
+      await notifyPartner(tx, r.partner_id, 'partner.order_cancelled', { number: maskedNumber(num.rows[0].number) }, `p:rev:${orderId}`);
+    }
+  }
 }
 
 /**
@@ -181,6 +197,12 @@ export async function promoteToPending(tx: Tx, orderId: string, holdDays: number
       [a.id, v, holdDays, x.delivered_at],
     );
   }
+  if (acc.rows.length) {
+    const num = await tx.query(`SELECT number FROM orders WHERE id=$1`, [orderId]);
+    const byPartner = new Map<string, bigint>();
+    for (const a of acc.rows) byPartner.set(a.partner_id, (byPartner.get(a.partner_id) ?? 0n) + BigInt(a.target_minor));
+    for (const [pid, amt] of byPartner) await notifyPartner(tx, pid, 'partner.order_delivered', { number: maskedNumber(num.rows[0].number), amount_minor: amt.toString() }, `p:deliv:${orderId}:${pid}`);
+  }
 }
 
 /** pending -> available after hold, when no open return/dispute exists for the order. */
@@ -199,6 +221,7 @@ export async function releaseMatured(tx: Tx, now: Date = new Date()): Promise<nu
     await transfer(tx, { partnerId: a.partner_id, from: 'pending', to: 'available', amount: amt, sourceType: 'accrual', sourceId: a.id, effectKey: `v${v}:available`, reason: 'hold_elapsed' });
     await postJournal(tx, `commission:${a.id}:v${v}`, 'commission_available', [{ account: 'commission_expense', debit: amt }, { account: 'partner_payable', credit: amt }]);
     await tx.query(`UPDATE commission_accruals SET state='available', available_at=now(), version=$2 WHERE id=$1`, [a.id, v]);
+    await notifyPartner(tx, a.partner_id, 'partner.commission_available', { amount_minor: amt.toString() }, `p:avail:${a.id}`);
   }
   return acc.rowCount ?? 0;
 }

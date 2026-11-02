@@ -7,6 +7,7 @@ import { many, maybeOne, one, withTx } from '../../platform/db.js';
 import { AppError, conflict, forbidden, notFound } from '../../platform/errors.js';
 import { type Deps, route, zIdParam } from '../../platform/http.js';
 import { queueNotification } from './service.js';
+import { renderText } from './telegram.js';
 
 const LATEST_CONSENT = `(SELECT c.granted FROM consents c WHERE c.user_id=u.id AND c.purpose='marketing' AND c.channel IN ($CH,'any') ORDER BY c.created_at DESC, c.id DESC LIMIT 1)`;
 
@@ -67,6 +68,27 @@ export function registerMessaging(app: FastifyInstance, deps: Deps): void {
     return { token, deep_link: bot ? `https://t.me/${bot}?start=${token}` : null, configured: Boolean(bot) };
   });
 
+  route(app, deps, { method: 'GET', url: '/me/telegram', tags: ['messaging'], summary: 'Telegram link status for the current user' }, async ({ actor, db }) => {
+    requireUser(actor);
+    const l = await maybeOne<{ linked_at: string }>(db, `SELECT linked_at FROM telegram_links WHERE user_id=$1`, [actor.userId]);
+    return { linked: !!l, linked_at: l?.linked_at ?? null, bot_configured: Boolean(process.env.TELEGRAM_BOT_USERNAME && process.env.TELEGRAM_BOT_TOKEN), bot_username: process.env.TELEGRAM_BOT_USERNAME ?? null };
+  });
+
+  route(app, deps, { method: 'DELETE', url: '/me/telegram', tags: ['messaging'], summary: 'Unlink Telegram' }, async ({ actor, db }) => {
+    requireUser(actor);
+    await db.query(`DELETE FROM telegram_links WHERE user_id=$1`, [actor.userId]);
+    await audit(db, actor, 'telegram.unlinked', { type: 'user', id: actor.userId! });
+    return { ok: true };
+  });
+
+  // In-cabinet notification list (same events as Telegram; works even when Telegram is not linked).
+  route(app, deps, { method: 'GET', url: '/me/notifications', tags: ['messaging'], summary: 'My recent notifications (rendered text)' }, async ({ actor, db }) => {
+    requireUser(actor);
+    const rows = await many<{ id: string; template: string; params: Record<string, unknown>; status: string; created_at: string }>(db,
+      `SELECT id, template, params, status, created_at FROM notifications WHERE user_id=$1 AND purpose IN ('transactional','marketing') AND template LIKE 'partner.%' ORDER BY created_at DESC LIMIT 50`, [actor.userId]);
+    return { items: rows.map((r) => ({ id: r.id, kind: r.template, text: renderText(r.template, r.params ?? {}), telegram: r.status === 'sent', created_at: r.created_at })) };
+  });
+
   app.post('/webhooks/telegram', { schema: { hide: true } }, async (req, reply) => {
     const secret = process.env.TELEGRAM_WEBHOOK_SECRET;
     if (!secret) return reply.status(503).send({ code: 'TELEGRAM_NOT_CONFIGURED' });
@@ -83,6 +105,7 @@ export function registerMessaging(app: FastifyInstance, deps: Deps): void {
       if (other && other.user_id !== t.user_id) return { ok: true, linked: false, reason: 'chat_linked_to_other_account' };
       await tx.query(`INSERT INTO telegram_links (user_id, chat_id) VALUES ($1,$2) ON CONFLICT (user_id) DO UPDATE SET chat_id=EXCLUDED.chat_id, linked_at=now()`, [t.user_id, chatId]);
       await audit(tx, null, 'telegram.linked', { type: 'user', id: t.user_id });
+      await queueNotification(tx, { userId: t.user_id, channel: 'telegram', purpose: 'transactional', template: 'telegram.linked', locale: 'uz-Latn', params: {}, dedupeKey: `tglinked:${t.user_id}:${Date.now()}` });
       return { ok: true, linked: true };
     });
   });

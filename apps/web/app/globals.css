@@ -416,3 +416,8 @@ button.stat { font: inherit; text-align: left; cursor: pointer; }
 }
 .seller-list { display: grid; gap: 8px; }
 .seller-row { display: grid; gap: 6px; padding: 10px; border-radius: 12px; background: var(--surface-2); }
+.tg-card { margin-top: 12px; display: grid; grid-template-columns: auto 1fr auto; gap: 10px 12px; align-items: center; padding: 14px; border-radius: var(--radius); background: var(--surface); border: 1px solid #93c5fd; }
+.tg-card > span { font-size: 26px; }
+.tg-card.ok { border-color: #86efac; }
+.notif { grid-template-columns: auto 1fr; display: grid; align-items: start; }
+.notif-ico { font-size: 24px; }

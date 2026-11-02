@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { Async } from '@/components/Header';
 import { api, som } from '@/lib/api';
-import { BUCKET_LABEL, Chips, PERIODS, usePartnerMe } from './shared';
+import { BUCKET_LABEL, Chips, PERIODS, TelegramConnect, usePartnerMe } from './shared';
 
 function ApplyForm({ onDone }: { onDone: () => void }) {
   const [apply, setApply] = useState({ name: '', channels: '' });
@@ -57,6 +57,8 @@ export default function PartnerDashboard() {
             <Link href="/partner/payouts" className="btn bc-btn">Pul yechish</Link>
           </section>
 
+          <TelegramConnect />
+
           {d?.month_rank && (
             <section className="rank-card">
               <div className="rank-badge">#{d.month_rank.rank}</div>
@@ -93,6 +95,7 @@ export default function PartnerDashboard() {
             <Link href="/partner/order" className="tile-link"><span>📞</span>Mijoz uchun buyurtma</Link>
             <Link href="/partner/payouts" className="tile-link"><span>💳</span>Balans tarixi va to‘lovlar</Link>
             <Link href="/partner/top" className="tile-link"><span>🏆</span>TOP hamkorlar</Link>
+            <Link href="/partner/notifications" className="tile-link"><span>🔔</span>Bildirishnomalar</Link>
           </div>
         </>
       )}

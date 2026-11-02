@@ -68,3 +68,13 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 - **Shaxsiy ma'lumotlar:** server chet elda (Vultr). Real mijoz ma'lumotlarini saqlashdan oldin ЎРҚ-547 (27¹-modda, 2026 tahriri) bo'yicha huquqiy tekshiruv kerak (PHASE1_TASK §26). Staging'da faqat demo ma'lumot.
 - Zaxira: Vultr Auto Backups + `scripts/backup.sh` ni cron orqali boshqa joyga.
 - Yangilash: `git pull && docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build`.
+
+## 7. Hamkorlar uchun Telegram bot (ixtiyoriy)
+1. Telegram'da **@BotFather** → `/newbot` → nom (masalan `UzShop hamkor`) va username (masalan `uzshop_hamkor_bot`). BotFather token beradi — uni chatga yoki boshqa joyga yozmang.
+2. Serverda (`om` foydalanuvchisi, `~/online-magazin`):
+   ```bash
+   bash scripts/server/telegram-setup.sh
+   ```
+   Token ekranda ko'rinmaydi; skript tokenni tekshiradi, `.env` ga yozadi (zaxira nusxa qoladi), API'ni qayta ishga tushiradi va webhook'ni `https://<domen>/api/v1/webhooks/telegram` ga maxfiy kalit bilan ulaydi.
+3. Hamkor kabinetida **«Telegram'ni ulash»** → botda **Start**. Shundan keyin yangi buyurtma, yetkazildi, bekor qilindi, hisobga pul o'tdi, to'lov o'tkazildi xabarlari keladi. Xabarlarda mijozning ism/telefoni bo'lmaydi.
+Bot sozlanmagan bo'lsa ham xabarlar kabinetdagi «Bildirishnomalar» bo'limida ko'rinadi.

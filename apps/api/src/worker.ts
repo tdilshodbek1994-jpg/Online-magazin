@@ -3,6 +3,7 @@ import type { Db } from './platform/db.js';
 import { withTx } from './platform/db.js';
 import { releaseMatured } from './modules/commissions/service.js';
 import { releaseReservation } from './modules/inventory/service.js';
+import { renderText, sendTelegram } from './modules/notifications/telegram.js';
 
 /**
  * Durable worker (ADR-005). Jobs are claimed with FOR UPDATE SKIP LOCKED; scheduled tasks run under a
@@ -22,8 +23,21 @@ export async function runJobsOnce(db: Db, workerId: string, limit = 20): Promise
     try {
       await withTx(db, async (tx) => {
         if (j.kind === 'notification.send') {
-          // DEV adapter: no SMS/Telegram provider configured. Never reported as delivered (§23, AC-M17-2).
-          await tx.query(`UPDATE notifications SET status='suppressed', provider_ref='dev_log_only', attempts=attempts+1 WHERE id=$1 AND status='queued'`, [j.payload.id]);
+          const n = (await tx.query(`SELECT n.id, n.channel, n.template, n.params, n.status, tl.chat_id FROM notifications n LEFT JOIN telegram_links tl ON tl.user_id=n.user_id WHERE n.id=$1 FOR UPDATE OF n`, [j.payload.id])).rows[0];
+          const token = process.env.TELEGRAM_BOT_TOKEN;
+          if (n && n.status === 'queued' && n.channel === 'telegram' && token && n.chat_id) {
+            try {
+              const ref = await sendTelegram(token, n.chat_id, renderText(n.template, n.params ?? {}));
+              await tx.query(`UPDATE notifications SET status='sent', provider_ref=$2, attempts=attempts+1 WHERE id=$1`, [n.id, `tg:${ref}`]);
+            } catch (e) {
+              if (!(e as { permanent?: boolean }).permanent) throw e;
+              await tx.query(`UPDATE notifications SET status='failed', provider_ref=$2, attempts=attempts+1 WHERE id=$1`, [n.id, String((e as Error).message).slice(0, 120)]);
+            }
+          } else if (n && n.status === 'queued') {
+            // No provider/link configured (SMS adapter is dev-only): never reported as delivered (§23, AC-M17-2).
+            const why = n.channel === 'telegram' ? (token ? 'no_telegram_link' : 'telegram_not_configured') : 'dev_log_only';
+            await tx.query(`UPDATE notifications SET status='suppressed', provider_ref=$2, attempts=attempts+1 WHERE id=$1`, [n.id, why]);
+          }
         }
         await tx.query(`UPDATE jobs SET status='done', finished_at=now() WHERE id=$1`, [j.id]);
       });

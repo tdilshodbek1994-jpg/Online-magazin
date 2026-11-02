@@ -54,3 +54,6 @@ CREATE TABLE order_amendments (
   decided_at timestamptz
 );
 CREATE UNIQUE INDEX order_amendments_one_open ON order_amendments (order_id) WHERE status = 'awaiting_customer';
+
+INSERT INTO permissions (code, description, sensitive) VALUES ('marketing.manage','Create/approve/send marketing campaigns',true);
+INSERT INTO role_permissions (role_code, permission_code) VALUES ('owner','marketing.manage');

@@ -20,6 +20,7 @@ import { registerReturns } from './modules/returns/routes.js';
 import { registerPayments } from './modules/payments/routes.js';
 import { registerSupport } from './modules/support/routes.js';
 import { registerAdmin } from './modules/admin/routes.js';
+import { registerMessaging } from './modules/notifications/routes.js';
 
 declare module 'fastify' {
   interface FastifyRequest {
@@ -120,6 +121,7 @@ export async function buildApp(cfg: AppConfig, db: Db): Promise<FastifyInstance>
       registerPayments(api, deps);
       registerSupport(api, deps);
       registerAdmin(api, deps);
+      registerMessaging(api, deps);
     },
     { prefix: '/api/v1' },
   );

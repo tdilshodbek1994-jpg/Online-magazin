@@ -151,3 +151,51 @@ describe('T050 — changing a confirmed order requires customer re-confirmation'
     expect((await api(tt, 'POST', `/ops/orders/${id}/amendments`, { token: st.operator.token, body: { lines: [{ sku_id: prod.skuIds[0], qty: 1 }], reason: 'late' } })).json.code).toBe('ORDER_NOT_AMENDABLE');
   });
 });
+
+describe('T087 — marketing unsubscribe', () => {
+  it('withdrawn consent is suppressed at send time even after audience snapshot; transactional history untouched; sending is idempotent', async () => {
+    const tt = await setupApp();
+    const owner2 = await mkUser(tt, ['owner']);
+    const owner1 = await mkUser(tt, ['owner']);
+    const a = await mkUser(tt);
+    const b = await mkUser(tt);
+    const n = await mkUser(tt);
+    for (const u of [a, b]) await api(tt, 'POST', '/me/consents', { token: u.token, body: { purpose: 'marketing', channel: 'sms', granted: true } });
+    const c = await api(tt, 'POST', '/admin/campaigns', { token: owner1.token, body: { name: 'Aksiya', channel: 'sms', template: 'promo_generic', body: { text: 'Chegirma' } } });
+    expect((await api(tt, 'POST', `/admin/campaigns/${c.json.id}/approve`, { token: owner1.token })).json.code).toBe('MAKER_CANNOT_APPROVE');
+    const ap = await api(tt, 'POST', `/admin/campaigns/${c.json.id}/approve`, { token: owner2.token });
+    const inAudience = (await tt.db.query(`SELECT user_id FROM marketing_recipients WHERE campaign_id=$1`, [c.json.id])).rows.map((r) => r.user_id);
+    expect(inAudience).toEqual(expect.arrayContaining([a.id, b.id]));
+    expect(inAudience).not.toContain(n.id);
+    expect(ap.json.audience_size).toBe(inAudience.length);
+    await api(tt, 'POST', '/me/consents', { token: b.token, body: { purpose: 'marketing', channel: 'any', granted: false } });
+    const sent = await api(tt, 'POST', `/admin/campaigns/${c.json.id}/send`, { token: owner1.token });
+    expect(sent.json.suppressed).toBeGreaterThanOrEqual(1);
+    const st = Object.fromEntries((await tt.db.query(`SELECT user_id, status FROM marketing_recipients WHERE campaign_id=$1 AND user_id IN ($2,$3)`, [c.json.id, a.id, b.id])).rows.map((r) => [r.user_id, r.status]));
+    expect(st).toEqual({ [a.id]: 'queued', [b.id]: 'suppressed' });
+    const again = await api(tt, 'POST', `/admin/campaigns/${c.json.id}/send`, { token: owner1.token });
+    expect(again.json).toEqual({ queued: 0, suppressed: 0 });
+    expect((await tt.db.query(`SELECT COUNT(*)::int n FROM notifications WHERE dedupe_key=$1`, [`campaign:${c.json.id}:${a.id}`])).rows[0].n).toBe(1);
+  });
+});
+
+describe('T086 — Telegram linking', () => {
+  it('requires webhook secret; one-time token; expired/replayed tokens do not link; chat is never swapped to another account', async () => {
+    process.env.TELEGRAM_WEBHOOK_SECRET = 'om-test-webhook-secret';
+    const tt = await setupApp();
+    const u1 = await mkUser(tt);
+    const u2 = await mkUser(tt);
+    const hook = (text: string, chat: number, secret = 'om-test-webhook-secret') => api(tt, 'POST', '/api/v1/webhooks/telegram', { headers: { 'x-telegram-bot-api-secret-token': secret }, body: { message: { text, chat: { id: chat } } } });
+    const t1 = await api(tt, 'POST', '/me/telegram/link-token', { token: u1.token });
+    expect((await hook(`/start ${t1.json.token}`, 5551, 'wrong')).status).toBe(403);
+    expect((await hook(`/start ${t1.json.token}`, 5551)).json.linked).toBe(true);
+    expect((await hook(`/start ${t1.json.token}`, 5551)).json.reason).toBe('token_invalid_expired_or_used');
+    const t2 = await api(tt, 'POST', '/me/telegram/link-token', { token: u2.token });
+    expect((await hook(`/start ${t2.json.token}`, 5551)).json.reason).toBe('chat_linked_to_other_account');
+    const t3 = await api(tt, 'POST', '/me/telegram/link-token', { token: u2.token });
+    await tt.db.query(`UPDATE telegram_link_tokens SET expires_at = now() - interval '1 second' WHERE user_id=$1`, [u2.id]);
+    expect((await hook(`/start ${t3.json.token}`, 7777)).json.linked).toBe(false);
+    expect((await tt.db.query(`SELECT user_id FROM telegram_links WHERE chat_id=5551`)).rows[0].user_id).toBe(u1.id);
+    delete process.env.TELEGRAM_WEBHOOK_SECRET;
+  });
+});

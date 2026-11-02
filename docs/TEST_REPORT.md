@@ -1,0 +1,34 @@
+# Тест ҳисоботи (реал лог асосида)
+
+**Код commit'и:** `f472429` (кейинги commit'лар фақат docs/infra/CI). **Муҳит:** ONLINE-MAGAZIN-DEV сандбокс, Linux, Node 22.23.4, PostgreSQL 16.15 (локал), Chromium (Playwright 1.64). **Сана:** 2026-11-02.
+
+| Тўплам | Буйруқ | Passed | Failed | Skipped |
+|---|---|---|---|---|
+| Shared unit (пул, тақсимот, телефон, транслитерация) | `pnpm --filter @om/shared test` | 19 | 0 | 0 |
+| API integration, реал PostgreSQL (`om_test` ҳар сафар янгидан) | `pnpm --filter @om/api test` | 61 | 0 | 0 |
+| Браузер E2E (web :3000 → api :4000, seed DEMO) | `node apps/web/e2e/smoke.mjs` | 9 | 0 | 0 |
+| TypeScript | `pnpm -r typecheck` (api, shared, web) | ✓ | — | — |
+| Web production build | `next build` | ✓ | — | — |
+| Restore drill | `scripts/restore-drill.sh` | 6/6 текширув OK | — | — |
+| Dependency audit | `pnpm audit --prod --audit-level high` | 0 high/critical (2 moderate) | — | — |
+| Docker image build | `docker compose build` | **бажарилмади**: build-контейнер npm registry'га proxy/TLS орқали чиқа олмади | | |
+
+API тест файллари: `apps/api/test/b-order-flow.test.ts` (B босқич E2E + қидирув), `c-partner.test.ts` (ҳамкорлик, комиссия, payout), `d-integrity.test.ts` (параллеллик, idempotency, Payme/Click контракт, refund, рухсатлар, ҳисобот, миграция, журнал).
+
+## Тестлар топган ва тузатилган хатолар
+1. Гость саватни мавжуд саватга бирлаштиришда `carts` CHECK бузилар эди (T023).
+2. Attribution тузатишда SQL параметр типи (T040).
+3. Каталог қидирувида ORDER BY subquery ташқарисида (`p.published_at`) — қидирув 500 қайтарар эди (E2E).
+4. SKU бўйича аниқ қидирув токенларга бўлиниб ишламас эди.
+5. Checkout'да «оферта» ёзуви ҳавола бўлгани учун checkbox ўрнига бошқа саҳифага ўтиб кетар эди (E2E).
+6. Ҳамкор саҳифаси хатоликда ариза формасини кўрсатар эди.
+
+## Интеграциялар ҳолати
+| Провайдер | Ҳолат |
+|---|---|
+| Payme Merchant API | adapter + протокол контракт тестлари (auth, amount тийин, Create/Perform/Cancel/Check/GetStatement, 12 соат timeout, дубль). **Live/sandbox кабинетида текширилмаган** |
+| CLICK Prepare/Complete | adapter + MD5 sign, сўм→тийин конвертация, дубль/бекор. **Live текширилмаган** |
+| MOCK провайдер | фақат dev/test; production'да ўчиқ; UI'да «TEST/MOCK» |
+| SMS / Telegram | йўқ (dev log adapter, `suppressed`, «етказилди» деб ҳисобланмайди) |
+| Фискал | blocked |
+| AI | бошланмаган (flag off) |

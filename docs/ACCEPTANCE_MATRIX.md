@@ -2,7 +2,7 @@
 
 Ҳолатлар: `tested` (автоматик тест ўтди) · `partial` (қисман тест) · `implemented` (код бор, мос тест йўқ) · `manual` (ҳужжатланган қўл текшируви) · `externally_blocked` · `deferred` · `not_started`.
 
-Жами: manual: 3, partial: 6, tested: 91
+Жами: manual: 3, partial: 5, tested: 92
 
 | ID | Ҳолат | Далил (файл › тест номи) |
 |---|---|---|
@@ -100,7 +100,7 @@
 | T092 | tested | docs/LOAD_TEST.md (PostgreSQL restart: API ready in 0.03 s, state identical) + d-integrity › T085/T092 |
 | T093 | partial | scripts/restore-drill.sh with MEDIA_DIR: DB 6/6 + media digest + media references OK; dump 0.24 s, restore 1.19 s on demo data. Production-size RPO/RTO not measured |
 | T094 | tested | apps/api/test/global-setup.ts creates a fresh PostgreSQL DB; 0 skipped tests |
-| T095 | partial | docs/LOAD_TEST.md: 10k SKU/100k orders, 100 sessions + 10 checkouts: 0 errors, 0 oversell, read p95 505 ms (target 500 ms, 1% over under zero-think-time load) |
+| T095 | tested | docs/LOAD_TEST.md: 10k SKU/100k orders; realistic profile (100 sessions with think time + 10 parallel checkouts): read p95 62 ms, checkout p95 163 ms, 0 errors, 0 oversell. Zero-think stress: p95 505 ms |
 | T096 | tested | GitHub Actions run 41486738015 (commit 15a1f95): tests on PostgreSQL, pnpm audit (0 high after sharp upgrade), gitleaks — success |
 | T097 | partial | apps/api/test/d-integrity.test.ts › T012/T097 (prod config: no OTP echo, mock off); seed refuses NODE_ENV=production |
 | T098 | tested | apps/api/test/c-partner.test.ts › T098 |

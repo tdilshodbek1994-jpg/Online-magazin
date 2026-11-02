@@ -3,6 +3,7 @@
 import { randomUUID } from 'node:crypto';
 const API = (process.env.API_URL ?? 'http://localhost:4000') + '/api/v1';
 const DURATION = Number(process.env.DURATION_S ?? 60) * 1000;
+const THINK_MS = Number(process.env.THINK_MS ?? 0); // per-session pause between page views (0 = closed loop)
 const lat = { read: [], checkout: [] };
 let errors = { read: 0, checkout: 0 }, ok = { read: 0, checkout: 0 }, conflicts = 0;
 const pct = (a, p) => { const s = [...a].sort((x, y) => x - y); return s.length ? s[Math.min(s.length - 1, Math.floor((p / 100) * s.length))].toFixed(1) : 'n/a'; };
@@ -18,6 +19,7 @@ async function browser() {
     const which = Math.random();
     const r = await timed('read', () => which < 0.4 ? j(`/products?limit=24&offset=${Math.floor(Math.random() * 500)}`, { headers: h }) : which < 0.7 ? j(`/products?q=yuklama%20${n}`, { headers: h }) : j(`/products/load-${n}`, { headers: h }));
     if (r) ok.read++;
+    if (THINK_MS) await new Promise((res) => setTimeout(res, THINK_MS * (0.5 + Math.random())));
   }
 }
 async function checkout() {

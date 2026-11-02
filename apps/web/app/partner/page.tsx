@@ -103,7 +103,11 @@ export default function PartnerDashboard() {
             <Link href="/partner/streams" className="tile-link"><span>🔗</span>Oqimlarim</Link>
             <Link href="/partner/order" className="tile-link"><span>📞</span>Mijoz uchun buyurtma</Link>
             <Link href="/partner/payouts" className="tile-link"><span>💳</span>Balans tarixi va to‘lovlar</Link>
-            <Link href="/partner/top" className="tile-link"><span>🏆</span>TOP hamkorlar</Link>
+            <Link href="/partner/programs#konkurs" className="tile-link"><span>🏆</span>Konkurs</Link>
+            <Link href="/partner/programs#bonus" className="tile-link"><span>🎁</span>Bonuslar</Link>
+            <Link href="/partner/programs#jarima" className="tile-link"><span>⚠️</span>Jarimalar</Link>
+            <Link href="/partner/programs#hayriya" className="tile-link"><span>💝</span>Hayriya qutisi</Link>
+            <Link href="/partner/top" className="tile-link"><span>📈</span>TOP hamkorlar</Link>
             <Link href="/partner/notifications" className="tile-link"><span>🔔</span>Bildirishnomalar</Link>
             <Link href="/partner/about" className="tile-link"><span>📘</span>Dastur haqida</Link>
           </div>

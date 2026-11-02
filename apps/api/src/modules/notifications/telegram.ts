@@ -2,7 +2,7 @@ import type { Queryable } from '../../platform/db.js';
 import { queueNotification } from './service.js';
 
 /** Partner-facing events (Telegram + in-cabinet list). Amounts are tiyin strings; text never contains customer PII. */
-export type PartnerEvent = 'partner.order_new' | 'partner.order_delivered' | 'partner.order_cancelled' | 'partner.commission_available' | 'partner.payout_paid' | 'telegram.linked';
+export type PartnerEvent = 'partner.order_new' | 'partner.order_delivered' | 'partner.order_cancelled' | 'partner.commission_available' | 'partner.payout_paid' | 'partner.bonus' | 'partner.contest_prize' | 'partner.penalty' | 'telegram.linked';
 
 const som = (minor: unknown) => {
   try { return `${(BigInt(String(minor ?? '0')) / 100n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} so‘m`; } catch { return '—'; }
@@ -15,6 +15,9 @@ export function renderText(template: string, p: Record<string, unknown>): string
     case 'partner.order_cancelled': return `❌ Buyurtma ${p.number ?? ''} bekor qilindi yoki qaytarildi\nBu buyurtma bo‘yicha bonus hisoblanmaydi.`;
     case 'partner.commission_available': return `💰 Hisobingizga ${som(p.amount_minor)} o‘tdi\nEndi pul yechish so‘rovini yuborishingiz mumkin.`;
     case 'partner.payout_paid': return `💳 To‘lov amalga oshirildi: ${som(p.amount_minor)}\nKarta: ${p.destination ?? '—'}`;
+    case 'partner.bonus': return `🎁 Bonus: +${som(p.amount_minor)}\n${p.reason ?? ''}\nHisobingizga (yechish mumkin) qo‘shildi.`;
+    case 'partner.contest_prize': return `🏆 Tabriklaymiz! ${p.reason ?? 'Konkurs sovrini'}\n+${som(p.amount_minor)} hisobingizga qo‘shildi.`;
+    case 'partner.penalty': return `⚠️ Jarima: −${som(p.amount_minor)}\nSabab: ${p.reason ?? '—'}\nSavol bo‘lsa, qo‘llab-quvvatlashga yozing.`;
     case 'telegram.linked': return '✅ UzShop hamkor bildirishnomalari ulandi. Yangi buyurtma, yetkazish va to‘lovlar haqida shu yerga xabar keladi.';
     default: return String(p.text ?? template);
   }

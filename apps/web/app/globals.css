@@ -457,3 +457,7 @@ textarea { resize: vertical; }
   .b-delivered { color: #6ee7b7; border-color: #065f46; } .b-returned { color: #fca5a5; border-color: #991b1b; } .b-cancelled { color: #d1d5db; border-color: #4b5563; }
 }
 .btn.danger { background: #b42318; border-color: #b42318; color: #fff; }
+.progress { height: 10px; border-radius: 6px; background: var(--surface-2); overflow: hidden; border: 1px solid var(--border); }
+.progress span { display: block; height: 100%; background: linear-gradient(90deg, var(--primary), #14b8a6); }
+.contest { gap: 8px; }
+a.chip { text-decoration: none; }

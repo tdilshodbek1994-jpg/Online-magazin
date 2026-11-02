@@ -4,6 +4,7 @@ import { Async } from '@/components/Header';
 import { api, getToken, som } from '@/lib/api';
 import { pick, useI18n } from '@/lib/i18n';
 import { ProductEditor } from './ProductEditor';
+import { AdminPrograms } from './Programs';
 
 const today = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tashkent' }).format(new Date());
 
@@ -15,10 +16,11 @@ export default function Admin() {
   return (
     <>
       <h1>Boshqaruv paneli</h1>
-      <div className="chips admin-tabs" role="tablist">{[['orders', '📦 Buyurtmalar'], ['partners', '🤝 Hamkorlar — kim sotyapti'], ['flow', '🏷️ Qabul qilingan tovarlar'], ['products', 'Mahsulotlar'], ['summary', '📊 Hisobot'], ['import', 'CSV import'], ['promos', 'Promokodlar'], ['payouts', 'To‘lovlar (payout)'], ['finance', 'Moliya'], ['integrations', 'Integratsiyalar']].map(([k, l]) => <button key={k} role="tab" aria-selected={tab === k} className={`chip ${tab === k ? 'on' : ''}`} onClick={() => setTab(k)}>{l}</button>)}</div>
+      <div className="chips admin-tabs" role="tablist">{[['orders', '📦 Buyurtmalar'], ['partners', '🤝 Hamkorlar — kim sotyapti'], ['programs', '🏆 Konkurs va bonuslar'], ['flow', '🏷️ Qabul qilingan tovarlar'], ['products', 'Mahsulotlar'], ['summary', '📊 Hisobot'], ['import', 'CSV import'], ['promos', 'Promokodlar'], ['payouts', 'To‘lovlar (payout)'], ['finance', 'Moliya'], ['integrations', 'Integratsiyalar']].map(([k, l]) => <button key={k} role="tab" aria-selected={tab === k} className={`chip ${tab === k ? 'on' : ''}`} onClick={() => setTab(k)}>{l}</button>)}</div>
       {msg && <div className="notice" role="status">{msg}</div>}
       {tab === 'orders' && <Orders lang={lang} />}
       {tab === 'flow' && <Flow lang={lang} />}
+      {tab === 'programs' && <AdminPrograms />}
       {tab === 'summary' && <Summary />}
       {tab === 'products' && <Products act={act} lang={lang} />}
       {tab === 'import' && <Import />}

@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { TelegramConnect } from '../shared';
 
-const ICON: Record<string, string> = { 'partner.order_new': '🛒', 'partner.order_delivered': '✅', 'partner.order_cancelled': '❌', 'partner.commission_available': '💰', 'partner.payout_paid': '💳' };
+const ICON: Record<string, string> = { 'partner.order_new': '🛒', 'partner.order_delivered': '✅', 'partner.order_cancelled': '❌', 'partner.commission_available': '💰', 'partner.payout_paid': '💳', 'partner.bonus': '🎁', 'partner.contest_prize': '🏆', 'partner.penalty': '⚠️' };
 
 export default function PartnerNotifications() {
   const [items, setItems] = useState<any[] | null>(null);

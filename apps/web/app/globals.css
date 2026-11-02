@@ -414,3 +414,5 @@ button.stat { font: inherit; text-align: left; cursor: pointer; }
   .sku-row { grid-template-columns: 1fr 1fr; }
   .sku-row .btn { grid-column: 2; justify-self: end; }
 }
+.seller-list { display: grid; gap: 8px; }
+.seller-row { display: grid; gap: 6px; padding: 10px; border-radius: 12px; background: var(--surface-2); }

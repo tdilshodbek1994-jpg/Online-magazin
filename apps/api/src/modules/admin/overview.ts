@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { can, requirePerm } from '../../platform/auth.js';
 import { many } from '../../platform/db.js';
 import { forbidden } from '../../platform/errors.js';
-import { type Deps, route } from '../../platform/http.js';
+import { type Deps, route, zIdParam } from '../../platform/http.js';
 import { BUCKET_SQL, BUCKETS, periodSql } from '../partners/cabinet.js';
 
 const zPeriod = z.enum(['today', 'yesterday', 'week', 'month', 'half_year', 'all']).default('all');
@@ -76,4 +76,73 @@ export function registerAdminOverview(app: FastifyInstance, deps: Deps): void {
       }),
     };
   });
+
+  /** "Who sells my products": every partner with traffic, orders by status, sales value and commission for the period. */
+  route(app, deps, {
+    method: 'GET', url: '/admin/partners/performance', tags: T, summary: 'Partner leaderboard: clicks, orders by status, delivered sales, commission, balances, top products',
+    query: z.object({ period: zPeriod, q: z.string().max(80).optional() }),
+  }, async ({ actor, db, query }) => {
+    if (!can(actor, 'partners.manage') && !can(actor, 'reports.read')) throw forbidden();
+    const params: unknown[] = [];
+    let filter = '';
+    if (query.q) { params.push(`%${query.q}%`); filter = `WHERE (pa.display_name ILIKE $1 OR pa.code ILIKE $1)`; }
+    const per = periodSql('o.created_at', query.period);
+    const rows = await many(db, `
+      WITH ord AS (
+        SELECT o.attributed_partner_id AS pid, ${BUCKET_SQL} AS bucket, COUNT(*)::int AS n, SUM(o.payable_minor) AS value
+          FROM orders o WHERE o.attributed_partner_id IS NOT NULL AND ${per} GROUP BY 1, 2),
+      clk AS (SELECT t.partner_id AS pid, COUNT(*)::int AS n FROM referral_touches t WHERE t.eligible AND ${periodSql('t.touched_at', query.period)} GROUP BY 1),
+      com AS (SELECT o.attributed_partner_id AS pid, SUM(a.target_minor) FILTER (WHERE a.state IN ('estimated','pending')) AS pending, SUM(a.target_minor) FILTER (WHERE a.state='available') AS earned
+                FROM commission_accruals a JOIN orders o ON o.id=a.order_id WHERE ${per} GROUP BY 1),
+      top AS (
+        SELECT pid, json_agg(json_build_object('product_id', product_id, 'name', name, 'orders', n) ORDER BY n DESC) FILTER (WHERE rn <= 3) AS products FROM (
+          SELECT o.attributed_partner_id AS pid, p.id AS product_id, p.name, COUNT(DISTINCT o.id)::int AS n,
+                 ROW_NUMBER() OVER (PARTITION BY o.attributed_partner_id ORDER BY COUNT(DISTINCT o.id) DESC) AS rn
+            FROM orders o JOIN order_lines ol ON ol.order_id=o.id JOIN skus s ON s.id=ol.sku_id JOIN products p ON p.id=s.product_id
+           WHERE o.attributed_partner_id IS NOT NULL AND ${per} GROUP BY 1, 2, 3) x GROUP BY pid)
+      SELECT pa.id, pa.code, pa.display_name, pa.status, pa.created_at,
+             pa.payout_destination->>'masked' AS destination, pa.payout_destination_verified_at,
+             b.available_minor::text, b.pending_minor::text, b.paid_minor::text, b.debt_minor::text,
+             (SELECT COUNT(*)::int FROM referral_links l WHERE l.partner_id=pa.id AND l.status='active') AS streams,
+             COALESCE(clk.n, 0) AS clicks,
+             (SELECT json_object_agg(bucket, json_build_object('n', n, 'value', value::text)) FROM ord WHERE ord.pid=pa.id) AS by_status,
+             COALESCE(com.pending, 0)::text AS commission_pending_minor, COALESCE(com.earned, 0)::text AS commission_earned_minor,
+             top.products AS top_products
+        FROM partners pa LEFT JOIN partner_balances b ON b.partner_id=pa.id LEFT JOIN clk ON clk.pid=pa.id LEFT JOIN com ON com.pid=pa.id LEFT JOIN top ON top.pid=pa.id
+        ${filter}`, params);
+    const items = rows.map((r) => {
+      const bs = (r.by_status as Record<string, { n: number; value: string }> | null) ?? {};
+      const orders = Object.fromEntries(BUCKETS.map((k) => [k, bs[k]?.n ?? 0])) as Record<string, number>;
+      const total = Object.values(orders).reduce((a, b) => a + b, 0);
+      const finished = orders.delivered! + orders.returned! + orders.cancelled!;
+      return { ...r, clicks: Number(r.clicks), by_status: undefined, orders: { ...orders, total } as Record<string, number>, delivered_sales_minor: bs.delivered?.value ?? '0',
+        delivery_rate_pct: finished ? Math.round((orders.delivered! / finished) * 100) : null,
+        conversion_pct: Number(r.clicks) ? Math.round((total / Number(r.clicks)) * 1000) / 10 : null };
+    }).sort((a, b) => b.orders.delivered! - a.orders.delivered! || b.orders.total! - a.orders.total! || b.clicks - a.clicks);
+    return { period: query.period, items: items.map((x, i) => ({ rank: i + 1, ...x })) };
+  });
+
+  route(app, deps, { method: 'GET', url: '/admin/products/:id/sellers', tags: T, summary: 'Which partners sell this product: clicks, orders, delivered qty, commission', params: zIdParam, query: z.object({ period: zPeriod }) },
+    async ({ actor, db, params, query }) => {
+      if (!can(actor, 'partners.manage') && !can(actor, 'reports.read') && !can(actor, 'catalog.write')) throw forbidden();
+      const per = periodSql('o.created_at', query.period);
+      const rows = await many(db, `
+        WITH ord AS (
+          SELECT o.attributed_partner_id AS pid, COUNT(DISTINCT o.id)::int AS orders,
+                 COUNT(DISTINCT o.id) FILTER (WHERE ${BUCKET_SQL}='delivered')::int AS delivered_orders,
+                 SUM(ol.qty - ol.canceled_qty) FILTER (WHERE ${BUCKET_SQL}='delivered')::int AS delivered_qty,
+                 SUM(ol.qty - ol.canceled_qty)::int AS qty
+            FROM orders o JOIN order_lines ol ON ol.order_id=o.id JOIN skus s ON s.id=ol.sku_id
+           WHERE s.product_id=$1 AND o.attributed_partner_id IS NOT NULL AND ${per} GROUP BY 1),
+        clk AS (SELECT l.partner_id AS pid, COUNT(t.*)::int AS n, COUNT(DISTINCT l.id)::int AS streams FROM referral_links l LEFT JOIN referral_touches t ON t.link_id=l.id AND t.eligible AND ${periodSql('t.touched_at', query.period)} WHERE l.product_id=$1 GROUP BY 1),
+        com AS (SELECT o.attributed_partner_id AS pid, SUM(a.target_minor) AS amount FROM commission_accruals a JOIN order_lines ol ON ol.id=a.order_line_id JOIN skus s ON s.id=ol.sku_id JOIN orders o ON o.id=a.order_id
+                 WHERE s.product_id=$1 AND a.state <> 'reversed' AND ${per} GROUP BY 1)
+        SELECT pa.id, pa.code, pa.display_name, pa.status, COALESCE(clk.streams, 0) AS streams, COALESCE(clk.n, 0) AS clicks,
+               COALESCE(ord.orders, 0) AS orders, COALESCE(ord.qty, 0) AS qty, COALESCE(ord.delivered_orders, 0) AS delivered_orders, COALESCE(ord.delivered_qty, 0) AS delivered_qty,
+               COALESCE(com.amount, 0)::text AS commission_minor
+          FROM partners pa LEFT JOIN ord ON ord.pid=pa.id LEFT JOIN clk ON clk.pid=pa.id LEFT JOIN com ON com.pid=pa.id
+         WHERE ord.pid IS NOT NULL OR clk.pid IS NOT NULL
+         ORDER BY COALESCE(ord.delivered_qty, 0) DESC, COALESCE(ord.orders, 0) DESC, COALESCE(clk.n, 0) DESC`, [params.id]);
+      return { items: rows };
+    });
 }

@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { api, fulfilCod, mkProduct, mkUser, placeOrder, setupApp, staff, type Staff, type T } from './helpers.js';
+import { api, fulfilCod, mkPartner, mkProduct, mkUser, placeOrder, setupApp, staff, type Staff, type T } from './helpers.js';
 
 let t: T;
 let s: Staff;
@@ -34,6 +34,33 @@ describe('Admin overview', () => {
     expect(f.on_hand).toBe(8); // 10 − 2 shipped
     expect(f.reserved).toBe(3); // accepted order holds stock
     expect(f.available).toBe(5);
+  });
+
+  it('owner sees who sells which product: partner leaderboard and per-product sellers', async () => {
+    const star = await mkPartner(t);
+    const other = await mkPartner(t);
+    const prod = await mkProduct(t, { prices: [100_000], stock: [20], rule: { kind: 'percent', bps: 1000 } });
+    const sStar = await api(t, 'POST', '/partner/streams', { token: star.token, body: { product_id: prod.productId, name: 'TG' } });
+    await api(t, 'POST', '/partner/streams', { token: other.token, body: { product_id: prod.productId, name: 'IG' } });
+    for (let i = 0; i < 2; i++) {
+      const guest = randomUUID() + randomUUID();
+      await api(t, 'POST', '/referrals/touch', { guest, body: { code: sStar.json.code } });
+      const c = await mkUser(t);
+      const o = await placeOrder(t, { token: c.token, guest, phone: c.phone }, [{ sku_id: prod.skuIds[0]!, qty: 1 }]);
+      if (i === 0) await fulfilCod(t, s, o.json.order_id);
+    }
+    const perf = await api(t, 'GET', '/admin/partners/performance', { token: s.owner.token });
+    expect(perf.status).toBe(200);
+    const st = perf.json.items.find((x: any) => x.id === star.partnerId);
+    expect(st).toMatchObject({ clicks: 2, streams: 1, delivered_sales_minor: expect.any(String), delivery_rate_pct: 100 });
+    expect(st.orders).toMatchObject({ total: 2, delivered: 1, accepted: 1 });
+    expect(st.top_products[0].product_id).toBe(prod.productId);
+    expect(st.rank).toBeLessThan(perf.json.items.find((x: any) => x.id === other.partnerId).rank);
+
+    const sellers = await api(t, 'GET', `/admin/products/${prod.productId}/sellers`, { token: s.owner.token });
+    expect(sellers.json.items[0]).toMatchObject({ id: star.partnerId, orders: 2, delivered_qty: 1, clicks: 2, streams: 1, commission_minor: '2000000' });
+    expect(sellers.json.items.find((x: any) => x.id === other.partnerId)).toMatchObject({ orders: 0, streams: 1 });
+    expect((await api(t, 'GET', '/admin/partners/performance', { token: star.token })).status).toBe(403);
   });
 
   it('customers and couriers cannot read the overview', async () => {

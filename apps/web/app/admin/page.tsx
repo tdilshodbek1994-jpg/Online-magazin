@@ -14,7 +14,7 @@ export default function Admin() {
   return (
     <>
       <h1>Boshqaruv paneli</h1>
-      <div className="chips admin-tabs" role="tablist">{[['orders', '📦 Buyurtmalar'], ['flow', '🏷️ Qabul qilingan tovarlar'], ['summary', '📊 Hisobot'], ['products', 'Mahsulotlar'], ['import', 'CSV import'], ['promos', 'Promokodlar'], ['partners', 'Hamkorlar'], ['payouts', 'To‘lovlar (payout)'], ['finance', 'Moliya'], ['integrations', 'Integratsiyalar']].map(([k, l]) => <button key={k} role="tab" aria-selected={tab === k} className={`chip ${tab === k ? 'on' : ''}`} onClick={() => setTab(k)}>{l}</button>)}</div>
+      <div className="chips admin-tabs" role="tablist">{[['orders', '📦 Buyurtmalar'], ['partners', '🤝 Hamkorlar — kim sotyapti'], ['flow', '🏷️ Qabul qilingan tovarlar'], ['products', 'Mahsulotlar'], ['summary', '📊 Hisobot'], ['import', 'CSV import'], ['promos', 'Promokodlar'], ['payouts', 'To‘lovlar (payout)'], ['finance', 'Moliya'], ['integrations', 'Integratsiyalar']].map(([k, l]) => <button key={k} role="tab" aria-selected={tab === k} className={`chip ${tab === k ? 'on' : ''}`} onClick={() => setTab(k)}>{l}</button>)}</div>
       {msg && <div className="notice" role="status">{msg}</div>}
       {tab === 'orders' && <Orders lang={lang} />}
       {tab === 'flow' && <Flow lang={lang} />}
@@ -229,6 +229,7 @@ function Flow({ lang }: { lang: any }) {
                 <div><span>Yo‘lda</span><b>{p.in_delivery}</b></div>
                 <div><span>Yetkazilgan</span><b className="ok-t">{p.delivered}</b></div>
               </div>
+              <Sellers productId={p.id} period={period} />
               <div className="pills">
                 <span className="pill b-new">Yangi (tasdiq kutmoqda): {p.ordered.new}</span>
                 <span className="pill b-returned">Qaytgan: {p.ordered.returned}</span>
@@ -242,21 +243,90 @@ function Flow({ lang }: { lang: any }) {
   );
 }
 
+const PSTATUS_UZ: Record<string, string> = { active: 'Faol', pending: 'Ariza', suspended: 'To‘xtatilgan', rejected: 'Rad etilgan' };
+
 function Partners({ act }: { act: any }) {
-  const { data, st, load } = useLoad<any>('/admin/partners');
+  const { lang } = useI18n();
+  const [period, setPeriod] = useState('month');
+  const [q, setQ] = useState('');
+  const { data, st, load } = useLoad<any>(`/admin/partners/performance?period=${period}${q ? `&q=${encodeURIComponent(q)}` : ''}`);
+  const items: any[] = data?.items ?? [];
+  const sum = items.reduce((a, p) => ({ partners: a.partners + (p.status === 'active' ? 1 : 0), clicks: a.clicks + p.clicks, orders: a.orders + p.orders.total, delivered: a.delivered + p.orders.delivered, sales: a.sales + BigInt(p.delivered_sales_minor) }), { partners: 0, clicks: 0, orders: 0, delivered: 0, sales: 0n });
+  const pending = items.filter((p) => p.status === 'pending');
+  const medal = (r: number) => (r === 1 ? '🥇' : r === 2 ? '🥈' : r === 3 ? '🥉' : `#${r}`);
   return (
-    <section className="card" style={{ marginTop: 12 }}>
+    <section style={{ marginTop: 12 }}>
+      <h2>Kim sotyapti?</h2>
+      <div className="chips" role="group" aria-label="Davr">{PERIODS_UZ.map(([k, l]) => <button key={k} type="button" className={`chip ${period === k ? 'on' : ''}`} aria-pressed={period === k} onClick={() => setPeriod(k)}>{l}</button>)}</div>
+      <div className="kpi-row">
+        <div className="card kpi"><span className="muted">Faol hamkorlar</span><b>{sum.partners}</b></div>
+        <div className="card kpi"><span className="muted">Bosishlar</span><b>{sum.clicks}</b></div>
+        <div className="card kpi"><span className="muted">Buyurtmalar</span><b>{sum.orders}</b></div>
+        <div className="card kpi"><span className="muted">Yetkazilgan</span><b>{sum.delivered}</b></div>
+        <div className="card kpi"><span className="muted">Hamkorlar orqali savdo</span><b>{som(sum.sales.toString())}</b></div>
+      </div>
+      {pending.length > 0 && <p className="notice">🆕 {pending.length} ta yangi hamkorlik arizasi tasdiqlashni kutmoqda.</p>}
+      <form className="search plain" role="search" style={{ marginTop: 10 }} onSubmit={(e) => e.preventDefault()}>
+        <label htmlFor="hq" className="sr-only">Hamkor qidirish</label>
+        <input id="hq" type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Ism yoki hamkor kodi…" />
+      </form>
       <Async loading={st.loading} error={st.error} onRetry={load}>
-        <div className="table-wrap"><table><thead><tr><th>Kod</th><th>Ism</th><th>Holat</th><th>Mavjud / kutilmoqda / qarz</th><th>Rekvizit</th><th></th></tr></thead><tbody>
-          {data?.items.map((p: any) => (
-            <tr key={p.id}><td>{p.code}</td><td>{p.display_name}</td><td>{p.status}</td><td>{som(p.available_minor)} / {som(p.pending_minor)} / {som(p.debt_minor)}</td><td>{p.destination ?? '—'} {p.payout_destination_verified_at ? '✓' : ''}</td>
-              <td className="row">{p.status !== 'active' && <button className="btn" onClick={() => act(() => api(`/admin/partners/${p.id}/status`, { method: 'POST', body: { status: 'active', reason: 'tasdiqlandi' } }), load)}>Tasdiqlash</button>}
-                {p.status === 'active' && <button className="btn danger" onClick={() => { const r = prompt('Sabab'); if (r) act(() => api(`/admin/partners/${p.id}/status`, { method: 'POST', body: { status: 'suspended', reason: r } }), load); }}>To‘xtatish</button>}
-                {p.destination && !p.payout_destination_verified_at && <button className="btn secondary" onClick={() => act(() => api(`/admin/partners/${p.id}/verify-destination`, { method: 'POST' }), load)}>Rekvizitni tasdiqlash</button>}</td></tr>
+        {items.length === 0 && <div className="empty">Hali hamkor yo‘q</div>}
+        <div className="slist">
+          {items.map((p) => (
+            <article key={p.id} className="scard">
+              <div className="spread">
+                <div className="row" style={{ gap: 10 }}>
+                  <span className="top-rank">{medal(p.rank)}</span>
+                  <div><h3>{p.display_name}</h3><div className="muted small"><code>{p.code}</code> · {p.streams} ta oqim · {new Date(p.created_at).toLocaleDateString('uz-UZ')} dan</div></div>
+                </div>
+                <span className={`pill ${p.status === 'active' ? 'b-delivered' : p.status === 'pending' ? 'b-shipping' : 'b-returned'}`}>{PSTATUS_UZ[p.status] ?? p.status}</span>
+              </div>
+              <div className="flow-grid">
+                <div><span>Bosishlar</span><b>{p.clicks}</b></div>
+                <div><span>Buyurtma</span><b>{p.orders.total}</b></div>
+                <div><span>Yetkazildi</span><b className="ok-t">{p.orders.delivered}</b></div>
+                <div><span>Yetkazish %</span><b>{p.delivery_rate_pct === null ? '—' : `${p.delivery_rate_pct}%`}</b></div>
+                <div className="hl"><span>Savdo (yetkazilgan)</span><b style={{ fontSize: 16 }}>{som(p.delivered_sales_minor)}</b></div>
+                <div><span>Komissiya</span><b style={{ fontSize: 16 }}>{som(p.commission_earned_minor)}</b></div>
+              </div>
+              <div className="pills">
+                {(['new', 'accepted', 'shipping', 'returned', 'cancelled'] as const).map((k) => <span key={k} className={`pill b-${k}`}>{BUCKET_UZ[k]}: {p.orders[k]}</span>)}
+              </div>
+              {p.top_products?.length > 0 && <div className="small"><b>Ko‘p sotadi:</b> {p.top_products.map((t: any) => `${pick(t.name, lang)} (${t.orders})`).join(', ')}</div>}
+              <div className="muted small">Balans: yechish mumkin {som(p.available_minor)} · kutilmoqda {som(p.pending_minor)} · to‘langan {som(p.paid_minor)}{p.debt_minor && p.debt_minor !== '0' ? ` · qarz ${som(p.debt_minor)}` : ''} · karta: {p.destination ?? '—'} {p.payout_destination_verified_at ? '✓' : ''}</div>
+              <div className="row" style={{ gap: 8 }}>
+                {p.status !== 'active' && <button className="btn sm" onClick={() => act(() => api(`/admin/partners/${p.id}/status`, { method: 'POST', body: { status: 'active', reason: 'tasdiqlandi' } }), load)}>Tasdiqlash</button>}
+                {p.status === 'active' && <button className="btn danger sm" onClick={() => { const r = prompt('Sabab'); if (r) act(() => api(`/admin/partners/${p.id}/status`, { method: 'POST', body: { status: 'suspended', reason: r } }), load); }}>To‘xtatish</button>}
+                {p.destination && !p.payout_destination_verified_at && <button className="btn secondary sm" onClick={() => act(() => api(`/admin/partners/${p.id}/verify-destination`, { method: 'POST' }), load)}>Kartani tasdiqlash</button>}
+              </div>
+            </article>
           ))}
-        </tbody></table></div>
+        </div>
       </Async>
     </section>
+  );
+}
+
+function Sellers({ productId, period }: { productId: string; period: string }) {
+  const [rows, setRows] = useState<any[] | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  if (rows === null) return <button type="button" className="btn secondary sm" onClick={() => api(`/admin/products/${productId}/sellers?period=${period}`).then((r) => setRows(r.items)).catch((e) => setErr(e.code))}>🤝 Kim sotyapti?{err ? ` (${err})` : ''}</button>;
+  if (rows.length === 0) return <p className="muted small">Bu mahsulotni hali hech bir hamkor sotmagan.</p>;
+  return (
+    <div className="seller-list">
+      {rows.map((r) => (
+        <div key={r.id} className="seller-row">
+          <div><b>{r.display_name}</b> <span className="muted small">{r.code}</span></div>
+          <div className="pills">
+            <span className="pill">👆 {r.clicks}</span>
+            <span className="pill b-new">🛒 {r.orders} buyurtma ({r.qty} dona)</span>
+            <span className="pill b-delivered">✅ {r.delivered_qty} dona yetkazildi</span>
+            <span className="pill b-accepted">💰 {som(r.commission_minor)}</span>
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }
 

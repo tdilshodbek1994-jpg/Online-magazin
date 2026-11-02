@@ -24,6 +24,6 @@ export async function mergeGuestCart(tx: Tx, guestToken: string | null, userId: 
      ON CONFLICT (cart_id, offer_id) DO UPDATE SET qty = GREATEST(cart_lines.qty, EXCLUDED.qty)`,
     [guestId, userCartId],
   );
-  await tx.query(`UPDATE carts SET status='merged', guest_token_hash=NULL, updated_at=now() WHERE id=$1`, [guestId]);
+  await tx.query(`UPDATE carts SET status='merged', user_id=$2, guest_token_hash=NULL, updated_at=now() WHERE id=$1`, [guestId, userId]);
   await tx.query(`UPDATE carts SET version=version+1, updated_at=now() WHERE id=$1`, [userCartId]);
 }

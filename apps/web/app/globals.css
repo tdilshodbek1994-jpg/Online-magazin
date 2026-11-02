@@ -461,3 +461,10 @@ textarea { resize: vertical; }
 .progress span { display: block; height: 100%; background: linear-gradient(90deg, var(--primary), #14b8a6); }
 .contest { gap: 8px; }
 a.chip { text-decoration: none; }
+.admin-head { flex-wrap: wrap; gap: 8px; }
+.admin-head h1 { margin-bottom: 8px; }
+.admin-tabs { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin: 4px 0 12px; }
+.admin-tab { display: flex; align-items: center; gap: 8px; min-height: 48px; padding: 8px 12px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font: inherit; font-size: 14px; font-weight: 600; text-align: left; cursor: pointer; }
+.admin-tab span { font-size: 18px; }
+.admin-tab.on { background: var(--primary); border-color: var(--primary); color: var(--primary-text); }
+@media (max-width: 760px) { .admin-tabs { grid-template-columns: 1fr 1fr; } }

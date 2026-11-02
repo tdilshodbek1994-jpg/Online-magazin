@@ -11,18 +11,22 @@ const today = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tashkent'
 export default function Admin() {
   const { lang } = useI18n();
   const [tab, setTab] = useState('orders');
+  const [newProduct, setNewProduct] = useState(0);
   const [msg, setMsg] = useState<string | null>(null);
   const act = async (fn: () => Promise<any>, after?: () => void) => { setMsg(null); try { await fn(); setMsg('OK'); after?.(); } catch (e: any) { setMsg(e.code ?? 'ERROR'); } };
   return (
     <>
-      <h1>Boshqaruv paneli</h1>
-      <div className="chips admin-tabs" role="tablist">{[['orders', '📦 Buyurtmalar'], ['partners', '🤝 Hamkorlar — kim sotyapti'], ['programs', '🏆 Konkurs va bonuslar'], ['flow', '🏷️ Qabul qilingan tovarlar'], ['products', 'Mahsulotlar'], ['summary', '📊 Hisobot'], ['import', 'CSV import'], ['promos', 'Promokodlar'], ['payouts', 'To‘lovlar (payout)'], ['finance', 'Moliya'], ['integrations', 'Integratsiyalar']].map(([k, l]) => <button key={k} role="tab" aria-selected={tab === k} className={`chip ${tab === k ? 'on' : ''}`} onClick={() => setTab(k)}>{l}</button>)}</div>
+      <div className="spread admin-head">
+        <h1>Boshqaruv paneli</h1>
+        <button className="btn" onClick={() => { setTab('products'); setNewProduct((n) => n + 1); }}>+ Mahsulot qo‘shish</button>
+      </div>
+      <div className="admin-tabs" role="tablist">{[['orders', '📦', 'Buyurtmalar'], ['products', '🛍️', 'Mahsulotlar'], ['partners', '🤝', 'Hamkorlar'], ['flow', '🏷️', 'Qabul qilingan tovarlar'], ['programs', '🏆', 'Konkurs va bonuslar'], ['summary', '📊', 'Hisobot'], ['payouts', '💳', 'To‘lovlar (payout)'], ['finance', '💰', 'Moliya'], ['promos', '🎟️', 'Promokodlar'], ['import', '📄', 'CSV import'], ['integrations', '⚙️', 'Integratsiyalar']].map(([k, i, l]) => <button key={k} role="tab" aria-selected={tab === k} className={`admin-tab ${tab === k ? 'on' : ''}`} onClick={() => setTab(k!)}><span aria-hidden>{i}</span>{l}</button>)}</div>
       {msg && <div className="notice" role="status">{msg}</div>}
       {tab === 'orders' && <Orders lang={lang} />}
       {tab === 'flow' && <Flow lang={lang} />}
       {tab === 'programs' && <AdminPrograms />}
       {tab === 'summary' && <Summary />}
-      {tab === 'products' && <Products act={act} lang={lang} />}
+      {tab === 'products' && <Products act={act} lang={lang} openNew={newProduct} />}
       {tab === 'import' && <Import />}
       {tab === 'promos' && <Promos act={act} />}
       {tab === 'partners' && <Partners act={act} />}
@@ -79,10 +83,11 @@ async function downloadCsv(range: { from: string; to: string; date_type: string 
 
 const STATUS_UZ: Record<string, string> = { published: 'Sotuvda', draft: 'Qoralama', archived: 'Arxiv', pending_review: 'Tekshiruvda' };
 
-function Products({ act, lang }: { act: any; lang: any }) {
+function Products({ act, lang, openNew = 0 }: { act: any; lang: any; openNew?: number }) {
   const { data, st, load } = useLoad<any>('/admin/products');
   const cats = useLoad<any>('/categories');
   const [editor, setEditor] = useState<{ product?: any } | null>(null);
+  useEffect(() => { if (openNew > 0) setEditor({}); }, [openNew]);
   const [q, setQ] = useState('');
   const [status, setStatus] = useState('all');
   const all: any[] = data?.items ?? [];

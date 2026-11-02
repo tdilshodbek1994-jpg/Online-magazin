@@ -20,6 +20,7 @@ WORKDIR /app
 COPY --from=build /out ./
 COPY --from=build /app/apps/api/dist ./dist
 COPY --from=build /app/apps/api/migrations ./migrations
+RUN mkdir -p /data/media && chown node:node /data/media
 USER node
 EXPOSE 4000
 HEALTHCHECK --interval=15s --timeout=3s CMD node -e "fetch('http://localhost:4000/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"

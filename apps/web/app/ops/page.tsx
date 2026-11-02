@@ -23,6 +23,8 @@ export default function Ops() {
   }, [queue]);
   useEffect(() => { void load(); }, [load]);
   const open = async (id: string) => { try { setSel(await api(`/ops/orders/${id}`)); } catch (e: any) { setMsg(e.code); } };
+  // Deep link from the owner overview: /ops?order=<id> opens that order card.
+  useEffect(() => { try { const id = new URLSearchParams(location.search).get('order'); if (id && /^[0-9a-f-]{36}$/.test(id)) void open(id); } catch {} }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const act = async (fn: () => Promise<any>) => { setMsg(null); try { await fn(); setMsg('OK'); if (sel) await open(sel.id); await load(); } catch (e: any) { setMsg(e.code ?? 'ERROR'); } };
   return (
     <>

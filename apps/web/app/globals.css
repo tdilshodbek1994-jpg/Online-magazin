@@ -400,3 +400,17 @@ body.reels-open { overflow: hidden; }
 .bottom-nav.five-main { grid-template-columns: repeat(5, 1fr); }
 .video-chip { position: absolute; right: 12px; bottom: 12px; background: rgba(17,24,39,.85); color: #fff; text-decoration: none; font-weight: 700; padding: 10px 14px; border-radius: 999px; font-size: 14px; }
 @media (max-width: 760px) { .bottom-nav a { font-size: 10.5px; } }
+.admin-tabs { margin-bottom: 4px; }
+.stat.sel { outline: 3px solid var(--primary); outline-offset: 1px; }
+button.stat { font: inherit; text-align: left; cursor: pointer; }
+.sku-list { display: grid; gap: 6px; }
+.sku-row { display: grid; grid-template-columns: 1.4fr 1fr 1.2fr auto; gap: 8px; align-items: center; padding: 8px 10px; background: var(--surface-2); border-radius: 10px; font-size: 14px; }
+.flow-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.flow-grid div { background: var(--surface-2); border-radius: 12px; padding: 8px 10px; display: grid; }
+.flow-grid span { font-size: 11px; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); font-weight: 700; }
+.flow-grid b { font-size: 20px; }
+.flow-grid .hl { background: var(--primary-50); }
+@media (max-width: 760px) {
+  .sku-row { grid-template-columns: 1fr 1fr; }
+  .sku-row .btn { grid-column: 2; justify-self: end; }
+}

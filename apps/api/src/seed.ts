@@ -2,6 +2,8 @@ import { normalizeSearch } from '@om/shared';
 import sharp from 'sharp';
 import { type ArtKind, PALETTES, productSvg } from './demo/art.js';
 import { saveProductImage } from './modules/catalog/media.js';
+import { saveProductVideo } from './modules/catalog/videos.js';
+import { readFile } from 'node:fs/promises';
 import { loadConfig } from './config.js';
 import { bootstrapReference } from './platform/bootstrap.js';
 import { createPool, withTx } from './platform/db.js';
@@ -92,6 +94,16 @@ await withTx(db, async (tx) => {
     if (!row) continue;
     const png = await sharp(Buffer.from(productSvg(p.art, PALETTES[p.pal] ?? PALETTES.mint!))).png().toBuffer();
     await saveProductImage(tx, cfg.mediaDir, row.id, png, { mime: 'image/png', width: 800, height: 800, filename: `${p.slug}.png`, alt: { 'uz-Latn': p.latn, 'uz-Cyrl': p.cyrl }, rights_source: 'DEMO illustration (generated)', sort: 0, uploadedBy: null });
+  }
+  // DEMO reels: short generated clips shipped in demo-assets/videos (only for products that have no video yet).
+  const videoDir = new URL('../demo-assets/videos/', import.meta.url);
+  for (const p of products) {
+    const row = (await tx.query(`SELECT p.id FROM products p WHERE p.slug=$1 AND NOT EXISTS (SELECT 1 FROM product_videos v WHERE v.product_id=p.id)`, [p.slug])).rows[0];
+    if (!row) continue;
+    const mp4 = await readFile(new URL(`${p.slug}.mp4`, videoDir)).catch(() => null);
+    if (!mp4) continue;
+    const poster = await readFile(new URL(`${p.slug}.jpg`, videoDir)).catch(() => null);
+    await saveProductVideo(tx, cfg.mediaDir, row.id, mp4, { caption: { 'uz-Latn': `${p.latn} — ${p.about}`, 'uz-Cyrl': p.cyrl }, rights_source: 'DEMO video (generated)', poster, uploadedBy: null });
   }
 });
 console.log('seed done (synthetic DEMO data). Login: phone +99890000000{1..8}, OTP shown in dev response.');

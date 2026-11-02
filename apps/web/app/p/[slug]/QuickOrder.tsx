@@ -12,10 +12,10 @@ const T = {
 
 const ERR: Record<string, string> = { PHONE_INVALID: 'Telefon raqami noto‘g‘ri. Masalan: +998 90 123 45 67', QUICK_ORDER_RATE_LIMIT: 'Bu raqamdan juda ko‘p buyurtma berildi. Birozdan keyin urinib ko‘ring yoki operatorga yozing.', OUT_OF_STOCK: 'Afsuski, bu variant tugadi.', NETWORK: 'Internet aloqasini tekshirib, qayta bosing — buyurtma ikki marta yozilmaydi.' };
 
-export function QuickOrder({ skuId, qty, disabled }: { skuId: string; qty: number; disabled: boolean }) {
+export function QuickOrder({ skuId, qty, disabled, autoOpen = false, onClose }: { skuId: string; qty: number; disabled: boolean; autoOpen?: boolean; onClose?: () => void }) {
   const { lang } = useI18n();
   const t = T[lang] ?? T['uz-Latn'];
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(autoOpen);
   const [zones, setZones] = useState<any[]>([]);
   const [f, setF] = useState({ name: '', phone: '+998 ', zone: '', terms: false });
   const [busy, setBusy] = useState(false);
@@ -62,7 +62,7 @@ export function QuickOrder({ skuId, qty, disabled }: { skuId: string; qty: numbe
       {err && <div className="field-error" role="alert">{err}</div>}
       <div className="row" style={{ marginTop: 10 }}>
         <button className="btn big" disabled={busy || !f.terms || f.name.trim().length < 2} style={{ flex: 1 }}>{busy ? '…' : t.send}</button>
-        <button type="button" className="btn secondary" onClick={() => setOpen(false)}>{t.cancel}</button>
+        <button type="button" className="btn secondary" onClick={() => { setOpen(false); onClose?.(); }}>{t.cancel}</button>
       </div>
     </form>
   );

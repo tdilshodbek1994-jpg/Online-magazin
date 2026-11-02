@@ -1,7 +1,7 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
 import { Async } from '@/components/Header';
-import { api, som } from '@/lib/api';
+import { api, getToken, som } from '@/lib/api';
 import { pick, useI18n } from '@/lib/i18n';
 
 const today = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tashkent' }).format(new Date());
@@ -98,6 +98,7 @@ function Products({ act, lang }: { act: any; lang: any }) {
               <td>{p.commission_rule ? (p.commission_rule.kind === 'percent' ? `${p.commission_rule.rate_bps / 100}%` : som(p.commission_rule.fixed_minor) + '/dona') : '—'}
                 <label className="btn secondary" style={{ display: 'inline-flex', alignItems: 'center' }}>Rasm<input type="file" accept="image/jpeg,image/png,image/webp" style={{ display: 'none' }} onChange={(e) => { const f = e.target.files?.[0]; if (!f) return; const rd = new FileReader(); rd.onload = () => act(() => api(`/admin/products/${p.id}/media`, { method: 'POST', body: { filename: f.name, content_base64: String(rd.result).split(',')[1], alt: { 'uz-Latn': pick(p.name, 'uz-Latn' as any) }, rights_source: 'owner upload' } }), load); rd.readAsDataURL(f); }} /></label>
                 <ProductMedia productId={p.id} />
+                <ProductVideos productId={p.id} />
                 <button className="btn secondary" onClick={() => { const v = prompt('Foiz (masalan 10) yoki "f:30000" (dona uchun so‘m)'); if (!v) return; const body = v.startsWith('f:') ? { kind: 'fixed_per_unit', fixed_minor: String(BigInt(v.slice(2)) * 100n) } : { kind: 'percent', rate_bps: Math.round(Number(v) * 100) }; act(() => api(`/admin/products/${p.id}/commission-rules`, { method: 'POST', body }), load); }}>Qoida</button></td>
               <td>{p.status !== 'published' && <button className="btn" onClick={() => act(() => api(`/admin/products/${p.id}/status`, { method: 'POST', body: { status: 'published', expected_version: p.version } }), load)}>E’lon qilish</button>}
                 {p.status === 'published' && <button className="btn secondary" onClick={() => act(() => api(`/admin/products/${p.id}/status`, { method: 'POST', body: { status: 'archived', expected_version: p.version } }), load)}>Arxiv</button>}</td>
@@ -256,6 +257,43 @@ function ProductMedia({ productId }: { productId: string }) {
         </div>
       ))}
       {err && <span className="field-error">{err}</span>}
+    </div>
+  );
+}
+
+function ProductVideos({ productId }: { productId: string }) {
+  const [items, setItems] = useState<any[] | null>(null);
+  const [msg, setMsg] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const load = () => api(`/admin/products/${productId}/videos`).then((r) => setItems(r.items)).catch((e) => setMsg(e.code));
+  const upload = async (f: File) => {
+    if (f.size > 40 * 1024 * 1024) { setMsg('Video 40 MB dan katta. Qisqaroq (15–60 soniya) video yuklang.'); return; }
+    const caption = prompt('Video izohi (ixtiyoriy)') ?? '';
+    setBusy(true); setMsg('Yuklanmoqda…');
+    try {
+      const headers: Record<string, string> = { 'content-type': 'video/mp4' };
+      const tok = getToken(); if (tok) headers['x-session-token'] = tok;
+      const r = await fetch(`/api/v1/admin/products/${productId}/videos${caption ? `?caption=${encodeURIComponent(caption)}` : ''}`, { method: 'POST', headers, body: f });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw j;
+      setMsg('Video yuklandi ✓'); await load();
+    } catch (e: any) { setMsg(e.code === 'VIDEO_TYPE_NOT_ALLOWED' ? 'Faqat MP4 video (telefon kamerasi videosi) qabul qilinadi.' : e.code ?? 'ERROR'); } finally { setBusy(false); }
+  };
+  if (items === null) return <button className="btn secondary" onClick={load}>Videolar</button>;
+  return (
+    <div className="media-admin">
+      {items.length === 0 && <span className="muted small">Video yo‘q</span>}
+      {items.map((v) => (
+        <div key={v.id} className="media-thumb">
+          <video src={v.url} poster={v.poster ?? undefined} width={64} height={96} muted playsInline preload="metadata" style={{ width: 64, height: 96, objectFit: 'cover', borderRadius: 10, display: 'block' }} />
+          <button className="btn danger sm" aria-label="Videoni o‘chirish" onClick={async () => { if (!confirm('Video olib tashlansinmi?')) return; try { await api(`/admin/videos/${v.id}`, { method: 'DELETE' }); await load(); } catch (e: any) { setMsg(e.code); } }}>×</button>
+          <span className="muted small">❤ {v.likes} · 👁 {v.views}</span>
+        </div>
+      ))}
+      <label className={`btn secondary sm ${busy ? 'disabled' : ''}`} style={{ display: 'inline-flex', alignItems: 'center' }}>+ Video (MP4)
+        <input type="file" accept="video/mp4" style={{ display: 'none' }} disabled={busy} onChange={(e) => { const f = e.target.files?.[0]; if (f) void upload(f); e.target.value = ''; }} />
+      </label>
+      {msg && <span className="small" role="status">{msg}</span>}
     </div>
   );
 }

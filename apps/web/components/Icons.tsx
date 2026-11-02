@@ -24,6 +24,12 @@ export const IconLink = (p: P) => <svg {...base(p)}><path d="M10 14a4 4 0 0 0 5.
 export const IconChart = (p: P) => <svg {...base(p)}><path d="M4 4v16h16" /><path d="m7 15 4-5 3 3 5-6" /></svg>;
 export const IconWallet = (p: P) => <svg {...base(p)}><rect x="3" y="6" width="18" height="13" rx="2" /><path d="M16 12.5h2M3 9h18" /></svg>;
 
+export const IconPlay = (p: P) => <svg {...base(p)}><rect x="3" y="3" width="18" height="18" rx="4" /><path d="m10 8.5 5.5 3.5-5.5 3.5z" /></svg>;
+export const IconHeart = (p: P & { filled?: boolean }) => { const { filled, ...r } = p; return <svg {...base(r)} fill={filled ? 'currentColor' : 'none'}><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z" /></svg>; };
+export const IconShare = (p: P) => <svg {...base(p)}><path d="M21 3 10 14" /><path d="m21 3-7 18-4-7-7-4z" /></svg>;
+export const IconSound = (p: P & { off?: boolean }) => { const { off, ...r } = p; return <svg {...base(r)}><path d="M4 9h4l5-4v14l-5-4H4z" />{off ? <path d="m16 9 5 6m0-6-5 6" /> : <path d="M16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11" />}</svg>; };
+export const IconClose = (p: P) => <svg {...base(p)}><path d="M6 6l12 12M18 6 6 18" /></svg>;
+
 /** Category pictograms by slug; unknown slugs get a generic bag. */
 export function CategoryIcon({ slug, size = 28 }: { slug: string; size?: number }) {
   const p = base({ size, strokeWidth: 1.6 });

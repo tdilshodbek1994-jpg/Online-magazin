@@ -29,7 +29,7 @@ export function AddToCart({ product, minPrice }: { product: any; minPrice: strin
         <span>{name}</span>
       </nav>
       <div className="pdp">
-        <Gallery media={product.media ?? []} name={name} off={off} />
+        <Gallery media={product.media ?? []} name={name} off={off} slug={product.slug} />
         <div className="buybox">
           {product.brand && <div className="pbrand">{product.brand}{product.model ? ` · ${product.model}` : ''}</div>}
           <h1>{name}</h1>

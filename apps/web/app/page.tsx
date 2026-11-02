@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { AiAssistant } from '@/components/AiAssistant';
 import { CategoryIcon, IconCash, IconChevron, IconReturn, IconShield, IconTruck } from '@/components/Icons';
 import { ProductCard, SkeletonGrid } from '@/components/ProductCard';
-import { api } from '@/lib/api';
+import { api, som } from '@/lib/api';
 import { pick, useI18n } from '@/lib/i18n';
 
 function Rail({ title, href, items, loading }: { title: string; href: string; items: any[]; loading: boolean }) {
@@ -27,6 +27,7 @@ export default function Home() {
   const [fresh, setFresh] = useState<any[]>([]);
   const [cheap, setCheap] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [reels, setReels] = useState<any[]>([]);
   const [error, setError] = useState<any>(null);
   const load = () => {
     setLoading(true); setError(null);
@@ -36,6 +37,7 @@ export default function Home() {
       .finally(() => setLoading(false));
   };
   useEffect(load, []);
+  useEffect(() => { api('/reels?limit=10').then((r) => setReels(r.items)).catch(() => {}); }, []);
   const deals = [...fresh, ...cheap].filter((p, i, a) => p.compare_at && a.findIndex((x) => x.id === p.id) === i).slice(0, 8);
   const heroImgs = fresh.filter((p) => p.image).slice(0, 3);
   return (
@@ -69,6 +71,21 @@ export default function Home() {
               <Link key={c.id} href={`/catalog?category=${c.slug}`} className="cat">
                 <span className="cat-ico"><CategoryIcon slug={c.slug} /></span>
                 <span>{pick(c.name, lang)}</span>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {reels.length > 0 && (
+        <section className="rail">
+          <div className="rail-head"><h2>▶ Video sharhlar</h2><Link href="/reels" className="see-all">{t('seeAll')} <IconChevron size={16} /></Link></div>
+          <div className="vrail">
+            {reels.map((v) => (
+              <Link key={v.id} href={`/reels?v=${v.id}`} className="vtile" aria-label={`Video: ${pick(v.name, lang)}`}>
+                {(v.poster || v.image) && <img src={v.poster ?? v.image} alt="" loading="lazy" />}
+                <span className="vplay" aria-hidden>▶</span>
+                <span className="vprice">{som(v.price_minor)}</span>
               </Link>
             ))}
           </div>

@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { IconBag, IconCart, IconSearch, IconUser } from '@/components/Icons';
+import { IconBag, IconCart, IconPlay, IconSearch, IconUser } from '@/components/Icons';
 import { api, getToken, setToken } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
 
@@ -55,6 +55,7 @@ export function Header() {
           <button type="submit" className="search-btn" aria-label={t('search')}><IconSearch size={20} /></button>
         </form>
         <nav className="head-actions" aria-label="Asosiy">
+          <Link href="/reels" className="icon-link"><IconPlay /><span className="icon-label">Video</span></Link>
           <Link href="/cart" className="icon-link" aria-label={`${t('cart')}${count ? ` (${count})` : ''}`}>
             <IconCart /><span className="icon-label">{t('cart')}</span>
             {count > 0 && <span className="count" aria-hidden>{count > 99 ? '99+' : count}</span>}

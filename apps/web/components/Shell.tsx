@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useCartCount } from '@/components/Header';
-import { IconBag, IconCart, IconChart, IconGauge, IconGrid, IconHome, IconLink, IconStore, IconUser, IconWallet } from '@/components/Icons';
+import { IconBag, IconCart, IconChart, IconGauge, IconGrid, IconHome, IconLink, IconPlay, IconStore, IconUser, IconWallet } from '@/components/Icons';
 import { getToken } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
 import { useEffect, useState } from 'react';
@@ -31,11 +31,12 @@ export function BottomNav() {
   const items: [string, string, React.ReactNode, boolean][] = [
     ['/', t('home'), <IconHome key="h" />, path === '/'],
     ['/catalog', t('catalog'), <IconGrid key="g" />, path.startsWith('/catalog') || path.startsWith('/p/')],
+    ['/reels', 'Video', <IconPlay key="v" />, path.startsWith('/reels')],
     ['/cart', t('cart'), <IconCart key="c" />, path.startsWith('/cart') || path.startsWith('/checkout')],
     [logged ? '/account' : '/login', t('account'), <IconUser key="u" />, path.startsWith('/account') || path.startsWith('/login')],
   ];
   return (
-    <nav className="bottom-nav" aria-label={t('catalog')}>
+    <nav className="bottom-nav five-main" aria-label={t('catalog')}>
       {items.map(([href, label, icon, on]) => (
         <Link key={href} href={href} className={on ? 'on' : ''} aria-current={on ? 'page' : undefined}>
           <span className="bn-icon">{icon}{href === '/cart' && count > 0 && <span className="count" aria-hidden>{count > 99 ? '99+' : count}</span>}</span>

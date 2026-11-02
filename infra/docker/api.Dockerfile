@@ -20,6 +20,7 @@ WORKDIR /app
 COPY --from=build /out ./
 COPY --from=build /app/apps/api/dist ./dist
 COPY --from=build /app/apps/api/migrations ./migrations
+COPY --from=build /app/apps/api/demo-assets ./demo-assets
 RUN mkdir -p /data/media && chown node:node /data/media
 USER node
 EXPOSE 4000

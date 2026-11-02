@@ -23,6 +23,7 @@ import { registerSupport } from './modules/support/routes.js';
 import { registerAdmin } from './modules/admin/routes.js';
 import { registerMessaging } from './modules/notifications/routes.js';
 import { registerAi } from './modules/ai/routes.js';
+import { registerVideos, registerVideoServe, VIDEO_MAX_BYTES } from './modules/catalog/videos.js';
 
 declare module 'fastify' {
   interface FastifyRequest {
@@ -50,6 +51,8 @@ export async function buildApp(cfg: AppConfig, db: Db): Promise<FastifyInstance>
       done(new AppError(400, 'MALFORMED_JSON'), undefined);
     }
   });
+  // Product videos are uploaded as raw MP4 bytes (no base64 inflation); the route enforces its own size limit.
+  app.addContentTypeParser('video/mp4', { parseAs: 'buffer', bodyLimit: VIDEO_MAX_BYTES }, (_req, body, done) => done(null, body));
   app.addContentTypeParser('application/x-www-form-urlencoded', { parseAs: 'string' }, (req, body, done) => {
     req.rawBodyText = body as string;
     done(null, Object.fromEntries(new URLSearchParams(body as string)));
@@ -111,6 +114,7 @@ export async function buildApp(cfg: AppConfig, db: Db): Promise<FastifyInstance>
 
   const deps: Deps = { db, cfg };
   registerMediaServe(app, deps);
+  registerVideoServe(app, deps);
 
   await app.register(
     async (api) => {
@@ -123,6 +127,7 @@ export async function buildApp(cfg: AppConfig, db: Db): Promise<FastifyInstance>
       registerAmendments(api, deps);
       registerPartners(api, deps);
       registerPartnerCabinet(api, deps);
+      registerVideos(api, deps);
       registerReturns(api, deps);
       registerPayments(api, deps);
       registerSupport(api, deps);

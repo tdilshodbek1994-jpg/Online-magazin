@@ -33,6 +33,8 @@ interface RouteDef<B extends z.ZodType, Q extends z.ZodType, P extends z.ZodType
   query?: Q;
   params?: P;
   rawBody?: boolean;
+  /** Per-route request size limit in bytes (default: app bodyLimit). */
+  bodyLimit?: number;
 }
 
 function jsonSchema(s: z.ZodType | undefined): Record<string, unknown> | undefined {
@@ -66,6 +68,7 @@ export function route<B extends z.ZodType = z.ZodUnknown, Q extends z.ZodType = 
   app.route({
     method: def.method,
     url: def.url,
+    ...(def.bodyLimit ? { bodyLimit: def.bodyLimit } : {}),
     schema: Object.fromEntries(
       Object.entries({ tags: def.tags, summary: def.summary, body: jsonSchema(def.body), querystring: jsonSchema(def.query), params: jsonSchema(def.params) }).filter(([, v]) => v !== undefined),
     ),

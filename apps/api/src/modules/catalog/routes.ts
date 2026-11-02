@@ -47,33 +47,45 @@ export function registerCatalog(app: FastifyInstance, deps: Deps): void {
       where.push(`c.id IN (WITH RECURSIVE t AS (SELECT id FROM categories WHERE slug=$${params.length} UNION ALL SELECT c2.id FROM categories c2 JOIN t ON c2.parent_id=t.id) SELECT id FROM t)`);
     }
     if (query.q) {
-      const tokens = tokenize(query.q);
+      const tokens = tokenize(query.q).slice(0, 8);
+      // Synonyms resolved once; each token becomes LIKE (trigram-indexable) + boundary regex recheck (T095).
+      const syn = tokens.length ? await many<{ term: string; synonym: string }>(db, `SELECT term, synonym FROM search_synonyms WHERE term = ANY($1)`, [tokens]) : [];
       const conds: string[] = [];
-      // Synonyms (e.g. quloqchin <-> naushnik) expand each token; numbers/models stay exact (128 != 256).
-      for (const tok of tokens.slice(0, 8)) {
-        params.push(tok);
-        const i = params.length;
-        params.push('(^|[^a-z0-9])' + tok + (/^\d+$/.test(tok) ? '([^0-9]|$)' : ''));
-        const pi = params.length;
-        conds.push(`(p.search_doc ~ $${pi} OR EXISTS (SELECT 1 FROM search_synonyms ss WHERE ss.term=$${i} AND p.search_doc LIKE '%' || ss.synonym || '%'))`);
+      for (const tok of tokens) {
+        const alts = [tok, ...syn.filter((x) => x.term === tok).map((x) => x.synonym)];
+        const ors: string[] = [];
+        for (const a of alts) {
+          params.push(`%${a}%`);
+          const li = params.length;
+          params.push('(^|[^a-z0-9])' + a + (/^\d+$/.test(a) ? '([^0-9]|$)' : ''));
+          ors.push(`(p.search_doc LIKE $${li} AND p.search_doc ~ $${params.length})`);
+        }
+        conds.push(`(${ors.join(' OR ')})`);
       }
       params.push(query.q.trim().toLowerCase());
       const raw = params.length;
-      const skuExact = `EXISTS (SELECT 1 FROM skus s2 WHERE s2.product_id=p.id AND (lower(s2.sku_code)=$${raw} OR s2.barcode=$${raw}))`;
+      const skuExact = `p.id IN (SELECT s2.product_id FROM skus s2 WHERE lower(s2.sku_code)=$${raw} OR s2.barcode=$${raw})`;
       where.push(conds.length ? `((${conds.join(' AND ')}) OR ${skuExact})` : skuExact);
     }
-    const order = query.sort === 'price_asc' ? 'min_price ASC NULLS LAST' : query.sort === 'price_desc' ? 'min_price DESC NULLS LAST' : 'published_at DESC NULLS LAST';
+    // Aggregates are computed set-wise (GROUP BY) and, for the default "new" sort, only for the requested page (T095).
+    const limitFirst = query.sort === 'new' && !query.in_stock;
     params.push(query.limit, query.offset);
+    const L = params.length - 1, O = params.length;
+    const order = query.sort === 'price_asc' ? 'min_price ASC NULLS LAST, published_at DESC' : query.sort === 'price_desc' ? 'min_price DESC NULLS LAST, published_at DESC' : 'published_at DESC NULLS LAST, id';
     const rows = await many(db, `
-      SELECT * FROM (
-        SELECT p.id, p.slug, p.name, b.name AS brand, p.published_at,
-               (SELECT MIN(o.price_minor) FROM skus s JOIN offers o ON o.sku_id=s.id AND o.status='active' WHERE s.product_id=p.id AND s.status='active') AS min_price,
-               (SELECT COALESCE(SUM(GREATEST(0, sb.on_hand_sellable - sb.reserved - sb.safety_buffer)),0) FROM skus s JOIN stock_balances sb ON sb.sku_id=s.id WHERE s.product_id=p.id AND s.status='active') AS available,
-               (SELECT '/media/' || storage_key FROM media_assets ma WHERE ma.product_id=p.id AND ma.status='approved' ORDER BY sort LIMIT 1) AS image
-          FROM products p JOIN categories c ON c.id=p.category_id LEFT JOIN brands b ON b.id=p.brand_id
-         WHERE ${where.join(' AND ')}) x
-      ${query.in_stock ? 'WHERE available > 0' : ''}
-      ORDER BY ${order} LIMIT $${params.length - 1} OFFSET $${params.length}`, params);
+      WITH cand AS (
+        SELECT p.id, p.slug, p.name, p.brand_id, p.published_at FROM products p JOIN categories c ON c.id=p.category_id
+         WHERE ${where.join(' AND ')}
+         ${limitFirst ? `ORDER BY p.published_at DESC NULLS LAST, p.id LIMIT $${L} OFFSET $${O}` : ''}),
+      price AS (SELECT s.product_id, MIN(o.price_minor) AS min_price FROM skus s JOIN offers o ON o.sku_id=s.id AND o.status='active' WHERE s.status='active' AND s.product_id IN (SELECT id FROM cand) GROUP BY s.product_id),
+      avail AS (SELECT s.product_id, SUM(GREATEST(0, sb.on_hand_sellable - sb.reserved - sb.safety_buffer)) AS available FROM skus s JOIN stock_balances sb ON sb.sku_id=s.id WHERE s.status='active' AND s.product_id IN (SELECT id FROM cand) GROUP BY s.product_id),
+      page AS (
+        SELECT cand.*, price.min_price, COALESCE(avail.available, 0) AS available FROM cand LEFT JOIN price ON price.product_id=cand.id LEFT JOIN avail ON avail.product_id=cand.id
+         ${query.in_stock ? 'WHERE COALESCE(avail.available,0) > 0' : ''}
+         ORDER BY ${order} ${limitFirst ? '' : `LIMIT $${L} OFFSET $${O}`})
+      SELECT page.id, page.slug, page.name, b.name AS brand, page.published_at, page.min_price, page.available,
+             (SELECT '/media/' || storage_key FROM media_assets ma WHERE ma.product_id=page.id AND ma.status='approved' ORDER BY sort LIMIT 1) AS image
+        FROM page LEFT JOIN brands b ON b.id=page.brand_id ORDER BY ${order}`, params);
     return { items: rows.map((r) => ({ ...r, min_price: r.min_price ? m(r.min_price as string) : null, available: Number(r.available) })) };
   });
 

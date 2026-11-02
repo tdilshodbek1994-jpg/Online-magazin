@@ -57,3 +57,10 @@ CREATE UNIQUE INDEX order_amendments_one_open ON order_amendments (order_id) WHE
 
 INSERT INTO permissions (code, description, sensitive) VALUES ('marketing.manage','Create/approve/send marketing campaigns',true);
 INSERT INTO role_permissions (role_code, permission_code) VALUES ('owner','marketing.manage');
+
+-- Performance (T095): catalog listing and media lookups.
+CREATE INDEX products_published_at ON products (published_at DESC, id) WHERE status = 'published';
+CREATE INDEX skus_product ON skus (product_id);
+CREATE INDEX media_assets_product ON media_assets (product_id, sort) WHERE status = 'approved';
+CREATE INDEX offers_sku ON offers (sku_id) WHERE status = 'active';
+CREATE INDEX skus_sku_code_lower ON skus (lower(sku_code));

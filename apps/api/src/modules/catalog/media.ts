@@ -21,6 +21,31 @@ export function sniff(buf: Buffer): 'image/jpeg' | 'image/png' | 'image/webp' | 
   return null; // SVG/HTML/executables and anything else are rejected
 }
 
+type Queryable = { query: (sql: string, params?: unknown[]) => Promise<{ rows: any[] }> };
+
+/** Stores an already-validated image: original kept privately, public responsive WEBP variants, DB row (approved). Used by upload and DEMO seed. */
+export async function saveProductImage(db: Queryable, mediaDir: string, productId: string, buf: Buffer,
+  o: { mime: string; width: number; height: number; filename: string; alt: Record<string, string>; rights_source: string; sort: number; uploadedBy: string | null }) {
+  const sha = createHash('sha256').update(buf).digest('hex');
+  // Stored names derive only from the content hash; the original filename never becomes a path (§08).
+  const dir = join(mediaDir, 'public');
+  await mkdir(dir, { recursive: true });
+  await mkdir(join(mediaDir, 'originals'), { recursive: true });
+  await writeFile(join(mediaDir, 'originals', `${sha}.bin`), buf);
+  const variants: Record<string, string> = {};
+  for (const w of WIDTHS) {
+    const key = `${sha}-w${w}.webp`;
+    // Re-encoding strips metadata (EXIF/GPS) and any embedded active content.
+    await writeFile(join(dir, key), await sharp(buf).rotate().resize({ width: w, withoutEnlargement: true }).webp({ quality: 80 }).toBuffer());
+    variants[`w${w}`] = key;
+  }
+  const r = await db.query(`INSERT INTO media_assets (product_id, storage_key, mime, width, height, bytes, sha256, alt, rights_source, sort, status, original_name, variants, uploaded_by)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'approved',$11,$12,$13)
+      ON CONFLICT (product_id, sha256) DO UPDATE SET alt=EXCLUDED.alt, sort=EXCLUDED.sort RETURNING id`,
+    [productId, variants.w640, o.mime, o.width, o.height, buf.length, sha, JSON.stringify(o.alt), o.rights_source, o.sort, o.filename.replace(/[^\p{L}\p{N}._ -]/gu, '_').slice(0, 120), JSON.stringify(variants), o.uploadedBy]);
+  return { id: r.rows[0].id as string, sha256: sha, variants };
+}
+
 export function registerMedia(app: FastifyInstance, deps: Deps): void {
   route(app, deps, {
     method: 'POST', url: '/admin/products/:id/media', tags: ['catalog'], summary: 'Upload product image (JPEG/PNG/WEBP, ≤5MB, 200–6000px); responsive WEBP variants generated',
@@ -39,23 +64,8 @@ export function registerMedia(app: FastifyInstance, deps: Deps): void {
       throw badRequest('MEDIA_CORRUPT');
     }
     if (!meta.width || !meta.height || meta.width < 200 || meta.height < 200 || meta.width > 6000 || meta.height > 6000) throw badRequest('MEDIA_DIMENSIONS_INVALID');
-    const sha = createHash('sha256').update(buf).digest('hex');
-    // Stored names derive only from the content hash; the original filename never becomes a path (§08).
-    const dir = join(cfg.mediaDir, 'public');
-    await mkdir(dir, { recursive: true });
-    await mkdir(join(cfg.mediaDir, 'originals'), { recursive: true });
-    await writeFile(join(cfg.mediaDir, 'originals', `${sha}.bin`), buf);
-    const variants: Record<string, string> = {};
-    for (const w of WIDTHS) {
-      const key = `${sha}-w${w}.webp`;
-      // Re-encoding strips metadata (EXIF/GPS) and any embedded active content.
-      await writeFile(join(dir, key), await sharp(buf).rotate().resize({ width: w, withoutEnlargement: true }).webp({ quality: 80 }).toBuffer());
-      variants[`w${w}`] = key;
-    }
-    const row = await one<{ id: string }>(db, `INSERT INTO media_assets (product_id, storage_key, mime, width, height, bytes, sha256, alt, rights_source, sort, status, original_name, variants, uploaded_by)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'approved',$11,$12,$13)
-        ON CONFLICT (product_id, sha256) DO UPDATE SET alt=EXCLUDED.alt, sort=EXCLUDED.sort RETURNING id`,
-      [params.id, variants.w640, mime, meta.width, meta.height, buf.length, sha, JSON.stringify(body.alt), body.rights_source, body.sort, body.filename.replace(/[^\p{L}\p{N}._ -]/gu, '_').slice(0, 120), JSON.stringify(variants), actor.userId]);
+    const row = await saveProductImage(db, cfg.mediaDir, params.id, buf, { mime, width: meta.width, height: meta.height, filename: body.filename, alt: body.alt, rights_source: body.rights_source, sort: body.sort, uploadedBy: actor.userId });
+    const sha = row.sha256, variants = row.variants;
     await audit(db, actor, 'media.uploaded', { type: 'product', id: params.id }, { after: { sha256: sha, mime } });
     return { id: row.id, mime, width: meta.width, height: meta.height, variants };
   });

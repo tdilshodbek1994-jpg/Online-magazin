@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import { api, som } from '@/lib/api';
+import { notifyCart } from '@/components/Header';
 import { pick, useI18n } from '@/lib/i18n';
 
 export default function Checkout() {
@@ -29,7 +30,7 @@ export default function Checkout() {
   const place = async () => {
     setBusy(true); setErr(null);
     try {
-      setDone(await api('/checkout/confirmations', { method: 'POST', idem: idem.current, body: { quote_id: quote.quote_id, quote_hash: quote.quote_hash, payment_method: f.payment, accept_terms: true, marketing_opt_in: marketing, referral_code: f.referral || undefined } }));
+      setDone(await api('/checkout/confirmations', { method: 'POST', idem: idem.current, body: { quote_id: quote.quote_id, quote_hash: quote.quote_hash, payment_method: f.payment, accept_terms: true, marketing_opt_in: marketing, referral_code: f.referral || undefined } })); notifyCart();
     } catch (e: any) {
       if (e.code === 'QUOTE_CHANGED') { setQuote({ ...quote, ...e.details.new_quote, changed: true }); idem.current = crypto.randomUUID(); }
       setErr(e);

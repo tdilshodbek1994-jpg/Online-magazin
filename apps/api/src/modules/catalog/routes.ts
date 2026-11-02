@@ -77,16 +77,16 @@ export function registerCatalog(app: FastifyInstance, deps: Deps): void {
         SELECT p.id, p.slug, p.name, p.brand_id, p.published_at FROM products p JOIN categories c ON c.id=p.category_id
          WHERE ${where.join(' AND ')}
          ${limitFirst ? `ORDER BY p.published_at DESC NULLS LAST, p.id LIMIT $${L} OFFSET $${O}` : ''}),
-      price AS (SELECT s.product_id, MIN(o.price_minor) AS min_price FROM skus s JOIN offers o ON o.sku_id=s.id AND o.status='active' WHERE s.status='active' AND s.product_id IN (SELECT id FROM cand) GROUP BY s.product_id),
+      price AS (SELECT s.product_id, MIN(o.price_minor) AS min_price, MAX(o.compare_at_minor) FILTER (WHERE o.compare_at_minor > o.price_minor) AS compare_at FROM skus s JOIN offers o ON o.sku_id=s.id AND o.status='active' WHERE s.status='active' AND s.product_id IN (SELECT id FROM cand) GROUP BY s.product_id),
       avail AS (SELECT s.product_id, SUM(GREATEST(0, sb.on_hand_sellable - sb.reserved - sb.safety_buffer)) AS available FROM skus s JOIN stock_balances sb ON sb.sku_id=s.id WHERE s.status='active' AND s.product_id IN (SELECT id FROM cand) GROUP BY s.product_id),
       page AS (
-        SELECT cand.*, price.min_price, COALESCE(avail.available, 0) AS available FROM cand LEFT JOIN price ON price.product_id=cand.id LEFT JOIN avail ON avail.product_id=cand.id
+        SELECT cand.*, price.min_price, price.compare_at, COALESCE(avail.available, 0) AS available FROM cand LEFT JOIN price ON price.product_id=cand.id LEFT JOIN avail ON avail.product_id=cand.id
          ${query.in_stock ? 'WHERE COALESCE(avail.available,0) > 0' : ''}
          ORDER BY ${order} ${limitFirst ? '' : `LIMIT $${L} OFFSET $${O}`})
-      SELECT page.id, page.slug, page.name, b.name AS brand, page.published_at, page.min_price, page.available,
+      SELECT page.id, page.slug, page.name, b.name AS brand, page.published_at, page.min_price, page.compare_at, page.available,
              (SELECT '/media/' || storage_key FROM media_assets ma WHERE ma.product_id=page.id AND ma.status='approved' ORDER BY sort LIMIT 1) AS image
         FROM page LEFT JOIN brands b ON b.id=page.brand_id ORDER BY ${order}`, params);
-    return { items: rows.map((r) => ({ ...r, min_price: r.min_price ? m(r.min_price as string) : null, available: Number(r.available) })) };
+    return { items: rows.map((r) => ({ ...r, min_price: r.min_price ? m(r.min_price as string) : null, compare_at: r.compare_at ? m(r.compare_at as string) : null, available: Number(r.available) })) };
   });
 
   route(app, deps, { method: 'GET', url: '/products/:slug', tags: T, summary: 'Product page', params: z.object({ slug: z.string().max(140) }) }, async ({ db, params }) => {

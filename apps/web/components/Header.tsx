@@ -1,45 +1,90 @@
 'use client';
 import Link from 'next/link';
+import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { IconBag, IconCart, IconSearch, IconUser } from '@/components/Icons';
 import { api, getToken, setToken } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
 
+/** Fire after any cart change so the header/bottom-nav badges refresh. */
+export const notifyCart = () => { try { window.dispatchEvent(new Event('om-cart')); } catch {} };
+
+export function useCartCount(): number {
+  const [n, setN] = useState(0);
+  useEffect(() => {
+    const load = () => api('/cart').then((c) => setN((c.lines ?? []).reduce((a: number, l: any) => a + Number(l.qty), 0))).catch(() => {});
+    void load();
+    window.addEventListener('om-cart', load);
+    return () => window.removeEventListener('om-cart', load);
+  }, []);
+  return n;
+}
+
 export function Header() {
   const { t, lang, setLang } = useI18n();
+  const router = useRouter();
+  const path = usePathname();
   const [perms, setPerms] = useState<string[]>([]);
   const [roles, setRoles] = useState<string[]>([]);
   const [logged, setLogged] = useState(false);
+  const [q, setQ] = useState('');
+  const count = useCartCount();
   useEffect(() => {
     if (!getToken()) return;
     api('/me').then((m) => { setLogged(true); setPerms(m.permissions); setRoles(m.roles.map((r: any) => r.role)); }).catch((e) => { if (e?.status === 401) setToken(null); }); // network errors/aborts never log the user out
   }, []);
+  useEffect(() => {
+    try { setQ(new URLSearchParams(location.search).get('q') ?? ''); } catch {}
+  }, [path]);
+  const staff: [string, string][] = [];
+  if (roles.includes('partner')) staff.push(['/partner', t('partner')]);
+  if (perms.includes('orders.read_all')) staff.push(['/ops', t('ops')]);
+  if (perms.includes('catalog.write') || perms.includes('reports.read') || perms.includes('payouts.prepare')) staff.push(['/admin', t('admin')]);
+  if (roles.includes('courier')) staff.push(['/courier', 'Kuryer']);
+  if (roles.includes('owner') || roles.includes('finance')) staff.push(['/account/security', 'MFA']);
   return (
     <header className="top">
-      <div className="wrap">
-        <Link href="/" className="brand">{t('shop')}</Link>
-        <nav className="links" aria-label="Asosiy">
-          <Link href="/cart">{t('cart')}</Link>
-          {logged && <Link href="/account">{t('myOrders')}</Link>}
-          {(roles.includes('owner') || roles.includes('finance')) && <Link href="/account/security">MFA</Link>}
-          {roles.includes('courier') && <Link href="/courier">Kuryer</Link>}
-          {roles.includes('partner') && <Link href="/partner">{t('partner')}</Link>}
-          {perms.includes('orders.read_all') && <Link href="/ops">{t('ops')}</Link>}
-          {(perms.includes('catalog.write') || perms.includes('reports.read') || perms.includes('payouts.prepare')) && <Link href="/admin">{t('admin')}</Link>}
-          {logged ? <button className="btn secondary" onClick={async () => { await api('/auth/logout', { method: 'POST' }).catch(() => {}); setToken(null); location.href = '/'; }}>{t('logout')}</button> : <Link href="/login">{t('login')}</Link>}
+      <div className="wrap head-grid">
+        <Link href="/" className="brand" aria-label={t('shop')}>
+          <span className="logo-mark"><IconBag size={20} /></span>
+          <span>Uz<b>Shop</b></span>
+        </Link>
+        <form className="search" role="search" onSubmit={(e) => { e.preventDefault(); router.push(q.trim() ? `/catalog?q=${encodeURIComponent(q.trim())}` : '/catalog'); }}>
+          <label htmlFor="q" className="sr-only">{t('search')}</label>
+          <input id="q" type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('searchPh')} autoComplete="off" />
+          <button type="submit" className="search-btn" aria-label={t('search')}><IconSearch size={20} /></button>
+        </form>
+        <nav className="head-actions" aria-label="Asosiy">
+          <Link href="/cart" className="icon-link" aria-label={`${t('cart')}${count ? ` (${count})` : ''}`}>
+            <IconCart /><span className="icon-label">{t('cart')}</span>
+            {count > 0 && <span className="count" aria-hidden>{count > 99 ? '99+' : count}</span>}
+          </Link>
+          {logged
+            ? <Link href="/account" className="icon-link"><IconUser /><span className="icon-label">{t('myOrders')}</span></Link>
+            : <Link href="/login" className="icon-link"><IconUser /><span className="icon-label">{t('login')}</span></Link>}
           <label className="sr-only" htmlFor="lang">Til</label>
-          <select id="lang" value={lang} onChange={(e) => setLang(e.target.value as any)} style={{ width: 'auto' }}>
+          <select id="lang" className="lang" value={lang} onChange={(e) => setLang(e.target.value as any)}>
             <option value="uz-Latn">O‘zbek (lotin)</option>
             <option value="uz-Cyrl">Ўзбек (кирилл)</option>
           </select>
         </nav>
       </div>
+      {logged && (
+        <div className="staff-bar">
+          <div className="wrap staff-row">
+            {staff.length > 0 && <span className="muted staff-title">{t('staff')}:</span>}
+            {staff.map(([href, label]) => <Link key={href} href={href} className={path?.startsWith(href) ? 'on' : ''}>{label}</Link>)}
+            <button className="link-btn" onClick={async () => { await api('/auth/logout', { method: 'POST' }).catch(() => {}); setToken(null); location.href = '/'; }}>{t('logout')}</button>
+          </div>
+        </div>
+      )}
     </header>
   );
 }
 
 export function Async({ loading, error, onRetry, children }: { loading: boolean; error: any; onRetry?: () => void; children: React.ReactNode }) {
   const { t } = useI18n();
-  if (loading) return <p role="status">{t('loading')}</p>;
+  if (loading) return <div role="status" className="loading"><span className="spinner" aria-hidden />{t('loading')}</div>;
   if (error) return <div role="alert" className="notice">{t('error')}: <code>{error.code ?? 'UNKNOWN'}</code> {onRetry && <button className="btn secondary" onClick={onRetry}>{t('retry')}</button>}</div>;
   return <>{children}</>;
 }

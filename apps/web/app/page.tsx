@@ -1,48 +1,85 @@
 'use client';
 import Link from 'next/link';
-import { useCallback, useEffect, useState } from 'react';
-import { Async } from '@/components/Header';
+import { useEffect, useState } from 'react';
 import { AiAssistant } from '@/components/AiAssistant';
-import { api, som } from '@/lib/api';
+import { CategoryIcon, IconCash, IconChevron, IconReturn, IconShield, IconTruck } from '@/components/Icons';
+import { ProductCard, SkeletonGrid } from '@/components/ProductCard';
+import { api } from '@/lib/api';
 import { pick, useI18n } from '@/lib/i18n';
+
+function Rail({ title, href, items, loading }: { title: string; href: string; items: any[]; loading: boolean }) {
+  const { t } = useI18n();
+  if (!loading && items.length === 0) return null;
+  return (
+    <section className="rail">
+      <div className="rail-head">
+        <h2>{title}</h2>
+        <Link href={href} className="see-all">{t('seeAll')} <IconChevron size={16} /></Link>
+      </div>
+      {loading ? <SkeletonGrid n={4} /> : <div className="pgrid">{items.map((p) => <ProductCard key={p.id} p={p} />)}</div>}
+    </section>
+  );
+}
 
 export default function Home() {
   const { t, lang } = useI18n();
-  const [q, setQ] = useState('');
-  const [items, setItems] = useState<any[]>([]);
-  const [state, setState] = useState<{ loading: boolean; error: any }>({ loading: true, error: null });
-  const load = useCallback(async (query: string) => {
-    setState({ loading: true, error: null });
-    try {
-      const r = await api(`/products?limit=48${query ? `&q=${encodeURIComponent(query)}` : ''}`);
-      setItems(r.items);
-      setState({ loading: false, error: null });
-    } catch (e) { setState({ loading: false, error: e }); }
-  }, []);
-  useEffect(() => { void load(''); }, [load]);
+  const [cats, setCats] = useState<any[]>([]);
+  const [fresh, setFresh] = useState<any[]>([]);
+  const [cheap, setCheap] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<any>(null);
+  const load = () => {
+    setLoading(true); setError(null);
+    Promise.all([api('/categories'), api('/products?limit=10&sort=new'), api('/products?limit=10&sort=price_asc&in_stock=true')])
+      .then(([c, n, ch]) => { setCats(c.items); setFresh(n.items); setCheap(ch.items); })
+      .catch(setError)
+      .finally(() => setLoading(false));
+  };
+  useEffect(load, []);
+  const deals = [...fresh, ...cheap].filter((p, i, a) => p.compare_at && a.findIndex((x) => x.id === p.id) === i).slice(0, 8);
+  const heroImgs = fresh.filter((p) => p.image).slice(0, 3);
   return (
     <>
-      <form className="row" role="search" onSubmit={(e) => { e.preventDefault(); void load(q); }}>
-        <label htmlFor="q" className="sr-only">{t('search')}</label>
-        <input id="q" value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('searchPh')} style={{ flex: 1, minWidth: 180 }} />
-        <button className="btn">{t('search')}</button>
-        {q && <button type="button" className="btn secondary" onClick={() => { setQ(''); void load(''); }}>×</button>}
-      </form>
-      <AiAssistant />
-      <Async loading={state.loading} error={state.error} onRetry={() => load(q)}>
-        {items.length === 0 ? <p>{t('empty')}</p> : (
-          <div className="grid" style={{ marginTop: 16 }}>
-            {items.map((p) => (
-              <Link key={p.id} href={`/p/${p.slug}`} className="card tile" style={{ textDecoration: 'none', color: 'inherit' }}>
-                {p.image ? <img src={p.image} alt="" width={300} height={300} /> : <div className="ph" aria-hidden />}
-                <div style={{ fontWeight: 600, marginTop: 8 }}>{pick(p.name, lang)}</div>
-                <div>{som(p.min_price?.amount_minor)}</div>
-                <div className="muted">{p.available > 0 ? t('inStock') : t('outOfStock')}</div>
+      <section className="hero">
+        <div className="hero-text">
+          <span className="hero-tag">UzShop</span>
+          <h1>{t('heroTitle')}</h1>
+          <p>{t('heroSub')}</p>
+          <Link href="/catalog" className="btn hero-btn">{t('shopNow')} <IconChevron size={18} /></Link>
+        </div>
+        <div className="hero-art" aria-hidden>
+          {heroImgs.map((p, i) => <img key={p.id} src={p.image} alt="" className={`hero-img h${i}`} />)}
+        </div>
+      </section>
+
+      <ul className="benefits">
+        <li><IconCash /><div><b>{t('bCod')}</b><span>{t('bCodSub')}</span></div></li>
+        <li><IconTruck /><div><b>{t('bFast')}</b><span>{t('bFastSub')}</span></div></li>
+        <li><IconReturn /><div><b>{t('bReturn')}</b><span>{t('bReturnSub')}</span></div></li>
+        <li><IconShield /><div><b>{t('bWarranty')}</b><span>{t('bWarrantySub')}</span></div></li>
+      </ul>
+
+      {error && <div role="alert" className="notice">{t('error')}: <code>{error.code ?? 'UNKNOWN'}</code> <button className="btn secondary" onClick={load}>{t('retry')}</button></div>}
+
+      {cats.length > 0 && (
+        <section className="rail">
+          <div className="rail-head"><h2>{t('categories')}</h2></div>
+          <div className="cats">
+            {cats.map((c) => (
+              <Link key={c.id} href={`/catalog?category=${c.slug}`} className="cat">
+                <span className="cat-ico"><CategoryIcon slug={c.slug} /></span>
+                <span>{pick(c.name, lang)}</span>
               </Link>
             ))}
           </div>
-        )}
-      </Async>
+        </section>
+      )}
+
+      {deals.length > 0 && <Rail title={t('deals')} href="/catalog" items={deals} loading={false} />}
+      <Rail title={t('newArrivals')} href="/catalog?sort=new" items={fresh} loading={loading} />
+      <Rail title={t('bestPrice')} href="/catalog?sort=price_asc" items={cheap} loading={loading} />
+
+      <section className="rail"><AiAssistant /></section>
     </>
   );
 }

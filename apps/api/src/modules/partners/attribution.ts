@@ -41,15 +41,17 @@ export async function resolveAttribution(
   }
   if (!conds.length) return null;
   const t = await q.query(
-    `SELECT t.id AS touch_id, t.link_id, l.campaign_id, l.status AS link_status, c.status AS campaign_status, p.id AS partner_id, p.user_id, p.status
-       FROM referral_touches t JOIN referral_links l ON l.id=t.link_id JOIN partners p ON p.id=t.partner_id LEFT JOIN partner_campaigns c ON c.id=l.campaign_id
+    `SELECT t.id AS touch_id, t.link_id, t.placement_id, cp.channel AS placement_channel, l.campaign_id, l.status AS link_status, c.status AS campaign_status, p.id AS partner_id, p.user_id, p.status
+       FROM referral_touches t JOIN referral_links l ON l.id=t.link_id JOIN partners p ON p.id=t.partner_id LEFT JOIN partner_campaigns c ON c.id=l.campaign_id LEFT JOIN campaign_placements cp ON cp.id=t.placement_id
       WHERE t.eligible AND t.touched_at > now() - make_interval(days => $1) AND (${conds.join(' OR ')})
       ORDER BY t.touched_at DESC, t.id DESC LIMIT 1`,
     params,
   );
   const row = t.rows[0];
   if (!row) return null;
-  const base: Attribution = { partner_id: row.partner_id, campaign_id: row.campaign_id, touch_id: row.touch_id, link_id: row.link_id, rule_version: ruleVersion, reason: 'last_eligible_click', attributed_at: now, eligible: true };
+  const base: Attribution = { partner_id: row.partner_id, campaign_id: row.campaign_id, touch_id: row.touch_id, link_id: row.link_id, rule_version: ruleVersion, reason: 'last_eligible_click', attributed_at: now, eligible: true,
+    // An old link spread on both Telegram and Instagram without a placement stays 'unknown' — history is never guessed (T26).
+    placement_id: row.placement_id ?? null, source_channel: row.placement_channel ?? 'unknown' };
   if (row.link_status !== 'active' || (row.campaign_id && row.campaign_status !== 'active')) return { ...base, eligible: false, ineligible_reason: 'link_or_campaign_disabled' };
   return finalize(base, row, input.customerUserId);
 }

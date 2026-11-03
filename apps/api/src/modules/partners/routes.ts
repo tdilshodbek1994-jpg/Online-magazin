@@ -33,16 +33,21 @@ export async function myPartner(tx: { query: Tx['query'] }, actor: Actor, requir
  * Shared partner-assisted order creation (manual form, draft submit, customer fill link): order awaits the customer's own
  * confirmation; a one-time code + link goes to the customer's phone only (never to the partner, T043/T11).
  */
-export async function createAssistedOrder(tx: Tx, cfg: AppConfig, actor: Actor, p: { id: string; user_id: string }, o: { quoteId: string; quoteHash: string; note: string }) {
+export async function createAssistedOrder(tx: Tx, cfg: AppConfig, actor: Actor, p: { id: string; user_id: string }, o: { quoteId: string; quoteHash: string; note: string; placementId?: string | null; rootLinkId?: string | null }) {
         const q = await maybeOne<{ created_by_user_id: string; contact_snapshot: { phone: string }; cart_id: string | null }>(tx, `SELECT created_by_user_id, contact_snapshot, cart_id FROM checkout_quotes WHERE id=$1`, [o.quoteId]);
   if (!q || q.created_by_user_id !== p.user_id || q.cart_id !== null) throw notFound('QUOTE');
   const phone = q.contact_snapshot.phone;
   const customer = await maybeOne<{ id: string }>(tx, `SELECT id FROM users WHERE phone_e164=$1 AND status <> 'closed'`, [phone]);
   if (customer?.id === p.user_id) throw unprocessable('SELF_ORDER_NOT_ALLOWED');
+  // The partner may name the campaign the customer came from; only their own placements/links are accepted (never trusted from the client).
+  const pl = o.placementId ? await maybeOne<{ id: string; root_link_id: string; channel: string }>(tx, `SELECT id, root_link_id, channel FROM campaign_placements WHERE id=$1 AND partner_id=$2`, [o.placementId, p.id]) : null;
+  if (o.placementId && !pl) throw notFound('PLACEMENT');
+  const rootLink = !pl && o.rootLinkId ? await maybeOne<{ id: string }>(tx, `SELECT id FROM referral_links WHERE id=$1 AND partner_id=$2`, [o.rootLinkId, p.id]) : null;
   const order = await createOrder(tx, cfg, actor, {
     quoteId: o.quoteId, quoteHash: o.quoteHash, paymentMethod: 'cod', channel: 'partner_assisted', customerUserId: customer?.id ?? null, customerPhone: phone,
     createdBy: p.user_id, confirmation: 'pending', acceptedTerms: true,
-    attribution: { partner_id: p.id, campaign_id: null, touch_id: null, link_id: null, rule_version: 0, reason: 'partner_assisted', attributed_at: new Date().toISOString(), eligible: true },
+    attribution: { partner_id: p.id, campaign_id: null, touch_id: null, link_id: pl?.root_link_id ?? rootLink?.id ?? null, rule_version: 0, reason: 'partner_assisted', attributed_at: new Date().toISOString(), eligible: true,
+      placement_id: pl?.id ?? null, source_channel: (pl?.channel as never) ?? 'unknown' },
   });
   // Duplicate signal (T046/T047): same phone + same SKU in last 48h. Operator decides; nothing is auto-cancelled and nothing is revealed to the partner.
   const dup = await maybeOne(tx, `SELECT 1 FROM orders o2 JOIN order_lines l2 ON l2.order_id=o2.id
@@ -133,14 +138,16 @@ export function registerPartners(app: FastifyInstance, deps: Deps): void {
   route(app, deps, { method: 'POST', url: '/referrals/touch', tags: ['referral'], summary: 'Record referral click (needs X-Guest-Token)', body: z.object({ code: z.string().min(8).max(16) }) },
     async ({ actor, db, req, body }) => {
       if (!actor.guestToken) throw badRequest('GUEST_TOKEN_REQUIRED');
+      // A placement code (one per Telegram post / Instagram campaign) resolves to its root link and is recorded on the touch.
+      const plc = await maybeOne<{ id: string; root_link_id: string; status: string }>(db, `SELECT id, root_link_id, status FROM campaign_placements WHERE code=$1`, [body.code]);
       const l = await maybeOne<{ id: string; partner_id: string; status: string; pstatus: string; cstatus: string | null; slug: string | null }>(db,
-        `SELECT l.id, l.partner_id, l.status, p.status AS pstatus, c.status AS cstatus, pr.slug FROM referral_links l JOIN partners p ON p.id=l.partner_id LEFT JOIN partner_campaigns c ON c.id=l.campaign_id LEFT JOIN products pr ON pr.id=l.product_id WHERE l.code=$1`, [body.code]);
+        `SELECT l.id, l.partner_id, l.status, p.status AS pstatus, c.status AS cstatus, pr.slug FROM referral_links l JOIN partners p ON p.id=l.partner_id LEFT JOIN partner_campaigns c ON c.id=l.campaign_id LEFT JOIN products pr ON pr.id=l.product_id WHERE ${plc ? 'l.id=$1' : 'l.code=$1'}`, [plc ? plc.root_link_id : body.code]);
       // Invalid codes do not break browsing (T035): just no attribution.
       if (!l) return { ok: true, attributed: false, redirect: '/' };
       const bot = isBotUserAgent(req.headers['user-agent']);
-      const reason = bot ? 'bot_or_preview' : l.status !== 'active' ? 'link_disabled' : l.pstatus !== 'active' ? `partner_${l.pstatus}` : l.cstatus && l.cstatus !== 'active' ? 'campaign_disabled' : null;
-      await db.query(`INSERT INTO referral_touches (link_id, partner_id, visitor_hash, user_id, is_bot, eligible, ineligible_reason) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-        [l.id, l.partner_id, visitorHash(actor.guestToken), actor.userId, bot, reason === null, reason]);
+      const reason = bot ? 'bot_or_preview' : l.status !== 'active' ? 'link_disabled' : l.pstatus !== 'active' ? `partner_${l.pstatus}` : l.cstatus && l.cstatus !== 'active' ? 'campaign_disabled' : plc && plc.status !== 'active' ? 'placement_archived' : null;
+      await db.query(`INSERT INTO referral_touches (link_id, partner_id, visitor_hash, user_id, is_bot, eligible, ineligible_reason, placement_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+        [l.id, l.partner_id, visitorHash(actor.guestToken), actor.userId, bot, reason === null, reason, plc?.id ?? null]);
       return { ok: true, attributed: reason === null, redirect: l.slug ? `/p/${l.slug}` : '/' };
     });
 

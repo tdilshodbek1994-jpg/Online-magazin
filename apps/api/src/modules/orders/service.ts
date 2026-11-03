@@ -156,6 +156,9 @@ export interface Attribution {
   attributed_at: string;
   eligible: boolean;
   ineligible_reason?: string;
+  // Reporting attribution (spec §9): source placement/channel, separate from capture mode (orders.channel).
+  placement_id?: string | null;
+  source_channel?: 'telegram_channel' | 'telegram_ads' | 'instagram_target' | 'organic' | 'unknown' | null;
 }
 
 export interface CreateOrderInput {

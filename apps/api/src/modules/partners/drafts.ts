@@ -8,7 +8,7 @@ import { type Actor, hashToken } from '../../platform/auth.js';
 import { many, maybeOne, one, type Tx, withTx } from '../../platform/db.js';
 import { AppError, badRequest, conflict, notFound, unprocessable } from '../../platform/errors.js';
 import { type Deps, route, zIdParam } from '../../platform/http.js';
-import { computeTarget, ruleForProduct } from '../commissions/service.js';
+import { estimateCommission } from '../commissions/service.js';
 import { releaseDraftHold } from '../inventory/service.js';
 import { maskedNumber, notifyPartner } from '../notifications/telegram.js';
 import { priceLines, pricedToJson, storeQuote } from '../orders/service.js';
@@ -32,6 +32,8 @@ const zDraft = z.object({
   contact_time: z.string().max(120).nullable().optional(),
   note: z.string().max(500).nullable().optional(),
   source: z.enum(['manual', 'message']).optional(),
+  placement_id: z.string().uuid().nullable().optional(),
+  root_link_id: z.string().uuid().nullable().optional(),
   raw_message: z.string().max(2000).nullable().optional(),
 });
 export type DraftRow = { id: string; partner_id: string; created_by: string; status: string; source: string; lines: { sku_id: string; qty: number }[]; customer_name: string | null; customer_phone: string | null; delivery_zone_id: string | null;
@@ -58,15 +60,11 @@ export async function quoteDraft(q: Tx | Deps['db'], d: Pick<DraftRow, 'lines' |
   const zone = d.delivery_zone_id ?? (await defaultZone(q))?.id;
   if (!zone) return null;
   const priced = await priceLines(q as Tx, { lines: d.lines, delivery_zone_id: zone });
-  let commission = 0n;
-  const rules: { sku_id: string; rule: unknown; amount_minor: string }[] = [];
-  for (const l of priced.lines) {
-    const rule = await ruleForProduct(q, String(l.snapshot.product_id));
-    const amt = rule ? computeTarget(rule, { qty: l.qty, canceledQty: 0, returnedQty: 0, lineNet: l.net, refundedProduct: 0n }) : 0n;
-    commission += amt;
-    rules.push({ sku_id: l.skuId, rule, amount_minor: amt.toString() });
-  }
-  return { ...pricedToJson(priced), zone_assumed: !d.delivery_zone_id, commission_estimate_minor: commission.toString(), commission_lines: rules };
+  // Same server function as real orders (quantity matrix groups, review for unsupported quantities).
+  const est = await estimateCommission(q, priced.lines.map((l) => ({ key: l.skuId, productId: String(l.snapshot.product_id), qty: l.qty, lineNet: l.net })));
+  const commission = est.total;
+  const rules = est.lines.map((x) => ({ sku_id: x.key, rule: x.rule, amount_minor: x.amount_minor, review: x.review }));
+  return { ...pricedToJson(priced), zone_assumed: !d.delivery_zone_id, commission_estimate_minor: commission.toString(), commission_lines: rules, commission_review: est.review };
 }
 
 /** A quote failure (e.g. variant sold out) must not block autosave: the draft is saved and the reason is shown. */
@@ -87,7 +85,8 @@ export async function loadDraft(q: Tx | Deps['db'], id: string, partnerId: strin
 export const view = (d: DraftRow, extra: Record<string, unknown> = {}) => ({
   id: d.id, status: d.status, source: d.source, lines: d.lines, customer_name: d.customer_name, customer_phone: d.customer_phone, delivery_zone_id: d.delivery_zone_id,
   address: d.address, address_later: d.address_later, contact_time: d.contact_time, note: d.note, fill_status: d.fill_status, fill_expires_at: d.fill_expires_at, order_id: d.order_id,
-  version: d.version, created_at: d.created_at, updated_at: d.updated_at, missing: missingFields(d), ...extra,
+  version: d.version, created_at: d.created_at, updated_at: d.updated_at, missing: missingFields(d),
+  placement_id: (d as DraftRow & { placement_id?: string | null }).placement_id ?? null, root_link_id: (d as DraftRow & { root_link_id?: string | null }).root_link_id ?? null, ...extra,
 });
 
 /** Convert a complete draft into one partner-assisted order (row lock + unique order_id ⇒ idempotent, T06). */
@@ -104,11 +103,14 @@ export async function convertDraft(tx: Tx, cfg: AppConfig, actor: Actor, d: Draf
   // A short hold (V2 §09) protects stock only until the order exists: release it in the same transaction.
   await releaseDraftHold(tx, { draftId: d.id }, 'released');
   const priced = await priceLines(tx, { lines: d.lines, delivery_zone_id: d.delivery_zone_id! });
+  // A bundle size without an approved matrix row is not offered (spec §4): no invented rate, the partner sees why.
+  const est = await estimateCommission(tx, priced.lines.map((l) => ({ key: l.skuId, productId: String(l.snapshot.product_id), qty: l.qty, lineNet: l.net })));
+  if (est.review) throw unprocessable('QTY_RULE_MISSING', { lines: est.lines.filter((x) => x.review).map((x) => ({ sku_id: x.key, reason: x.review })) });
   const zone = await one<{ region_code: string }>(tx, `SELECT region_code FROM delivery_zones WHERE id=$1`, [d.delivery_zone_id]);
   const address = { region_code: zone.region_code, ...d.address };
   const q = await storeQuote(tx, priced, { cartId: null, userId: null, createdBy: partner.user_id, address, contact: { name: d.customer_name!.trim(), phone }, ttlMinutes: cfg.quoteTtlMinutes });
   const note = [d.note, d.contact_time ? `Aloqa vaqti: ${d.contact_time}` : null].filter(Boolean).join(' · ') || 'Hamkor kabineti orqali';
-  const r = await createAssistedOrder(tx, cfg, actor, partner, { quoteId: q.id, quoteHash: priced.hash, note });
+  const r = await createAssistedOrder(tx, cfg, actor, partner, { quoteId: q.id, quoteHash: priced.hash, note, placementId: (d as DraftRow & { placement_id?: string | null }).placement_id ?? null, rootLinkId: (d as DraftRow & { root_link_id?: string | null }).root_link_id ?? null });
   await tx.query(`UPDATE orders SET contact_time_note=$2 WHERE id=$1`, [r.order_id, d.contact_time]);
   await tx.query(`UPDATE sales_drafts SET status='converted', order_id=$2, raw_message=NULL, version=version+1, updated_at=now() WHERE id=$1`, [d.id, r.order_id]);
   // Contact notebook (V2 §14): only this partner's own contact; phone typed by the customer is shown masked.
@@ -157,10 +159,13 @@ export function registerSalesDrafts(app: FastifyInstance, deps: Deps): void {
         const n = await one<DraftRow>(tx, `UPDATE sales_drafts SET
             lines=COALESCE($2, lines), customer_name=CASE WHEN $3 THEN $4 ELSE customer_name END, customer_phone=CASE WHEN $5 THEN $6 ELSE customer_phone END,
             delivery_zone_id=CASE WHEN $7 THEN $8::uuid ELSE delivery_zone_id END, address=COALESCE($9, address), address_later=COALESCE($10, address_later),
-            contact_time=CASE WHEN $11 THEN $12 ELSE contact_time END, note=CASE WHEN $13 THEN $14 ELSE note END, version=version+1, updated_at=now() WHERE id=$1 RETURNING *`,
+            contact_time=CASE WHEN $11 THEN $12 ELSE contact_time END, note=CASE WHEN $13 THEN $14 ELSE note END,
+            placement_id=CASE WHEN $15 THEN (SELECT id FROM campaign_placements WHERE id=$16::uuid AND partner_id=$19) ELSE placement_id END,
+            root_link_id=CASE WHEN $17 THEN (SELECT id FROM referral_links WHERE id=$18::uuid AND partner_id=$19) ELSE root_link_id END, version=version+1, updated_at=now() WHERE id=$1 RETURNING *`,
           [d.id, body.lines ? JSON.stringify(body.lines) : null, body.customer_name !== undefined, body.customer_name ?? null, body.customer_phone !== undefined, body.customer_phone ?? null,
            body.delivery_zone_id !== undefined, body.delivery_zone_id ?? null, body.address ? JSON.stringify(body.address) : null, body.address_later ?? null,
-           body.contact_time !== undefined, body.contact_time ?? null, body.note !== undefined, body.note ?? null]);
+           body.contact_time !== undefined, body.contact_time ?? null, body.note !== undefined, body.note ?? null,
+           body.placement_id !== undefined, body.placement_id ?? null, body.root_link_id !== undefined, body.root_link_id ?? null, p.id]);
         return n;
       });
       // Quote after commit: a pricing failure (e.g. sold out) never undoes the autosave.

@@ -239,15 +239,18 @@ export function registerPartnerP2(app: FastifyInstance, deps: Deps): void {
     body: z.object({ spent_on: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), amount_minor: z.string().regex(/^[1-9]\d{0,13}$/), channel: z.string().trim().max(60).optional(), note: z.string().trim().max(200).optional() }) },
   async ({ actor, db, body }) => {
     const p = await myPartner(db, actor, false);
-    return one(db, `INSERT INTO partner_ad_spend (partner_id, spent_on, amount_minor, channel, note) VALUES ($1,$2,$3,$4,$5) RETURNING id`, [p.id, body.spent_on, body.amount_minor, body.channel || null, body.note || null]);
+    // Single expense source (ad_expenses): the quick form is a one-day, partner-paid, actual UZS expense.
+    const ch = /insta/i.test(body.channel ?? '') ? 'instagram_target' : /telegram/i.test(body.channel ?? '') ? 'telegram_channel' : 'other';
+    return one(db, `INSERT INTO ad_expenses (partner_id, channel, placement_name, amount_original, currency, fx_rate, fx_nominal, fx_date, fx_source, amount_uzs_minor, service_from, service_to, paid_at, payer, kind, source, note, created_by)
+        VALUES ($1,$2,$3,$4::bigint / 100.0,'UZS',1,1,$5,'identity',$4,$5,$5,$5,'partner','actual','manual',$6,$7) RETURNING id`, [p.id, ch, body.channel || null, body.amount_minor, body.spent_on, body.note || null, actor.userId]);
   });
   route(app, deps, { method: 'GET', url: '/partner/ad-spend', tags: T, summary: 'My ad spend entries' }, async ({ actor, db }) => {
     const p = await myPartner(db, actor, false);
-    return { items: await many(db, `SELECT id, spent_on::text, amount_minor::text, channel, note FROM partner_ad_spend WHERE partner_id=$1 ORDER BY spent_on DESC, created_at DESC LIMIT 200`, [p.id]) };
+    return { items: await many(db, `SELECT id, service_from::text AS spent_on, amount_uzs_minor::text AS amount_minor, COALESCE(placement_name, channel) AS channel, note FROM ad_expenses WHERE partner_id=$1 AND status='active' AND kind IN ('actual','adjustment') ORDER BY service_from DESC, created_at DESC LIMIT 200`, [p.id]) };
   });
   route(app, deps, { method: 'DELETE', url: '/partner/ad-spend/:id', tags: T, summary: 'Delete my ad spend entry', params: zIdParam }, async ({ actor, db, params }) => {
     const p = await myPartner(db, actor, false);
-    const r = await db.query(`DELETE FROM partner_ad_spend WHERE id=$1 AND partner_id=$2`, [params.id, p.id]);
+    const r = await db.query(`UPDATE ad_expenses SET status='void', version=version+1, updated_at=now() WHERE id=$1 AND partner_id=$2 AND status <> 'void'`, [params.id, p.id]);
     if (!r.rowCount) throw notFound('AD_SPEND');
     return { ok: true };
   });
@@ -281,7 +284,7 @@ export function registerPartnerP2(app: FastifyInstance, deps: Deps): void {
       SELECT COALESCE(SUM(a.target_minor) FILTER (WHERE a.state='available'),0)::text AS confirmed,
              COALESCE(SUM(a.target_minor) FILTER (WHERE a.state IN ('estimated','pending')),0)::text AS expected
         FROM commission_accruals a JOIN orders o ON o.id=a.order_id WHERE a.partner_id=$1 AND o.created_at >= ${since}`, [p.id]);
-    const spend = await one<{ s: string; n: number }>(db, `SELECT COALESCE(SUM(amount_minor),0)::text AS s, COUNT(*)::int AS n FROM partner_ad_spend WHERE partner_id=$1 AND spent_on >= (${since})::date`, [p.id]);
+    const spend = await one<{ s: string; n: number }>(db, `SELECT COALESCE(SUM(amount_uzs_minor),0)::text AS s, COUNT(*)::int AS n FROM ad_expenses WHERE partner_id=$1 AND status='active' AND payer='partner' AND kind IN ('actual','adjustment','zero_confirmed') AND fx_status='ok' AND service_to >= (${since})::date`, [p.id]);
     const rate = (num: number, den: number, formula: string) => ({ value: den > 0 ? Math.round((num / den) * 1000) / 10 : null, num, den, formula, small_sample: den > 0 && den < 30 });
     const finished = c.delivered! + c.returned! + c.cancelled!;
     const byStream = await many(db, `

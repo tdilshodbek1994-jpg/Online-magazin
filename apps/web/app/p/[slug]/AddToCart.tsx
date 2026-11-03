@@ -1,6 +1,6 @@
 'use client';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { notifyCart } from '@/components/Header';
 import { IconCash, IconCheck, IconMinus, IconPlus, IconReturn, IconShield, IconTruck } from '@/components/Icons';
 import { discountPct } from '@/components/ProductCard';
@@ -21,6 +21,20 @@ export function AddToCart({ product, minPrice }: { product: any; minPrice: strin
   const off = discountPct(v?.price_minor, v?.compare_at_minor);
   const inStock = !!v && v.available > 0;
   const maxQty = Math.max(1, Math.min(99, v?.available ?? 1));
+  const [zone, setZone] = useState<any>(null);
+  const [quickKey, setQuickKey] = useState(0);
+  useEffect(() => { api('/delivery-zones').then((r) => setZone((r.items ?? [])[0] ?? null)).catch(() => {}); }, []);
+  const sold = Number(product.sold_30d ?? 0);
+  const save = off > 0 && v ? BigInt(v.compare_at_minor) - BigInt(v.price_minor) : 0n;
+  const add = async () => {
+    setBusy(true); setMsg(null);
+    try {
+      const cart = await api('/cart');
+      const existing = cart.lines?.find((l: any) => l.sku_id === skuId)?.qty ?? 0;
+      await api('/cart/lines', { method: 'PUT', body: { sku_id: skuId, qty: existing + qty } });
+      setMsg('ok'); notifyCart();
+    } catch (e: any) { setMsg(e.code ?? 'ERROR'); } finally { setBusy(false); }
+  };
   return (
     <>
       <nav className="crumbs" aria-label="breadcrumb">
@@ -33,9 +47,16 @@ export function AddToCart({ product, minPrice }: { product: any; minPrice: strin
         <div className="buybox">
           {product.brand && <div className="pbrand">{product.brand}{product.model ? ` · ${product.model}` : ''}</div>}
           <h1>{name}</h1>
-          <div className="price-row big" aria-live="polite">
-            <span className="price">{v ? som(v.price_minor) : som(minPrice)}</span>
-            {off > 0 && <><s className="was">{som(v.compare_at_minor)}</s><span className="sale inline">−{off}%</span></>}
+          <div className={`price-block ${off > 0 ? 'deal' : ''}`} aria-live="polite">
+            <div className="price-row big">
+              <span className={`price ${off > 0 ? 'is-deal' : ''}`}>{v ? som(v.price_minor) : som(minPrice)}</span>
+              {off > 0 && <><s className="was">{som(v.compare_at_minor)}</s><span className="b-off pdp-off">−{off}%</span></>}
+            </div>
+            {save > 0n && <div className="save-t">Tejaysiz: <b>{som(save.toString())}</b></div>}
+            <div className="pmeta">
+              {sold > 0 && <span className="sold-chip">🔥 30 kunda {sold} {t('sold')}</span>}
+              {inStock && v.available <= 5 && <span className="few-t">⏳ {t('fewLeft')}: {v.available} {t('pcs')}</span>}
+            </div>
           </div>
           {variants.length > 1 && (
             <fieldset className="variants">
@@ -60,27 +81,32 @@ export function AddToCart({ product, minPrice }: { product: any; minPrice: strin
               <button type="button" aria-label="+1" onClick={() => setQty(Math.min(maxQty, qty + 1))} disabled={qty >= maxQty}><IconPlus size={18} /></button>
             </div>
           </div>
+          {zone && (
+            <div className="ship-box">
+              <div><span aria-hidden>🚚</span> <b>{zone.eta_min_days}–{zone.eta_max_days} kunda yetkazamiz</b> · {pick(zone.name, lang)}</div>
+              <div className="muted small">Yetkazish: {som(zone.tariff_minor)}{zone.free_from_minor ? ` · ${som(zone.free_from_minor)} dan bepul` : ''} · {t('codShort')}</div>
+            </div>
+          )}
           <div className="buy-cta">
-            <button className="btn big" disabled={!inStock || busy} onClick={async () => {
-              setBusy(true); setMsg(null);
-              try {
-                const cart = await api('/cart');
-                const existing = cart.lines?.find((l: any) => l.sku_id === skuId)?.qty ?? 0;
-                await api('/cart/lines', { method: 'PUT', body: { sku_id: skuId, qty: existing + qty } });
-                setMsg('ok'); notifyCart();
-              } catch (e: any) { setMsg(e.code ?? 'ERROR'); } finally { setBusy(false); }
-            }}>{t('addToCart')}</button>
+            <button className="btn big" disabled={!inStock || busy} onClick={add}>{t('addToCart')}</button>
             {msg === 'ok' && <div className="added" role="status"><IconCheck size={18} /> {t('added')} · <Link href="/cart">{t('cart')} →</Link></div>}
             {msg && msg !== 'ok' && <span role="alert" className="field-error">{msg}</span>}
           </div>
-          <QuickOrder skuId={skuId} qty={qty} disabled={!inStock} />
+          <div id="quick-order"><QuickOrder key={quickKey} skuId={skuId} qty={qty} disabled={!inStock} autoOpen={quickKey > 0} /></div>
           <ul className="perks">
             <li><IconCash size={20} /> {t('bCod')}</li>
-            <li><IconTruck size={20} /> {t('delivery')}: zona tarifi checkoutda hisoblanadi</li>
+            <li><IconTruck size={20} /> {zone ? `${t('delivery')}: ${zone.eta_min_days}–${zone.eta_max_days} kun, ${som(zone.tariff_minor)}` : t('delivery')}</li>
             <li><IconReturn size={20} /> <Link href="/legal/returns">{t('returns')}</Link></li>
             {product.warranty_months ? <li><IconShield size={20} /> {t('warranty')}: {product.warranty_months} {t('months')}</li> : null}
           </ul>
         </div>
+      </div>
+      {/* Mobile sticky buy bar: the price and both actions are always one tap away while reading. */}
+      {msg === 'ok' && <div className="bb-toast" role="status">✓ {t('added')} · <Link href="/cart">Savatni ochish</Link></div>}
+      <div className="buy-bar" aria-label="Xarid paneli">
+        <div className="bb-price"><b className={off > 0 ? 'is-deal' : ''}>{v ? som(v.price_minor) : som(minPrice)}</b>{off > 0 && <s>{som(v.compare_at_minor)}</s>}</div>
+        <button className="btn secondary" disabled={!inStock || busy} onClick={add}>🛒 Savatga</button>
+        <button className="btn bb-now" disabled={!inStock} onClick={() => { setQuickKey((k) => k + 1); setTimeout(() => document.getElementById('quick-order')?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 50); }}>Hozir olish</button>
       </div>
       {pick(product.description, lang) && (
         <section className="card desc">

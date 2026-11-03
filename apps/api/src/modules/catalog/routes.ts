@@ -108,7 +108,10 @@ export function registerCatalog(app: FastifyInstance, deps: Deps): void {
       if (red) return { redirect: red.slug };
       throw notFound('PRODUCT');
     }
-    return p;
+    // Real social proof: units in verified, not-cancelled orders over the last 30 days.
+    const sold = await maybeOne<{ n: number }>(db, `SELECT COALESCE(SUM(ol.qty),0)::int AS n FROM order_lines ol JOIN skus s ON s.id=ol.sku_id JOIN orders o ON o.id=ol.order_id
+        WHERE s.product_id=$1 AND o.created_at > now() - interval '30 days' AND o.commercial_status <> 'cancelled' AND o.confirmation_status='verified'`, [(p as { id: string }).id]);
+    return { ...p, sold_30d: sold?.n ?? 0 };
   });
 
   // ---------- Admin (catalog.write) ----------

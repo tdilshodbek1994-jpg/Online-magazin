@@ -763,3 +763,49 @@ header.top:not(.ptop) .staff-bar { background: var(--surface); }
 .hero2-dots button::before { content: ''; width: 8px; height: 8px; border-radius: 999px; background: rgba(255,255,255,.55); transition: width .2s; }
 .hero2-dots button.on { width: 34px; background: transparent; }
 .hero2-dots button.on::before { width: 22px; background: #fff; }
+
+/* Catalog 2.0 */
+.catalog2 h1 { margin: 6px 0 10px; font-size: 24px; font-weight: 900; }
+.cat-chips { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 6px; scrollbar-width: none; }
+.cat-chips::-webkit-scrollbar { display: none; }
+.cchip { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 4px 14px 4px 4px; border-radius: 999px; border: 2px solid transparent; background: var(--tile); color: var(--text); font: inherit; font-weight: 700; font-size: 14px; cursor: pointer; white-space: nowrap; }
+.cchip img, .cc-ico { width: 34px; height: 34px; border-radius: 999px; object-fit: cover; display: inline-grid; place-items: center; background: var(--surface); }
+.cchip.on { border-color: var(--primary); background: var(--primary-50); }
+.filter-bar { position: sticky; top: 68px; z-index: 15; display: grid; gap: 6px; padding: 8px 0; background: var(--bg); }
+.sort-chips { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
+.sort-chips::-webkit-scrollbar { display: none; }
+.schip { flex: 0 0 auto; min-height: 36px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+.schip.on { background: var(--text); color: var(--surface); border-color: var(--text); }
+.result-count { margin: 2px 0 8px; }
+@media (max-width: 760px) { .filter-bar { top: 112px; } }
+
+/* Product page 2.0 */
+.price-block { display: grid; gap: 4px; padding: 12px 14px; border-radius: 14px; background: var(--surface-2); margin: 8px 0; }
+.price-block.deal { background: linear-gradient(135deg, var(--deal-bg), var(--surface)); }
+.price-block .price { font-size: 32px; font-weight: 900; }
+.pdp-off { position: static; font-size: 14px; padding: 4px 8px; border-radius: 6px; }
+.save-t { color: var(--deal); font-size: 14px; }
+.ship-box { display: grid; gap: 2px; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface); margin: 8px 0; font-size: 14px; }
+.ship-box b { color: var(--ship); }
+.buy-bar { display: none; }
+.bb-toast { display: none; }
+@media (max-width: 760px) {
+  .buy-bar { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 8px; position: fixed; left: 0; right: 0; bottom: calc(56px + env(safe-area-inset-bottom)); z-index: 29; padding: 8px 12px; background: var(--surface); border-top: 1px solid var(--border); box-shadow: 0 -6px 18px rgba(16,24,40,.08); }
+  .bb-price { display: grid; line-height: 1.1; min-width: 0; }
+  .bb-price b { font-size: 18px; font-weight: 900; }
+  .bb-price b.is-deal { color: var(--deal); }
+  .bb-price s { font-size: 12px; color: var(--muted); }
+  .buy-bar .btn { min-height: 44px; padding: 0 14px; }
+  .bb-now { background: var(--signal); border-color: var(--signal); color: var(--signal-ink); }
+  .bb-now:hover { background: #ffcc00; border-color: #ffcc00; }
+  .bb-toast { display: block; position: fixed; left: 12px; right: 12px; bottom: calc(124px + env(safe-area-inset-bottom)); z-index: 29; padding: 10px 14px; border-radius: 12px; background: #0b7a55; color: #fff; font-weight: 700; box-shadow: 0 6px 18px rgba(0,0,0,.2); }
+  .bb-toast a { color: #fff; text-decoration: underline; }
+  article:has(.buy-bar) { padding-bottom: 72px; }
+}
+.quick-btn { background: var(--signal); border-color: var(--signal); color: var(--signal-ink); }
+.quick-btn:hover { background: #ffcc00; border-color: #ffcc00; }
+@media (max-width: 760px) {
+  .bb-price b { font-size: 16px; white-space: nowrap; }
+  .bb-price s { white-space: nowrap; }
+  .buy-bar .btn { padding: 0 12px; font-size: 15px; }
+}

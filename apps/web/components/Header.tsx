@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { IconBag, IconCart, IconPlay, IconSearch, IconUser } from '@/components/Icons';
 import { api, getToken, setToken } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
@@ -29,6 +29,18 @@ export function Header() {
   const [logged, setLogged] = useState(false);
   const [q, setQ] = useState('');
   const count = useCartCount();
+  // The partner profile menu is a <details>: it must close after a choice (also when the chosen page is the current
+  // one, where the route does not change), on a tap outside, and on Escape — otherwise it stays open over the page.
+  const menu = useRef<HTMLDetailsElement>(null);
+  const closeMenu = () => { if (menu.current) menu.current.open = false; };
+  useEffect(() => { closeMenu(); }, [path]);
+  useEffect(() => {
+    const out = (e: Event) => { if (menu.current?.open && !menu.current.contains(e.target as Node)) closeMenu(); };
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') closeMenu(); };
+    document.addEventListener('pointerdown', out);
+    document.addEventListener('keydown', esc);
+    return () => { document.removeEventListener('pointerdown', out); document.removeEventListener('keydown', esc); };
+  }, []);
   useEffect(() => {
     if (!getToken()) return;
     api('/me').then((m) => { setLogged(true); setPerms(m.permissions); setRoles(m.roles.map((r: any) => r.role)); }).catch((e) => { if (e?.status === 401) setToken(null); }); // network errors/aborts never log the user out
@@ -53,19 +65,19 @@ export function Header() {
             <span>Uz<b>Shop</b> <small className="ptop-sub">Hamkor</small></span>
           </Link>
           <Link href="/partner/new" className="btn sm ptop-new">+ Buyurtma</Link>
-          <details className="pmenu">
+          <details className="pmenu" ref={menu}>
             <summary aria-label="Profil menyusi"><IconUser /></summary>
-            <div className="pmenu-pop">
-              <Link href="/partner/orders">Buyurtmalar</Link>
-              <Link href="/partner/analytics">Reklama va daromad</Link>
-              <Link href="/partner/expenses">Reklama xarajatlari</Link>
-              <Link href="/partner/offers">Taklif to‘plami</Link>
-              <Link href="/partner/contacts">Mijozlar daftari</Link>
-              <Link href="/partner/streams">Oqimlarim</Link>
-              <Link href="/partner/stats">Statistika</Link>
-              <Link href="/partner/programs">Konkurs va bonuslar</Link>
-              <Link href="/partner/notifications">Bildirishnomalar</Link>
-              <Link href="/partner/about">Dastur haqida</Link>
+            <div className="pmenu-pop" onClick={(e) => { if ((e.target as HTMLElement).closest('a')) closeMenu(); }}>
+              <Link href="/partner/orders" aria-current={path === '/partner/orders' ? 'page' : undefined}>Buyurtmalar</Link>
+              <Link href="/partner/analytics" aria-current={path === '/partner/analytics' ? 'page' : undefined}>Reklama va daromad</Link>
+              <Link href="/partner/expenses" aria-current={path === '/partner/expenses' ? 'page' : undefined}>Reklama xarajatlari</Link>
+              <Link href="/partner/offers" aria-current={path === '/partner/offers' ? 'page' : undefined}>Taklif to‘plami</Link>
+              <Link href="/partner/contacts" aria-current={path === '/partner/contacts' ? 'page' : undefined}>Mijozlar daftari</Link>
+              <Link href="/partner/streams" aria-current={path === '/partner/streams' ? 'page' : undefined}>Oqimlarim</Link>
+              <Link href="/partner/stats" aria-current={path === '/partner/stats' ? 'page' : undefined}>Statistika</Link>
+              <Link href="/partner/programs" aria-current={path === '/partner/programs' ? 'page' : undefined}>Konkurs va bonuslar</Link>
+              <Link href="/partner/notifications" aria-current={path === '/partner/notifications' ? 'page' : undefined}>Bildirishnomalar</Link>
+              <Link href="/partner/about" aria-current={path === '/partner/about' ? 'page' : undefined}>Dastur haqida</Link>
               {staff.filter(([h]) => h !== '/partner').map(([href, label]) => <Link key={href} href={href}>{label}</Link>)}
               <Link href="/">Do‘konga o‘tish</Link>
               <label className="sr-only" htmlFor="plang">Til</label>

@@ -1022,3 +1022,5 @@ a.m-link { display: grid; gap: 2px; }
 .wal-line > * { min-width: 0; }
 .wal-card > * { min-width: 0; }
 .wal input, .wal select, .wal button.btn { max-width: 100%; }
+.pmenu-pop a[aria-current="page"] { background: var(--surface-2); color: var(--brand, var(--text)); }
+.pmenu-pop a[aria-current="page"]::after { content: ' ✓'; }

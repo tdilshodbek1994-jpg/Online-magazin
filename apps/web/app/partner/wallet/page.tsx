@@ -11,7 +11,7 @@ const HELP: Record<string, string> = {
   awaiting_cash: 'Mijoz to‘ladi, kuryer pulni do‘konga topshirishi va solishtirilishi kutilmoqda.',
   hold: 'Qaytarish muddati tugashini kutyapmiz — shundan keyin yechish mumkin bo‘ladi.',
   dispute: 'Siz yozgan murojaat ko‘rib chiqilmoqda.',
-  available: 'Pul yechish so‘rovini yuborishingiz mumkin.',
+  available: 'Komissiya tasdiqlangan va hisobingizga o‘tgan.',
   reversed: 'Buyurtma bekor bo‘lgan yoki qaytarilgan — sababi yonida yozilgan.',
 };
 
@@ -21,6 +21,7 @@ export default function Wallet() {
   const [w, setW] = useState<any>(null);
   const [err, setErr] = useState<string | null>(null);
   const [filter, setFilter] = useState<string>('all');
+  const [shown, setShown] = useState(15);
   const [disp, setDisp] = useState({ order_id: '', subject: '', body: '' });
   const [dmsg, setDmsg] = useState<string | null>(null);
   const load = () => api('/partner/wallet').then(setW).catch((e) => setErr(e.code));
@@ -51,8 +52,9 @@ export default function Wallet() {
           <h2>Komissiya qayerda turibdi</h2>
           <div className="reason-grid">
             {groups.map((g: any) => (
-              <button key={g.reason} type="button" className={`reason-card r-${g.reason} ${filter === g.reason ? 'on' : ''}`} aria-pressed={filter === g.reason} onClick={() => setFilter(filter === g.reason ? 'all' : g.reason)}>
+              <button key={g.reason} type="button" className={`reason-card r-${g.reason} ${filter === g.reason ? 'on' : ''}`} aria-pressed={filter === g.reason} onClick={() => { setFilter(filter === g.reason ? 'all' : g.reason); setShown(15); }}>
                 <span>{g.label}</span><b>{som(g.amount_minor)}</b><small>{g.count} ta · {HELP[g.reason] ?? ''}</small>
+                {g.reason === 'available' && <small className="avail-split">Shundan: to‘langan {som(w.balances.paid_minor)} · so‘rovda {som(w.balances.reserved_minor)} · <b>yechish mumkin {som(w.balances.available_minor)}</b></small>}
               </button>
             ))}
             {groups.length === 0 && <div className="empty">Hali komissiya yo‘q. <Link href="/partner/new">Birinchi buyurtmani kiriting</Link> yoki <Link href="/partner/market">mahsulot tanlang</Link>.</div>}
@@ -60,7 +62,7 @@ export default function Wallet() {
 
           {lines.length > 0 && (
             <div className="slist">
-              {lines.map((l: any) => (
+              {lines.slice(0, shown).map((l: any) => (
                 <Link key={l.id} href={`/partner/orders/${l.order_id}`} className="scard">
                   <div className="spread"><b>{l.masked_number} · {pick(l.product, lang)} × {l.qty}</b><b className={l.reason === 'reversed' ? 'no-t' : 'ok-t'}>{som(l.target_minor)}</b></div>
                   <div className="small"><span className={`pill r-${l.reason}`}>{l.reason_label}</span>
@@ -69,6 +71,7 @@ export default function Wallet() {
                   </div>
                 </Link>
               ))}
+              {lines.length > shown && <button className="btn secondary full" onClick={() => setShown(shown + 30)}>Yana ko‘rsatish ({lines.length - shown} ta qoldi)</button>}
             </div>
           )}
 

@@ -568,3 +568,5 @@ a.chip { text-decoration: none; }
   .ptop-new { display: none; }
 }
 @media (max-width: 520px) { .addr-grid { grid-template-columns: 1fr; } }
+.avail-split { display: block; margin-top: 4px; color: var(--text) !important; }
+.reason-card .avail-split b { font-size: inherit; color: var(--primary-600); }

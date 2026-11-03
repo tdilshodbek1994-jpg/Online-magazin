@@ -3,6 +3,7 @@
 # Requires: bootstrap-demo.sh done (Docker + 2 GB swap), repo cloned to ~/online-magazin, .env filled in.
 # Builds images on the server (slow on 1 vCPU: ~10-20 min first time; swap prevents OOM), backs up the DB first,
 # then starts the DEMO stack. Idempotent; keeps existing data.
+# Flags: --seed (base DEMO users/products), --demo-data (fill the DEMO with 500 products and realistic orders).
 set -euo pipefail
 cd "${OM_DIR:-$HOME/online-magazin}"
 BRANCH="${OM_BRANCH:-claude/online-marketplace-platform-sdtv52}"
@@ -31,7 +32,11 @@ for i in $(seq 1 60); do
   $C exec -T om-api node -e "fetch('http://localhost:4000/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))" 2>/dev/null && { echo "API ready"; break; }
   sleep 3
 done
-[[ "${1:-}" == "--seed" ]] && $C exec -T om-api node dist/seed.js
+for a in "$@"; do
+  if [[ "$a" == "--seed" ]]; then $C exec -T om-api node dist/seed.js; fi
+  # DEMO only: ~500 products + a few hundred orders in every state through the real flows (runs once; skips if already filled).
+  if [[ "$a" == "--demo-data" ]]; then $C exec -T om-api node dist/demo/fill.js; fi
+done
 $C ps --format "table {{.Service}}\t{{.State}}"
 docker stats --no-stream --format "{{.Name}}\t{{.MemUsage}}"; free -m
 docker image prune -f >/dev/null

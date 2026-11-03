@@ -15,6 +15,7 @@ export default function PartnerPayouts() {
   const [msg, setMsg] = useState<string | null>(null);
   const [d, setD] = useState({ holder: '', number: '' });
   const [amt, setAmt] = useState('');
+  const [ledgerAll, setLedgerAll] = useState(false);
   const load = useCallback(async () => {
     const [p, l] = await Promise.all([api('/partner/payouts').catch(() => ({ items: [] })), api('/partner/ledger').catch(() => ({ items: [] }))]);
     setPayouts(p.items); setLedger(l.items);
@@ -48,7 +49,7 @@ export default function PartnerPayouts() {
           <section className="card" style={{ marginTop: 12 }}>
             <h2>To‘lovlar tarixi</h2>
             {payouts.length === 0 ? <p className="muted">Hali to‘lov so‘rovi yo‘q</p> : (
-              <div className="table-wrap"><table><thead><tr><th>Sana</th><th>Summa</th><th>Holat</th><th>Izoh</th></tr></thead><tbody>
+              <div className="table-wrap" tabIndex={0} role="region" aria-label="Jadval"><table><thead><tr><th>Sana</th><th>Summa</th><th>Holat</th><th>Izoh</th></tr></thead><tbody>
                 {payouts.map((p) => <tr key={p.id}><td>{new Date(p.created_at).toLocaleDateString('uz-UZ')}</td><td>{som(p.amount_minor)}</td><td>{PAYOUT_STATUS[p.status] ?? p.status}</td><td>{p.paid_reference ?? p.reject_reason ?? ''}</td></tr>)}
               </tbody></table></div>
             )}
@@ -57,10 +58,11 @@ export default function PartnerPayouts() {
           <section className="card" style={{ marginTop: 12 }}>
             <h2>Balans tarixi</h2>
             {ledger.length === 0 ? <p className="muted">Ma’lumot topilmadi</p> : (
-              <div className="table-wrap"><table><thead><tr><th>Sana</th><th>Harakat</th><th>Summa</th><th>Sabab</th></tr></thead><tbody>
-                {ledger.map((e) => <tr key={e.id}><td>{new Date(e.created_at).toLocaleDateString('uz-UZ')}</td><td>{BUCKET_NAME[e.from_bucket] ?? e.from_bucket} → {BUCKET_NAME[e.to_bucket] ?? e.to_bucket}</td><td>{som(e.amount_minor)}</td><td className="muted small">{e.reason ?? e.source_type}</td></tr>)}
+              <div className="table-wrap" tabIndex={0} role="region" aria-label="Jadval"><table><thead><tr><th>Sana</th><th>Harakat</th><th>Summa</th><th>Sabab</th></tr></thead><tbody>
+                {(ledgerAll ? ledger : ledger.slice(0, 20)).map((e) => <tr key={e.id}><td>{new Date(e.created_at).toLocaleDateString('uz-UZ')}</td><td>{BUCKET_NAME[e.from_bucket] ?? e.from_bucket} → {BUCKET_NAME[e.to_bucket] ?? e.to_bucket}</td><td>{som(e.amount_minor)}</td><td className="muted small">{e.reason ?? e.source_type}</td></tr>)}
               </tbody></table></div>
             )}
+            {!ledgerAll && ledger.length > 20 && <button className="btn secondary full mt8" onClick={() => setLedgerAll(true)}>Hammasini ko‘rsatish ({ledger.length})</button>}
           </section>
         </>
       )}

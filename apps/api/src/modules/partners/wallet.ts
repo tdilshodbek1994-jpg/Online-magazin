@@ -24,12 +24,14 @@ export const ACCRUAL_REASON_SQL = `CASE
   WHEN a.state='pending' AND o.payment_status <> 'paid' AND COALESCE((SELECT c.status FROM cod_collections c WHERE c.order_id=a.order_id), '') <> 'reconciled' THEN 'awaiting_cash'
   ELSE 'hold' END`;
 
+const MISSING_UZ: Record<string, string> = { product: 'mahsulot', customer_name: 'mijoz ismi', customer_phone: 'telefon', delivery_zone: 'hudud', address: 'manzil' };
+
 export const REASON_LABEL: Record<string, string> = {
   not_delivered: 'Hali yetkazilmagan',
   awaiting_cash: 'Yetkazildi, pul tushumi solishtirilmoqda',
   hold: 'Qaytarish muddati kutilmoqda',
   dispute: 'Nizo ko‘rib chiqilmoqda',
-  available: 'Yechish mumkin',
+  available: 'Tasdiqlandi',
   reversed: 'Bekor qilindi',
   superseded: 'Boshqa hamkorga o‘tkazildi',
 };
@@ -55,7 +57,7 @@ export function registerPartnerWallet(app: FastifyInstance, deps: Deps): void {
           : { kind: 'fill_link_shared', title: 'Mijoz ma’lumotlarini to‘ldirishini kutyapmiz', detail: 'Havola yuborilgan', href: `/partner/new?draft=${d.id}`, at: d.updated_at, ref_id: d.id });
       } else {
         const miss = missingFields(d);
-        action.push({ kind: 'draft_incomplete', title: miss.length ? 'Qoralama to‘liq emas' : 'Qoralama tayyor — yuboring', detail: miss.length ? `Yetishmayapti: ${miss.join(', ')}` : undefined, href: `/partner/new?draft=${d.id}`, at: d.updated_at, ref_id: d.id });
+        action.push({ kind: 'draft_incomplete', title: miss.length ? 'Qoralama to‘liq emas' : 'Qoralama tayyor — yuboring', detail: miss.length ? `Yetishmayapti: ${miss.map((m) => MISSING_UZ[m] ?? m).join(', ')}` : undefined, href: `/partner/new?draft=${d.id}`, at: d.updated_at, ref_id: d.id });
       }
     }
 

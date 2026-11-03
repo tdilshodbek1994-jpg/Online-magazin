@@ -13,7 +13,8 @@ export default function PartnerStats() {
   const [period, setPeriod] = useState('month');
   const [data, setData] = useState<any>(null);
   const [err, setErr] = useState<any>(null);
-  useEffect(() => { setErr(null); setData(null); api(`/partner/stats?group=${group}&period=${period}`).then(setData).catch(setErr); }, [group, period]);
+  const [shown, setShown] = useState(15);
+  useEffect(() => { setErr(null); setData(null); setShown(15); api(`/partner/stats?group=${group}&period=${period}`).then(setData).catch(setErr); }, [group, period]);
   const sum = (data?.items ?? []).reduce((a: any, r: any) => ({ clicks: a.clicks + r.clicks, total: a.total + r.orders.total, delivered: a.delivered + r.orders.delivered, earned: a.earned + BigInt(r.earned_minor), pending: a.pending + BigInt(r.pending_minor) }), { clicks: 0, total: 0, delivered: 0, earned: 0n, pending: 0n });
   return (
     <>
@@ -35,24 +36,25 @@ export default function PartnerStats() {
       {!data && !err && <div className="loading" role="status"><span className="spinner" aria-hidden />Yuklanmoqda…</div>}
       {data && data.items.length === 0 && <div className="empty">Bu davrda ma’lumot yo‘q</div>}
       <div className="slist">
-        {data?.items.map((r: any) => (
+        {data?.items.slice(0, shown).map((r: any) => (
           <article key={r.key} className="scard">
             <div className="spread">
               <div>
                 <h3>{group === 'day' ? new Date(r.key).toLocaleDateString('uz-UZ', { day: '2-digit', month: 'long', year: 'numeric' }) : r.label ?? 'To‘g‘ridan-to‘g‘ri (havolasiz)'}</h3>
                 {r.product_name && <div className="muted small">{pick(r.product_name, lang)}</div>}
               </div>
-              <div className="big-num ok-t">{r.orders.delivered}</div>
+              <div className="big-num ok-t" title="Yetkazilgan buyurtmalar">{r.orders.delivered}<small className="big-cap">yetkazildi</small></div>
             </div>
             <div className="muted small">👆 {r.clicks} bosish · Yetkazish foizi: {r.delivery_rate_pct === null ? '—' : `${r.delivery_rate_pct}%`}</div>
             <div className="money-row">
               <Link className="m-ok m-link" href={group === 'stream' && r.key !== 'direct' ? `/partner/analytics/link/${r.key}` : '/partner/wallet'}><span>Daromad ›</span><b>{som(r.earned_minor)}</b></Link>
               <Link className="m-wait m-link" href="/partner/wallet"><span>Kutilmoqda ›</span><b>{som(r.pending_minor)}</b></Link>
             </div>
-            <BucketPills c={r.orders} href={(st) => `/partner/orders?status=${st}&period=${period}${group === 'stream' && r.key !== 'direct' ? `&link=${r.key}&link_name=${encodeURIComponent(r.label ?? '')}` : ''}`} />
+            <details className="s2-more"><summary>Holatlar bo‘yicha</summary><BucketPills c={r.orders} href={(st) => `/partner/orders?status=${st}&period=${period}${group === 'stream' && r.key !== 'direct' ? `&link=${r.key}&link_name=${encodeURIComponent(r.label ?? '')}` : ''}`} /></details>
           </article>
         ))}
       </div>
+      {data && data.items.length > shown && <button className="btn secondary full mt8" onClick={() => setShown(shown + 15)}>Yana ko‘rsatish ({data.items.length - shown} ta qoldi)</button>}
     </>
   );
 }

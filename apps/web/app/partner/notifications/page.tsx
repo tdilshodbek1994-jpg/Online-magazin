@@ -9,6 +9,7 @@ const ICON: Record<string, string> = { 'partner.order_new': '🛒', 'partner.ord
 export default function PartnerNotifications() {
   const [items, setItems] = useState<any[] | null>(null);
   const [err, setErr] = useState<any>(null);
+  const [shown, setShown] = useState(20);
   useEffect(() => { api('/me/notifications').then((r) => setItems(r.items)).catch(setErr); }, []);
   return (
     <>
@@ -17,7 +18,7 @@ export default function PartnerNotifications() {
       {err && <div className="notice" role="alert">{errText(err)}</div>}
       {items && items.length === 0 && <div className="empty">Hozircha xabar yo‘q. Birinchi buyurtma kelganda shu yerda ko‘rinadi.</div>}
       <div className="slist">
-        {items?.map((n) => (
+        {items?.slice(0, shown).map((n) => (
           <article key={n.id} className="scard notif">
             <span className="notif-ico" aria-hidden>{ICON[n.kind] ?? '🔔'}</span>
             <div>
@@ -27,6 +28,7 @@ export default function PartnerNotifications() {
           </article>
         ))}
       </div>
+      {items && items.length > shown && <button className="btn secondary full mt8" onClick={() => setShown(shown + 20)}>Yana ko‘rsatish ({items.length - shown} ta qoldi)</button>}
     </>
   );
 }

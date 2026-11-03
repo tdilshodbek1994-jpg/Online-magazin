@@ -18,12 +18,13 @@ function Requests({ embedded = false }: { embedded?: boolean }) {
   const [query, setQuery] = useState('');
   const [data, setData] = useState<any>(null);
   const [err, setErr] = useState<any>(null);
+  const [shown, setShown] = useState(20);
   useEffect(() => {
     setErr(null);
     const qs = new URLSearchParams({ status, period });
     if (query) qs.set('q', query);
     if (link) qs.set('link', link);
-    api(`/partner/requests?${qs}`).then(setData).catch(setErr);
+    setShown(20); api(`/partner/requests?${qs}`).then(setData).catch(setErr);
   }, [status, period, query, link]);
   const c = data?.counts ?? {};
   return (
@@ -41,7 +42,7 @@ function Requests({ embedded = false }: { embedded?: boolean }) {
       {!data && !err && <div className="loading" role="status"><span className="spinner" aria-hidden />Yuklanmoqda…</div>}
       {data && data.items.length === 0 && <div className="empty">Ma’lumot topilmadi</div>}
       <div className="slist">
-        {data?.items.map((o: any) => (
+        {data?.items.slice(0, shown).map((o: any) => (
           <article key={o.id} className="scard">
             <div className="spread">
               <b>{o.masked_number}</b>
@@ -51,6 +52,7 @@ function Requests({ embedded = false }: { embedded?: boolean }) {
                 <span className={`pill b-${o.bucket}`}>{BUCKET_LABEL[o.bucket]}</span>
               </span>
             </div>
+      {data && data.items.length > shown && <button className="btn secondary full mt8" onClick={() => setShown(shown + 20)}>Yana ko‘rsatish ({data.items.length - shown} ta qoldi)</button>}
             <div className="req-grid">
               <div><span>Mijoz</span>{o.customer} · {o.customer_phone}</div>
               <div><span>Hudud</span>{o.district ?? '—'}</div>

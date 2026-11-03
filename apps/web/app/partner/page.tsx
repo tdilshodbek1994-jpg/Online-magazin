@@ -70,16 +70,10 @@ export default function PartnerDashboard() {
             <section className="attention" aria-labelledby="att-h">
               <h2 id="att-h">Hozir nima qilishim kerak?</h2>
               {att.action.length > 0 && (
-                <div className="att-group act">
-                  <h3>Sizdan amal kerak · {att.action.length}</h3>
-                  {att.action.slice(0, 6).map((x: any, i: number) => <Link key={i} href={x.href ?? '/partner'} className="att-item"><b>{x.title}</b>{x.detail && <small>{x.detail}</small>}</Link>)}
-                </div>
+                <AttGroup cls="act" title="Sizdan amal kerak" items={att.action} />
               )}
               {att.waiting.length > 0 && (
-                <div className="att-group wait">
-                  <h3>Magazin / mijoz javobini kutyapmiz · {att.waiting.length}</h3>
-                  {att.waiting.slice(0, 6).map((x: any, i: number) => <Link key={i} href={x.href ?? '/partner'} className="att-item"><b>{x.title}</b>{x.detail && <small>{x.detail}</small>}</Link>)}
-                </div>
+                <AttGroup cls="wait" title="Magazin / mijoz javobini kutyapmiz" items={att.waiting} />
               )}
             </section>
           ) : att && BigInt(me.balances.estimated_minor) + BigInt(me.balances.pending_minor) + BigInt(me.balances.available_minor) + BigInt(me.balances.paid_minor) === 0n ? (
@@ -151,5 +145,18 @@ export default function PartnerDashboard() {
         </>
       )}
     </Async>
+  );
+}
+
+/** One attention group: the 3 most urgent items first, the rest behind "Yana N ta" so the dashboard stays short. */
+function AttGroup({ cls, title, items }: { cls: string; title: string; items: any[] }) {
+  const [all, setAll] = useState(false);
+  const list = all ? items : items.slice(0, 3);
+  return (
+    <div className={`att-group ${cls}`}>
+      <h3>{title} · {items.length}</h3>
+      {list.map((x: any, i: number) => <Link key={i} href={x.href ?? '/partner'} className="att-item"><b>{x.title}</b>{x.detail && <small>{x.detail}</small>}</Link>)}
+      {items.length > 3 && <button type="button" className="link-btn small att-more" onClick={() => setAll(!all)}>{all ? 'Yig‘ish' : `Yana ${items.length - 3} ta ko‘rsatish`}</button>}
+    </div>
   );
 }

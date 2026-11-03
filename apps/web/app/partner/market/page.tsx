@@ -86,8 +86,9 @@ export default function PartnerMarket() {
   const [cats, setCats] = useState<any[]>([]);
   const [items, setItems] = useState<any[] | null>(null);
   const [err, setErr] = useState<any>(null);
+  const [shown, setShown] = useState(20);
   const load = () => {
-    setErr(null);
+    setErr(null); setShown(20);
     const qs = new URLSearchParams({ sort });
     if (query) qs.set('q', query);
     if (cat) qs.set('category', cat);
@@ -111,7 +112,9 @@ export default function PartnerMarket() {
       {err && <div className="notice" role="alert">{errText(err)}</div>}
       {items === null && !err && <div className="loading" role="status"><span className="spinner" aria-hidden />Yuklanmoqda…</div>}
       {items && items.length === 0 && <div className="empty">Mahsulot topilmadi</div>}
-      {items && <div className="mgrid">{items.map((p) => <MarketCard key={p.id} p={p} onCreated={() => {}} />)}</div>}
+      {items && items.length > 0 && <p className="muted small">{items.length} ta mahsulot</p>}
+      {items && <div className="mgrid">{items.slice(0, shown).map((p) => <MarketCard key={p.id} p={p} onCreated={() => {}} />)}</div>}
+      {items && items.length > shown && <button className="btn secondary full mt8" onClick={() => setShown(shown + 20)}>Yana ko‘rsatish ({items.length - shown} ta qoldi)</button>}
       <p className="muted small">“Siz olasiz” — eng arzon variant narxidan hisoblangan joriy komissiya. Haqiqiy summa buyurtma vaqtidagi qoida bo‘yicha qayd etiladi va yetkazilgandan keyin tasdiqlanadi.</p>
     </>
   );

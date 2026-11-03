@@ -50,11 +50,11 @@ const counts = (rows: { bucket: string; n: number }[]): Counts => {
   return { ...c, total: Object.values(c).reduce((a, b) => a + b, 0) };
 };
 
-function maskName(n: unknown): string {
+export function maskName(n: unknown): string {
   const s = typeof n === 'string' ? n.trim() : '';
   return s ? `${Array.from(s)[0]}***` : '—';
 }
-function maskTail(phone: unknown): string {
+export function maskTail(phone: unknown): string {
   const d = typeof phone === 'string' ? phone.replace(/\D/g, '') : '';
   return d.length >= 2 ? `+998 ** *** ** ${d.slice(-2)}` : '—';
 }

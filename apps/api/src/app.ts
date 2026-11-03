@@ -17,6 +17,8 @@ import { registerOrders } from './modules/orders/routes.js';
 import { registerAmendments } from './modules/orders/amendments.js';
 import { registerPartners } from './modules/partners/routes.js';
 import { registerPartnerCabinet } from './modules/partners/cabinet.js';
+import { registerSalesDrafts } from './modules/partners/drafts.js';
+import { registerPartnerWallet } from './modules/partners/wallet.js';
 import { registerPartnerPrograms } from './modules/partners/programs.js';
 import { registerReturns } from './modules/returns/routes.js';
 import { registerPayments } from './modules/payments/routes.js';
@@ -129,6 +131,8 @@ export async function buildApp(cfg: AppConfig, db: Db): Promise<FastifyInstance>
       registerAmendments(api, deps);
       registerPartners(api, deps);
       registerPartnerCabinet(api, deps);
+      registerSalesDrafts(api, deps);
+      registerPartnerWallet(api, deps);
       registerPartnerPrograms(api, deps);
       registerVideos(api, deps);
       registerReturns(api, deps);

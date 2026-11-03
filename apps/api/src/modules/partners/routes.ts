@@ -10,6 +10,7 @@ import { idempotent } from '../../platform/idempotency.js';
 import { type Deps, requireIdempotencyKey, route, zIdParam } from '../../platform/http.js';
 import { getPolicy, POLICY } from '../../platform/policies.js';
 import { zContact, zDeliveryAddress } from '../checkout/routes.js';
+import type { AppConfig } from '../../config.js';
 import { accrueForOrder, rebuildBalances, recalcOrder, releaseMatured, transfer } from '../commissions/service.js';
 import { postJournal } from '../finance/journal.js';
 import { queueNotification } from '../notifications/service.js';
@@ -25,6 +26,40 @@ export async function myPartner(tx: { query: Tx['query'] }, actor: Actor, requir
   if (!p) throw notFound('PARTNER');
   if (requireActive && p.status !== 'active') throw new AppError(403, 'PARTNER_NOT_ACTIVE');
   return p;
+}
+
+
+/**
+ * Shared partner-assisted order creation (manual form, draft submit, customer fill link): order awaits the customer's own
+ * confirmation; a one-time code + link goes to the customer's phone only (never to the partner, T043/T11).
+ */
+export async function createAssistedOrder(tx: Tx, cfg: AppConfig, actor: Actor, p: { id: string; user_id: string }, o: { quoteId: string; quoteHash: string; note: string }) {
+        const q = await maybeOne<{ created_by_user_id: string; contact_snapshot: { phone: string }; cart_id: string | null }>(tx, `SELECT created_by_user_id, contact_snapshot, cart_id FROM checkout_quotes WHERE id=$1`, [o.quoteId]);
+  if (!q || q.created_by_user_id !== p.user_id || q.cart_id !== null) throw notFound('QUOTE');
+  const phone = q.contact_snapshot.phone;
+  const customer = await maybeOne<{ id: string }>(tx, `SELECT id FROM users WHERE phone_e164=$1 AND status <> 'closed'`, [phone]);
+  if (customer?.id === p.user_id) throw unprocessable('SELF_ORDER_NOT_ALLOWED');
+  const order = await createOrder(tx, cfg, actor, {
+    quoteId: o.quoteId, quoteHash: o.quoteHash, paymentMethod: 'cod', channel: 'partner_assisted', customerUserId: customer?.id ?? null, customerPhone: phone,
+    createdBy: p.user_id, confirmation: 'pending', acceptedTerms: true,
+    attribution: { partner_id: p.id, campaign_id: null, touch_id: null, link_id: null, rule_version: 0, reason: 'partner_assisted', attributed_at: new Date().toISOString(), eligible: true },
+  });
+  // Duplicate signal (T046/T047): same phone + same SKU in last 48h. Operator decides; nothing is auto-cancelled and nothing is revealed to the partner.
+  const dup = await maybeOne(tx, `SELECT 1 FROM orders o2 JOIN order_lines l2 ON l2.order_id=o2.id
+      WHERE o2.customer_phone=$1 AND o2.id<>$2 AND o2.commercial_status<>'cancelled' AND o2.created_at > now() - interval '48 hours'
+        AND l2.sku_id IN (SELECT sku_id FROM order_lines WHERE order_id=$2) LIMIT 1`, [phone, order.id]);
+  if (dup) await tx.query(`UPDATE orders SET duplicate_signal=true WHERE id=$1`, [order.id]);
+  await tx.query(`INSERT INTO order_notes (order_id, author_id, body, internal) VALUES ($1,$2,$3,true)`, [order.id, p.user_id, `Partner note: ${o.note}`]);
+  // One-time, short-lived confirmation link + code to the customer's phone. Never shown to the partner (T043).
+  const ttl = (await getPolicy<{ hours: number }>(tx, POLICY.partnerConfirmTtlHours, cfg.env))?.value.hours ?? 24;
+  const conf = await one<{ id: string }>(tx, `INSERT INTO order_confirmations (order_id, method, status, expires_at, shown_total_minor, shown_quote_hash)
+      SELECT $1,'customer_otp','pending', now() + make_interval(hours => $2), payable_minor, $3 FROM orders WHERE id=$1 RETURNING id`, [order.id, ttl, o.quoteHash]);
+  const token = randomBytes(24).toString('base64url');
+  const code = String(randomInt(0, 1_000_000)).padStart(6, '0');
+  await tx.query(`UPDATE order_confirmations SET token_hash=$2, code_hash=$3 WHERE id=$1`, [conf.id, hashToken(token), codeHash(conf.id, code)]);
+  await queueNotification(tx, { phone, channel: 'sms', purpose: 'transactional', template: 'partner_order_confirm', locale: 'uz-Latn', params: { link: `${cfg.publicWebUrl}/confirm/${token}`, code_ref: conf.id, order_number: order.number }, dedupeKey: `confirm:${conf.id}` });
+  const devEcho = cfg.env !== 'production' && cfg.otp.devEcho ? { dev_customer_link_token: token, dev_customer_code: code } : {};
+  return { order_id: order.id, number: order.number, status: 'awaiting_customer_confirmation', customer_phone_masked: maskPhone(phone), ...devEcho };
 }
 
 const codeHash = (id: string, code: string) => createHash('sha256').update(`confirm:${id}:${code}`).digest();
@@ -133,32 +168,8 @@ export function registerPartners(app: FastifyInstance, deps: Deps): void {
     const res = await withTx(db, async (tx) => {
       const p = await myPartner(tx, actor);
       return idempotent(tx, `partner_order:${p.id}`, key, body, async () => {
-        const q = await maybeOne<{ created_by_user_id: string; contact_snapshot: { phone: string }; cart_id: string | null }>(tx, `SELECT created_by_user_id, contact_snapshot, cart_id FROM checkout_quotes WHERE id=$1`, [body.quote_id]);
-        if (!q || q.created_by_user_id !== actor.userId || q.cart_id !== null) throw notFound('QUOTE');
-        const phone = q.contact_snapshot.phone;
-        const customer = await maybeOne<{ id: string }>(tx, `SELECT id FROM users WHERE phone_e164=$1 AND status <> 'closed'`, [phone]);
-        if (customer?.id === actor.userId) throw unprocessable('SELF_ORDER_NOT_ALLOWED');
-        const order = await createOrder(tx, cfg, actor, {
-          quoteId: body.quote_id, quoteHash: body.quote_hash, paymentMethod: 'cod', channel: 'partner_assisted', customerUserId: customer?.id ?? null, customerPhone: phone,
-          createdBy: actor.userId, confirmation: 'pending', acceptedTerms: true,
-          attribution: { partner_id: p.id, campaign_id: null, touch_id: null, link_id: null, rule_version: 0, reason: 'partner_assisted', attributed_at: new Date().toISOString(), eligible: true },
-        });
-        // Duplicate signal (T046/T047): same phone + same SKU in last 48h. Operator decides; nothing is auto-cancelled and nothing is revealed to the partner.
-        const dup = await maybeOne(tx, `SELECT 1 FROM orders o2 JOIN order_lines l2 ON l2.order_id=o2.id
-            WHERE o2.customer_phone=$1 AND o2.id<>$2 AND o2.commercial_status<>'cancelled' AND o2.created_at > now() - interval '48 hours'
-              AND l2.sku_id IN (SELECT sku_id FROM order_lines WHERE order_id=$2) LIMIT 1`, [phone, order.id]);
-        if (dup) await tx.query(`UPDATE orders SET duplicate_signal=true WHERE id=$1`, [order.id]);
-        await tx.query(`INSERT INTO order_notes (order_id, author_id, body, internal) VALUES ($1,$2,$3,true)`, [order.id, actor.userId, `Partner note: ${body.customer_agreement_note}`]);
-        // One-time, short-lived confirmation link + code to the customer's phone. Never shown to the partner (T043).
-        const ttl = (await getPolicy<{ hours: number }>(tx, POLICY.partnerConfirmTtlHours, cfg.env))?.value.hours ?? 24;
-        const conf = await one<{ id: string }>(tx, `INSERT INTO order_confirmations (order_id, method, status, expires_at, shown_total_minor, shown_quote_hash)
-            SELECT $1,'customer_otp','pending', now() + make_interval(hours => $2), payable_minor, $3 FROM orders WHERE id=$1 RETURNING id`, [order.id, ttl, body.quote_hash]);
-        const token = randomBytes(24).toString('base64url');
-        const code = String(randomInt(0, 1_000_000)).padStart(6, '0');
-        await tx.query(`UPDATE order_confirmations SET token_hash=$2, code_hash=$3 WHERE id=$1`, [conf.id, hashToken(token), codeHash(conf.id, code)]);
-        await queueNotification(tx, { phone, channel: 'sms', purpose: 'transactional', template: 'partner_order_confirm', locale: 'uz-Latn', params: { link: `${cfg.publicWebUrl}/confirm/${token}`, code_ref: conf.id, order_number: order.number }, dedupeKey: `confirm:${conf.id}` });
-        const devEcho = cfg.env !== 'production' && cfg.otp.devEcho ? { dev_customer_link_token: token, dev_customer_code: code } : {};
-        return { status: 201, body: { order_id: order.id, number: order.number, status: 'awaiting_customer_confirmation', customer_phone_masked: maskPhone(phone), ...devEcho } };
+        const r = await createAssistedOrder(tx, cfg, actor, p, { quoteId: body.quote_id, quoteHash: body.quote_hash, note: body.customer_agreement_note });
+        return { status: 201, body: r };
       });
     });
     reply.status(res.replayed ? 200 : res.status);

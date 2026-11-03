@@ -4,6 +4,10 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 export type Lang = 'uz-Latn' | 'uz-Cyrl';
 const dict = {
   'uz-Latn': {
+    hits: 'Kun xitlari', hitsSub: 'Oxirgi 30 kunda eng ko‘p olinganlar', forYou: 'Siz uchun', underBudget: '100 000 so‘mgacha', sold: 'ta sotildi', fewLeft: 'Kam qoldi', pcs: 'ta', newBadge: 'Yangi', hitBadge: 'XIT',
+    deliveryLine: 'kunda yetkazish', codShort: 'to‘lov olganda', upTo: 'gacha', saleTitle: 'Chegirmalar', saleSub: 'Haqiqiy chegirmalar — eski narx katalogda saqlangan', newTitle: 'Yangi kelganlar', newSub: 'Har kuni yangi mahsulotlar',
+    codTitle: 'Avval tekshiring — keyin to‘lang', codSub: 'Kuryer kelganda mahsulotni ko‘rib, naqd yoki karta bilan to‘laysiz', viewAll: 'Hammasini ko‘rish', backToTop: 'Tepaga', loadingMore: 'Yuklanmoqda…', endOfFeed: 'Hozircha shu — tez orada yangilari keladi',
+    chipDeals: 'Chegirmalar', chipHits: 'Xitlar', chipNew: 'Yangi', chipCheap: '100 000 gacha',
     home: 'Bosh sahifa', catalog: 'Katalog', account: 'Kabinet', categories: 'Kategoriyalar', allCategories: 'Barchasi', newArrivals: 'Yangi mahsulotlar', deals: 'Chegirmalar', bestPrice: 'Hamyonbop narxlar', seeAll: 'Hammasi',
     heroTitle: 'Kerakli narsalar — uyingizgacha', heroSub: "Buyurtma bering, to'lovni mahsulotni qabul qilganda qiling.", shopNow: 'Xaridni boshlash',
     bCod: "To'lov qabul qilganda", bCodSub: 'Naqd yoki karta orqali', bFast: 'Tez yetkazish', bFastSub: "Toshkent bo'ylab", bReturn: 'Qaytarish', bReturnSub: 'Shartlar asosida', bWarranty: 'Kafolat', bWarrantySub: 'Rasmiy kafolat bilan',
@@ -18,6 +22,10 @@ const dict = {
     confirmTitle: 'Buyurtmani tasdiqlang', confirm: 'Tasdiqlayman', reject: 'Rad etaman', deliveryEta: 'Taxminiy muddat', days: 'kun', test: 'TEST / MOCK',
   },
   'uz-Cyrl': {
+    hits: 'Кун хитлари', hitsSub: 'Охирги 30 кунда энг кўп олинганлар', forYou: 'Сиз учун', underBudget: '100 000 сўмгача', sold: 'та сотилди', fewLeft: 'Кам қолди', pcs: 'та', newBadge: 'Янги', hitBadge: 'ХИТ',
+    deliveryLine: 'кунда етказиш', codShort: 'тўлов олганда', upTo: 'гача', saleTitle: 'Чегирмалар', saleSub: 'Ҳақиқий чегирмалар — эски нарх каталогда сақланган', newTitle: 'Янги келганлар', newSub: 'Ҳар куни янги маҳсулотлар',
+    codTitle: 'Аввал текширинг — кейин тўланг', codSub: 'Курьер келганда маҳсулотни кўриб, нақд ёки карта билан тўлайсиз', viewAll: 'Ҳаммасини кўриш', backToTop: 'Тепага', loadingMore: 'Юкланмоқда…', endOfFeed: 'Ҳозирча шу — тез орада янгилари келади',
+    chipDeals: 'Чегирмалар', chipHits: 'Хитлар', chipNew: 'Янги', chipCheap: '100 000 гача',
     home: 'Бош саҳифа', catalog: 'Каталог', account: 'Кабинет', categories: 'Категориялар', allCategories: 'Барчаси', newArrivals: 'Янги маҳсулотлар', deals: 'Чегирмалар', bestPrice: 'Ҳамёнбоп нархлар', seeAll: 'Ҳаммаси',
     heroTitle: 'Керакли нарсалар — уйингизгача', heroSub: 'Буюртма беринг, тўловни маҳсулотни қабул қилганда қилинг.', shopNow: 'Харидни бошлаш',
     bCod: 'Тўлов қабул қилганда', bCodSub: 'Нақд ёки карта орқали', bFast: 'Тез етказиш', bFastSub: 'Тошкент бўйлаб', bReturn: 'Қайтариш', bReturnSub: 'Шартлар асосида', bWarranty: 'Кафолат', bWarrantySub: 'Расмий кафолат билан',

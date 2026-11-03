@@ -15,6 +15,7 @@ function Catalog() {
   const category = sp.get('category') ?? '';
   const sort = sp.get('sort') ?? 'new';
   const inStock = sp.get('in_stock') === '1';
+  const maxPrice = sp.get('max_price') ?? '';
   const [cats, setCats] = useState<any[]>([]);
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -27,9 +28,10 @@ function Catalog() {
     if (q) qs.set('q', q);
     if (category) qs.set('category', category);
     if (inStock) qs.set('in_stock', 'true');
+    if (/^\d+$/.test(maxPrice)) qs.set('max_price', maxPrice);
     api(`/products?${qs}`).then((r) => setItems(r.items)).catch(setError).finally(() => setLoading(false));
   };
-  useEffect(load, [q, category, sort, inStock]);
+  useEffect(load, [q, category, sort, inStock, maxPrice]);
 
   const go = (patch: Record<string, string | null>) => {
     const next = new URLSearchParams(sp.toString());
@@ -58,6 +60,8 @@ function Catalog() {
           <label className="sr-only" htmlFor="sort">{t('sort')}</label>
           <select id="sort" value={sort} onChange={(e) => go({ sort: e.target.value })} className="sort">
             <option value="new">{t('sortNew')}</option>
+            <option value="popular">{t('chipHits')}</option>
+            <option value="discount">{t('chipDeals')}</option>
             <option value="price_asc">{t('sortCheap')}</option>
             <option value="price_desc">{t('sortExpensive')}</option>
           </select>

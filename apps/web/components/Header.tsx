@@ -88,7 +88,7 @@ export function Header() {
         <form className="search" role="search" onSubmit={(e) => { e.preventDefault(); router.push(q.trim() ? `/catalog?q=${encodeURIComponent(q.trim())}` : '/catalog'); }}>
           <label htmlFor="q" className="sr-only">{t('search')}</label>
           <input id="q" type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('searchPh')} autoComplete="off" />
-          <button type="submit" className="search-btn" aria-label={t('search')}><IconSearch size={20} /></button>
+          <button type="submit" className="search-btn" aria-label={t('search')}><IconSearch size={20} /><span className="sb-text" aria-hidden>{t('search')}</span></button>
         </form>
         <nav className="head-actions" aria-label="Asosiy">
           <Link href="/reels" className="icon-link"><IconPlay /><span className="icon-label">Video</span></Link>

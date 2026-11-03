@@ -33,12 +33,17 @@ export function registerCatalog(app: FastifyInstance, deps: Deps): void {
 
   // ---------- Public (no cost, internal notes or commission rules — §08) ----------
   route(app, deps, { method: 'GET', url: '/categories', tags: T, summary: 'Category tree' }, async ({ db }) => ({
-    items: await many(db, `SELECT id, parent_id, slug, name, sort FROM categories WHERE status='active' ORDER BY sort, slug`),
+    // cover: a real product photo from the category (or its children) for image tiles on the home page.
+    items: await many(db, `SELECT c.id, c.parent_id, c.slug, c.name, c.sort,
+        (SELECT '/media/' || ma.storage_key FROM products p JOIN media_assets ma ON ma.product_id=p.id AND ma.status='approved'
+          WHERE p.status='published' AND p.category_id IN (SELECT id FROM categories x WHERE x.id=c.id OR x.parent_id=c.id)
+          ORDER BY p.published_at DESC NULLS LAST, ma.sort LIMIT 1) AS cover
+      FROM categories c WHERE c.status='active' ORDER BY c.sort, c.slug`),
   }));
 
   route(app, deps, {
     method: 'GET', url: '/products', tags: T, summary: 'Catalog list / search (cyrillic+latin, SKU)',
-    query: z.object({ q: z.string().max(200).optional(), category: z.string().max(120).optional(), sort: z.enum(['new', 'price_asc', 'price_desc']).default('new'), in_stock: z.coerce.boolean().optional(), limit: z.coerce.number().int().min(1).max(60).default(24), offset: z.coerce.number().int().min(0).max(10000).default(0) }),
+    query: z.object({ q: z.string().max(200).optional(), category: z.string().max(120).optional(), sort: z.enum(['new', 'price_asc', 'price_desc', 'popular', 'discount']).default('new'), in_stock: z.coerce.boolean().optional(), max_price: z.coerce.number().int().min(1).optional(), limit: z.coerce.number().int().min(1).max(60).default(24), offset: z.coerce.number().int().min(0).max(10000).default(0) }),
   }, async ({ db, query }) => {
     const params: unknown[] = [];
     const where = [`p.status='published'`];
@@ -68,10 +73,13 @@ export function registerCatalog(app: FastifyInstance, deps: Deps): void {
       where.push(conds.length ? `((${conds.join(' AND ')}) OR ${skuExact})` : skuExact);
     }
     // Aggregates are computed set-wise (GROUP BY) and, for the default "new" sort, only for the requested page (T095).
-    const limitFirst = query.sort === 'new' && !query.in_stock;
+    const limitFirst = query.sort === 'new' && !query.in_stock && !query.max_price;
     params.push(query.limit, query.offset);
     const L = params.length - 1, O = params.length;
-    const order = query.sort === 'price_asc' ? 'min_price ASC NULLS LAST, published_at DESC' : query.sort === 'price_desc' ? 'min_price DESC NULLS LAST, published_at DESC' : 'published_at DESC NULLS LAST, id';
+    const order = query.sort === 'price_asc' ? 'min_price ASC NULLS LAST, published_at DESC' : query.sort === 'price_desc' ? 'min_price DESC NULLS LAST, published_at DESC'
+      : query.sort === 'popular' ? 'sold_30d DESC, published_at DESC NULLS LAST, id'
+      : query.sort === 'discount' ? 'COALESCE(1 - min_price::numeric / NULLIF(compare_at, 0), 0) DESC, published_at DESC NULLS LAST, id'
+      : 'published_at DESC NULLS LAST, id';
     const rows = await many(db, `
       WITH cand AS (
         SELECT p.id, p.slug, p.name, p.brand_id, p.published_at FROM products p JOIN categories c ON c.id=p.category_id
@@ -79,11 +87,15 @@ export function registerCatalog(app: FastifyInstance, deps: Deps): void {
          ${limitFirst ? `ORDER BY p.published_at DESC NULLS LAST, p.id LIMIT $${L} OFFSET $${O}` : ''}),
       price AS (SELECT s.product_id, MIN(o.price_minor) AS min_price, MAX(o.compare_at_minor) FILTER (WHERE o.compare_at_minor > o.price_minor) AS compare_at FROM skus s JOIN offers o ON o.sku_id=s.id AND o.status='active' WHERE s.status='active' AND s.product_id IN (SELECT id FROM cand) GROUP BY s.product_id),
       avail AS (SELECT s.product_id, SUM(GREATEST(0, sb.on_hand_sellable - sb.reserved - sb.safety_buffer)) AS available FROM skus s JOIN stock_balances sb ON sb.sku_id=s.id WHERE s.status='active' AND s.product_id IN (SELECT id FROM cand) GROUP BY s.product_id),
+      -- Real popularity: units in confirmed (not cancelled) orders in the last 30 days. Never invented.
+      sold AS (SELECT s.product_id, SUM(ol.qty)::int AS sold_30d FROM order_lines ol JOIN skus s ON s.id=ol.sku_id JOIN orders o ON o.id=ol.order_id
+                WHERE o.created_at > now() - interval '30 days' AND o.commercial_status <> 'cancelled' AND o.confirmation_status = 'verified' AND s.product_id IN (SELECT id FROM cand) GROUP BY s.product_id),
       page AS (
-        SELECT cand.*, price.min_price, price.compare_at, COALESCE(avail.available, 0) AS available FROM cand LEFT JOIN price ON price.product_id=cand.id LEFT JOIN avail ON avail.product_id=cand.id
-         ${query.in_stock ? 'WHERE COALESCE(avail.available,0) > 0' : ''}
+        SELECT cand.*, price.min_price, price.compare_at, COALESCE(avail.available, 0) AS available, COALESCE(sold.sold_30d, 0) AS sold_30d
+          FROM cand LEFT JOIN price ON price.product_id=cand.id LEFT JOIN avail ON avail.product_id=cand.id LEFT JOIN sold ON sold.product_id=cand.id
+         WHERE TRUE ${query.in_stock ? 'AND COALESCE(avail.available,0) > 0' : ''} ${query.sort === 'discount' ? 'AND price.compare_at IS NOT NULL' : ''} ${query.max_price ? `AND price.min_price <= ${Number(query.max_price) * 100}` : ''}
          ORDER BY ${order} ${limitFirst ? '' : `LIMIT $${L} OFFSET $${O}`})
-      SELECT page.id, page.slug, page.name, b.name AS brand, page.published_at, page.min_price, page.compare_at, page.available,
+      SELECT page.id, page.slug, page.name, b.name AS brand, page.published_at, page.min_price, page.compare_at, page.available, page.sold_30d,
              (SELECT '/media/' || storage_key FROM media_assets ma WHERE ma.product_id=page.id AND ma.status='approved' ORDER BY sort LIMIT 1) AS image
         FROM page LEFT JOIN brands b ON b.id=page.brand_id ORDER BY ${order}`, params);
     return { items: rows.map((r) => ({ ...r, min_price: r.min_price ? m(r.min_price as string) : null, compare_at: r.compare_at ? m(r.compare_at as string) : null, available: Number(r.available) })) };

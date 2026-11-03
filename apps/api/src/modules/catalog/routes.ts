@@ -101,6 +101,37 @@ export function registerCatalog(app: FastifyInstance, deps: Deps): void {
     return { items: rows.map((r) => ({ ...r, min_price: r.min_price ? m(r.min_price as string) : null, compare_at: r.compare_at ? m(r.compare_at as string) : null, available: Number(r.available) })) };
   });
 
+  // "Bular bilan birga olishadi": products that really appeared in the same orders as the given products (no invented
+  // pairings). When there is no history yet the response says so (basis: 'category') and the UI labels it "O'xshash".
+  route(app, deps, { method: 'GET', url: '/products/also-bought', tags: T, summary: 'Products bought together with the given products (real order history)',
+    query: z.object({ product_ids: z.string().max(2000) }) },
+  async ({ db, query }) => {
+    const ids = query.product_ids.split(',').filter((x) => /^[0-9a-f-]{36}$/.test(x)).slice(0, 20);
+    if (!ids.length) return { basis: 'none', items: [] };
+    const cols = `p.id, p.slug, p.name, b.name AS brand, p.published_at,
+        (SELECT MIN(o.price_minor) FROM skus s JOIN offers o ON o.sku_id=s.id AND o.status='active' WHERE s.product_id=p.id AND s.status='active') AS min_price,
+        (SELECT MAX(o.compare_at_minor) FILTER (WHERE o.compare_at_minor > o.price_minor) FROM skus s JOIN offers o ON o.sku_id=s.id AND o.status='active' WHERE s.product_id=p.id) AS compare_at,
+        (SELECT COALESCE(SUM(GREATEST(0, sb.on_hand_sellable - sb.reserved - sb.safety_buffer)),0) FROM skus s JOIN stock_balances sb ON sb.sku_id=s.id WHERE s.product_id=p.id AND s.status='active') AS available,
+        (SELECT '/media/' || ma.storage_key FROM media_assets ma WHERE ma.product_id=p.id AND ma.status='approved' ORDER BY ma.sort LIMIT 1) AS image`;
+    let basis = 'together';
+    let rows = await many(db, `
+      WITH src AS (SELECT DISTINCT ol.order_id FROM order_lines ol JOIN skus s ON s.id=ol.sku_id JOIN orders o ON o.id=ol.order_id
+                    WHERE s.product_id = ANY($1::uuid[]) AND o.commercial_status <> 'cancelled'),
+           co AS (SELECT s.product_id, COUNT(DISTINCT ol.order_id) AS n FROM order_lines ol JOIN skus s ON s.id=ol.sku_id
+                   WHERE ol.order_id IN (SELECT order_id FROM src) AND NOT (s.product_id = ANY($1::uuid[])) GROUP BY 1)
+      SELECT ${cols}, co.n AS together FROM co JOIN products p ON p.id=co.product_id LEFT JOIN brands b ON b.id=p.brand_id
+       WHERE p.status='published' ORDER BY co.n DESC, p.published_at DESC LIMIT 8`, [ids]);
+    rows = rows.filter((r) => Number(r.available) > 0);
+    if (rows.length < 2) {
+      basis = 'category';
+      rows = await many(db, `SELECT ${cols}, 0 AS together FROM products p LEFT JOIN brands b ON b.id=p.brand_id
+         WHERE p.status='published' AND NOT (p.id = ANY($1::uuid[])) AND p.category_id IN (SELECT category_id FROM products WHERE id = ANY($1::uuid[]))
+         ORDER BY p.published_at DESC LIMIT 12`, [ids]);
+      rows = rows.filter((r) => Number(r.available) > 0).slice(0, 8);
+    }
+    return { basis, items: rows.map((r) => ({ ...r, min_price: r.min_price ? m(String(r.min_price)) : null, compare_at: r.compare_at ? m(String(r.compare_at)) : null, available: Number(r.available), together: Number(r.together) })) };
+  });
+
   route(app, deps, { method: 'GET', url: '/products/:slug', tags: T, summary: 'Product page', params: z.object({ slug: z.string().max(140) }) }, async ({ db, params }) => {
     const p = await maybeOne(db, `${PUBLIC_PRODUCT_SQL} WHERE p.slug=$1 AND p.status='published'`, [params.slug]);
     if (!p) {

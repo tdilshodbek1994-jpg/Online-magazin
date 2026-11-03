@@ -36,7 +36,7 @@ async function findCart(tx: Tx, actor: Actor, create: boolean): Promise<{ id: st
 
 async function cartView(tx: Tx, cartId: string) {
   const lines = await many(tx, `
-    SELECT cl.id, cl.qty, s.id AS sku_id, s.sku_code, s.variant, p.slug, p.name, p.status AS product_status, s.status AS sku_status, o.price_minor::text, o.status AS offer_status,
+    SELECT cl.id, cl.qty, s.id AS sku_id, s.sku_code, s.variant, p.id AS product_id, p.slug, p.name, p.status AS product_status, s.status AS sku_status, o.price_minor::text, o.compare_at_minor::text, o.status AS offer_status,
            GREATEST(0, COALESCE(sb.on_hand_sellable - sb.reserved - sb.safety_buffer, 0)) AS available,
            (SELECT '/media/' || ma.storage_key FROM media_assets ma WHERE ma.product_id=p.id AND ma.status='approved' ORDER BY ma.sort LIMIT 1) AS image
       FROM cart_lines cl JOIN offers o ON o.id=cl.offer_id JOIN skus s ON s.id=o.sku_id JOIN products p ON p.id=s.product_id LEFT JOIN stock_balances sb ON sb.sku_id=s.id

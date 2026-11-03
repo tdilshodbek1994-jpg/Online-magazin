@@ -223,7 +223,7 @@ await step('E2E-14/V2-T01..T12', 'partner Order Studio: autosaved draft → orde
   await page.getByText('Buyurtmani o‘zingiz kiritdingiz').waitFor();
   await page.getByText('Kechqurun 18:00 dan keyin').waitFor();
   await page.goto(BASE + '/partner/wallet');
-  await page.getByText('Komissiya qayerda turibdi').waitFor();
+  await page.getByText('Komissiyalarim').waitFor();
   // customer fill link
   await page.goto(BASE + '/partner/new');
   await page.getByRole('tab', { name: 'Mijoz o‘zi to‘ldirsin' }).click();

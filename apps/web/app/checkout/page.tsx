@@ -16,6 +16,8 @@ export default function Checkout() {
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState<any>(null);
   const idem = useRef<string>('');
+  const [cartLines, setCartLines] = useState<any[]>([]);
+  useEffect(() => { api('/cart').then((c) => setCartLines(c.lines ?? [])).catch(() => {}); }, []);
   useEffect(() => { api('/delivery-zones').then((r) => { setZones(r.items); if (r.items[0]) setF((x) => ({ ...x, zone: r.items[0].id })); }).catch(setErr); }, []);
   const upd = (k: keyof typeof f) => (e: any) => { setF((x) => ({ ...x, [k]: e.target.value })); setQuote(null); };
   const fe = (k: string) => err?.field_errors?.[k];
@@ -46,24 +48,47 @@ export default function Checkout() {
   return (
     <>
       <h1>{t('checkout')}</h1>
+      <ul className="co-trust"><li>🔒 Ma’lumotlaringiz himoyalangan</li><li>💵 To‘lov olganda</li><li>↩️ Qaytarish mumkin</li></ul>
       {err && <div role="alert" className="notice">{err.code === 'QUOTE_CHANGED' ? t('priceChanged') : `${t('error')}: ${err.code}`}</div>}
-      <div className="card">
+      {cartLines.length > 0 && !quote && (
+        <div className="co-preview">
+          <div className="co-thumbs">{cartLines.slice(0, 4).map((l: any) => (l.image ? <img key={l.id} src={l.image} alt="" width={44} height={44} /> : <span key={l.id} className="ph" aria-hidden />))}</div>
+          <span>{cartLines.reduce((a: number, l: any) => a + Number(l.qty), 0)} ta mahsulot · <b>{som(cartLines.reduce((a: bigint, l: any) => a + BigInt(l.price.amount_minor) * BigInt(l.qty), 0n).toString())}</b></span>
+          <a href="/cart" className="link-btn small">O‘zgartirish</a>
+        </div>
+      )}
+      <section className="card co-step">
+        <h2><span className="co-num">1</span> Kim oladi?</h2>
         <label htmlFor="name">{t('name')}</label><input id="name" autoComplete="name" value={f.name} onChange={upd('name')} />{fe('body.contact.name') && <div className="field-error">{fe('body.contact.name')}</div>}
         <label htmlFor="phone">{t('phone')}</label><input id="phone" type="tel" autoComplete="tel" inputMode="tel" placeholder="+998 90 123 45 67" value={f.phone} onChange={upd('phone')} aria-invalid={!!fe('body.contact.phone')} />{fe('body.contact.phone') && <div className="field-error">Telefon raqami noto‘g‘ri (+998…)</div>}
+        <p className="muted small">Operator shu raqamga qo‘ng‘iroq qilib, buyurtmani tasdiqlaydi.</p>
+      </section>
+      <section className="card co-step">
+        <h2><span className="co-num">2</span> Qayerga yetkazamiz?</h2>
         <label htmlFor="zone">{t('delivery')}</label>
         <select id="zone" value={f.zone} onChange={upd('zone')}>{zones.map((z) => <option key={z.id} value={z.id}>{pick(z.name, lang)} — {som(z.tariff_minor)} · {z.eta_min_days}–{z.eta_max_days} {t('days')}</option>)}</select>
         <label htmlFor="district">{t('district')}</label><input id="district" value={f.district} onChange={upd('district')} />
         <label htmlFor="street">{t('street')}</label><input id="street" autoComplete="address-line1" value={f.street} onChange={upd('street')} />
         <div className="row"><div style={{ flex: 1 }}><label htmlFor="house">{t('house')}</label><input id="house" value={f.house} onChange={upd('house')} /></div><div style={{ flex: 1 }}><label htmlFor="apt">{t('apartment')}</label><input id="apt" value={f.apartment} onChange={upd('apartment')} /></div></div>
         <label htmlFor="landmark">{t('landmark')}</label><input id="landmark" value={f.landmark} onChange={upd('landmark')} />
-        <label htmlFor="pay">{t('payment')}</label>
-        <select id="pay" value={f.payment} onChange={upd('payment')}><option value="cod">{t('cod')}</option><option value="online">{t('online')}</option></select>
-        <label htmlFor="ref">{t('referral')}</label><input id="ref" value={f.referral} onChange={upd('referral')} autoCapitalize="characters" />{fe('body.referral_code') && <div className="field-error">Kod topilmadi</div>}
-        <label htmlFor="promo">Promokod</label><input id="promo" value={f.promo} onChange={upd('promo')} autoCapitalize="characters" />
-        <div className="sticky-cta"><button className="btn" disabled={busy || !f.name || !f.phone || !f.street || !f.house || !f.district} onClick={getQuote}>{t('getQuote')}</button></div>
-      </div>
+      </section>
+      <section className="card co-step">
+        <h2><span className="co-num">3</span> Qanday to‘laysiz?</h2>
+        <div className="pay-opts" role="radiogroup" aria-label={t('payment')}>
+          <label className={`pay-opt ${f.payment === 'cod' ? 'on' : ''}`}><input type="radio" name="pay" value="cod" checked={f.payment === 'cod'} onChange={upd('payment')} /><span><b>💵 {t('cod')}</b><small>Mahsulotni ko‘rib, keyin naqd yoki karta bilan to‘laysiz</small></span></label>
+          <label className={`pay-opt ${f.payment === 'online' ? 'on' : ''}`}><input type="radio" name="pay" value="online" checked={f.payment === 'online'} onChange={upd('payment')} /><span><b>💳 {t('online')}</b><small>Buyurtma tasdiqlangach onlayn to‘lov</small></span></label>
+        </div>
+        <details className="co-codes" open={!!fe('body.referral_code') || !!f.promo || !!f.referral || undefined}>
+          <summary className="small">Promokod yoki hamkor kodi bormi?</summary>
+          <label htmlFor="promo">Promokod</label><input id="promo" value={f.promo} onChange={upd('promo')} autoCapitalize="characters" />
+          <label htmlFor="ref">{t('referral')}</label><input id="ref" value={f.referral} onChange={upd('referral')} autoCapitalize="characters" />{fe('body.referral_code') && <div className="field-error">Kod topilmadi</div>}
+        </details>
+        <div className="sticky-cta"><button className="btn big full" disabled={busy || !f.name || !f.phone || !f.street || !f.house || !f.district} onClick={getQuote}>{t('getQuote')}</button></div>
+        <p className="muted small">Avval aniq summa hisoblanadi, keyin tasdiqlaysiz.</p>
+      </section>
       {quote && (
-        <div className="card" style={{ marginTop: 12 }} aria-live="polite">
+        <div className="card co-step co-summary" aria-live="polite">
+          <h2>Buyurtmangiz</h2>
           {quote.lines.map((l: any) => <div key={l.sku_id} className="spread"><span>{pick(l.product.name, lang)} × {l.qty}</span><span>{som(l.net.amount_minor)}</span></div>)}
           <hr />
           <div className="spread"><span>{t('subtotal')}</span><span>{som(quote.subtotal.amount_minor)}</span></div>

@@ -167,7 +167,12 @@ export function registerCheckout(app: FastifyInstance, deps: Deps): void {
   route(app, deps, { method: 'GET', url: '/me/orders', tags: T, summary: 'My orders (verified phone)' }, async ({ actor, db }) => {
     if (!actor.userId) throw unauthorized();
     const u = await one<{ phone_e164: string }>(db, `SELECT phone_e164 FROM users WHERE id=$1`, [actor.userId]);
-    return { items: await many(db, `SELECT id, number, commercial_status, payment_status, fulfillment_status, confirmation_status, payable_minor::text, created_at FROM orders WHERE user_id=$1 OR (user_id IS NULL AND customer_phone=$2) ORDER BY created_at DESC LIMIT 100`, [actor.userId, u.phone_e164]) };
+    return { items: await many(db, `SELECT o.id, o.number, o.commercial_status, o.payment_status, o.fulfillment_status, o.confirmation_status, o.payment_method, o.payable_minor::text, o.created_at,
+        (SELECT COALESCE(SUM(ol.qty),0)::int FROM order_lines ol WHERE ol.order_id=o.id) AS units,
+        (SELECT ol.product_snapshot->'name' FROM order_lines ol WHERE ol.order_id=o.id ORDER BY ol.id LIMIT 1) AS first_name,
+        (SELECT '/media/' || ma.storage_key FROM order_lines ol JOIN skus s ON s.id=ol.sku_id JOIN media_assets ma ON ma.product_id=s.product_id AND ma.status='approved'
+          WHERE ol.order_id=o.id ORDER BY ol.id, ma.sort LIMIT 1) AS image
+       FROM orders o WHERE o.user_id=$1 OR (o.user_id IS NULL AND o.customer_phone=$2) ORDER BY o.created_at DESC LIMIT 100`, [actor.userId, u.phone_e164]) };
   });
 
   route(app, deps, { method: 'GET', url: '/me/orders/:id', tags: T, summary: 'My order detail', params: zIdParam }, async ({ actor, db, params }) => {

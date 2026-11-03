@@ -3,6 +3,7 @@ import { use, useEffect, useState } from 'react';
 import { Async } from '@/components/Header';
 import { api, som } from '@/lib/api';
 import { pick, useI18n } from '@/lib/i18n';
+import { eventLabel, orderStage, PAYMENT_LABEL, STEPS } from '@/lib/orderStatus';
 
 export default function OrderPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -19,18 +20,31 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
           <h1>{o.number}</h1>
           {/* Return from the payment page is NOT proof of payment: status comes from server callbacks only (T061). */}
           {typeof window !== 'undefined' && location.search.includes('payment=return') && o.payment_status !== 'paid' && <div className="notice" role="status">To‘lov tekshirilmoqda… <button className="btn secondary" onClick={load}>{t('retry')}</button></div>}
-          <p>{t('status')}: {o.commercial_status} · {o.fulfillment_status} · {t('payment')}: {o.payment_status}</p>
-          {o.lines.map((l: any) => <div key={l.id} className="spread"><span>{pick(l.product_snapshot.name, lang)} × {l.qty}</span><span>{som(l.line_net_minor)}</span></div>)}
-          <div className="spread" style={{ fontWeight: 700 }}><span>{t('total')}</span><span>{som(o.payable_minor)}</span></div>
+          {(() => { const sg = orderStage(o); return (
+            <div className="ord-stage">
+              <div className="spread"><b className="ord-label">{sg.label}</b><span className={`wal-st st-${o.payment_status === 'paid' ? 'ok' : 'wait'}`}>{o.payment_method === 'cod' && o.payment_status === 'unpaid' ? 'Olganda to‘laysiz' : PAYMENT_LABEL[o.payment_status] ?? o.payment_status}</span></div>
+              <p className="muted small">{sg.hint}</p>
+              {sg.step >= 0 && <ol className="ord-steps" aria-label="Buyurtma bosqichlari">{STEPS.map((x, i) => <li key={x} className={i < sg.step ? 'done' : i === sg.step ? 'now' : ''} aria-current={i === sg.step ? 'step' : undefined}><span aria-hidden />{x}</li>)}</ol>}
+            </div>
+          ); })()}
+          <h2>Mahsulotlar</h2>
+          {o.lines.map((l: any) => <div key={l.id} className="ord-line"><span>{pick(l.product_snapshot.name, lang)} × {l.qty}</span><span>{som(l.line_net_minor)}</span></div>)}
+          {BigInt(o.discount_minor ?? 0) > 0n && <div className="ord-line"><span>Chegirma</span><span className="save-t">−{som(o.discount_minor)}</span></div>}
+          <div className="ord-line"><span>Yetkazish</span><span>{BigInt(o.delivery_minor ?? 0) === 0n ? 'Bepul' : som(o.delivery_minor)}</span></div>
+          <div className="ord-line ord-total"><span>{t('total')}</span><span>{som(o.payable_minor)}</span></div>
           {o.payment_method === 'online' && o.commercial_status === 'confirmed' && ['unpaid', 'failed'].includes(o.payment_status) && (
             <div className="row" style={{ marginTop: 12 }}>
               <button className="btn" onClick={() => pay('payme')}>Payme <span className="badge test">{t('test')}</span></button>
               <button className="btn" onClick={() => pay('click')}>Click <span className="badge test">{t('test')}</span></button>
-              <button className="btn secondary" onClick={() => pay('mock')}>MOCK</button>
+              <button className="btn secondary" onClick={() => pay('mock')}>Sinov to‘lovi</button>
             </div>
           )}
-          <h2>Timeline</h2>
-          <ul>{o.timeline.map((e: any, i: number) => <li key={i}>{new Date(e.created_at).toLocaleString('uz-UZ', { timeZone: 'Asia/Tashkent' })} — {e.dimension}: {e.to_status}</li>)}</ul>
+          {o.address_snapshot && <p className="small"><b>Manzil:</b> {[o.address_snapshot.district, o.address_snapshot.street, o.address_snapshot.house && `${o.address_snapshot.house}-uy`, o.address_snapshot.apartment && `${o.address_snapshot.apartment}-xonadon`].filter(Boolean).join(', ')}</p>}
+          <details className="ord-hist">
+            <summary>Buyurtma tarixi ({o.timeline.length})</summary>
+            <ul>{o.timeline.map((e: any, i: number) => <li key={i}><span className="muted small">{new Date(e.created_at).toLocaleString('uz-UZ', { timeZone: 'Asia/Tashkent', dateStyle: 'short', timeStyle: 'short' })}</span> {eventLabel(e.dimension, e.to_status)}</li>)}</ul>
+          </details>
+          <p className="muted small">Savol bo‘lsa, operator siz ko‘rsatgan raqamga qo‘ng‘iroq qiladi. <a href="/account">← Buyurtmalarim</a></p>
         </div>
       )}
     </Async>

@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { BucketPills, Chips, PERIODS } from '../shared';
 import { Insights } from './Insights';
 import { errText } from '@/lib/errors';
+import { uzDate } from '@/lib/orderStatus';
 
 export default function PartnerStats() {
   const { lang } = useI18n();
@@ -40,7 +41,7 @@ export default function PartnerStats() {
           <article key={r.key} className="scard">
             <div className="spread">
               <div>
-                <h3>{group === 'day' ? new Date(r.key).toLocaleDateString('uz-UZ', { day: '2-digit', month: 'long', year: 'numeric' }) : r.label ?? 'To‘g‘ridan-to‘g‘ri (havolasiz)'}</h3>
+                <h3>{group === 'day' ? uzDate(r.key, true) : r.label ?? 'To‘g‘ridan-to‘g‘ri (havolasiz)'}</h3>
                 {r.product_name && <div className="muted small">{pick(r.product_name, lang)}</div>}
               </div>
               <div className="big-num ok-t" title="Yetkazilgan buyurtmalar">{r.orders.delivered}<small className="big-cap">yetkazildi</small></div>

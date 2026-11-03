@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { Async } from '@/components/Header';
 import { api, som } from '@/lib/api';
 import { BUCKET_LABEL, Chips, PERIODS, TelegramConnect, usePartnerMe } from './shared';
-import { errText } from '@/lib/errors';
+import { errText, stText } from '@/lib/errors';
 
 function ApplyForm({ onDone }: { onDone: () => void }) {
   const [apply, setApply] = useState({ name: '', channels: '' });
@@ -49,7 +49,7 @@ export default function PartnerDashboard() {
             <div className="pd-avatar" aria-hidden>{(me.display_name || '?').slice(0, 2).toUpperCase()}</div>
             <div>
               <h1>{me.display_name}</h1>
-              <div className="muted-inv">Hamkor kodi: <code>{me.code}</code>{me.status !== 'active' && <span className="badge"> {me.status}</span>}</div>
+              <div className="muted-inv">Hamkor kodi: <code>{me.code}</code>{me.status !== 'active' && <span className="badge"> {stText(me.status)}</span>}</div>
               {support && <a className="support-btn" href={support} target="_blank" rel="noopener noreferrer">✈️ Qo‘llab-quvvatlash</a>}
             </div>
           </section>

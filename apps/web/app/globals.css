@@ -1059,3 +1059,29 @@ select, input, textarea { max-width: 100%; }
 .linkbox > .btn { justify-content: center; }
 @media (max-width: 640px) { .linkbox { grid-template-columns: 1fr 1fr; } }
 .big-num .big-cap { display: block; font-size: 11px; font-weight: 600; color: var(--muted); text-align: center; }
+a.admin-tab { text-decoration: none; color: inherit; }
+/* Customer orders */
+.acc { display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr); }
+.acc-list { display: grid; gap: 8px; }
+.acc-order { display: grid; grid-template-columns: 56px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 10px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); color: var(--text); text-decoration: none; }
+.acc-order:hover { border-color: var(--primary); }
+.acc-order img, .acc-order .ph { width: 56px; height: 56px; border-radius: 10px; object-fit: cover; }
+.acc-info { display: grid; gap: 2px; min-width: 0; }
+.acc-info b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; }
+.acc-right { display: grid; gap: 4px; justify-items: end; }
+.acc-links { display: grid; gap: 2px; margin-top: 8px; border-top: 1px solid var(--border); padding-top: 8px; }
+.acc-links a { padding: 12px 4px; color: var(--text); text-decoration: none; font-weight: 600; border-bottom: 1px solid var(--border); }
+.ord-stage { display: grid; gap: 6px; padding: 12px; border-radius: 14px; background: var(--surface-2); margin: 8px 0 12px; }
+.ord-label { font-size: 20px; }
+.ord-steps { list-style: none; padding: 0; margin: 6px 0 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; }
+.ord-steps li { display: grid; gap: 6px; font-size: 11px; color: var(--muted); text-align: center; }
+.ord-steps li span { height: 6px; border-radius: 999px; background: var(--border); }
+.ord-steps li.done span, .ord-steps li.now span { background: var(--primary); }
+.ord-steps li.now { color: var(--text); font-weight: 800; }
+.ord-hist { margin-top: 12px; }
+.ord-hist summary { cursor: pointer; font-weight: 700; min-height: 32px; display: flex; align-items: center; }
+.ord-hist ul { padding-left: 18px; }
+.ord-steps li { font-size: 10px; overflow-wrap: anywhere; line-height: 1.2; }
+.ord-line { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--border); }
+.ord-line > span:last-child { white-space: nowrap; font-weight: 700; }
+.ord-total { border-bottom: 0; font-weight: 800; font-size: 17px; }

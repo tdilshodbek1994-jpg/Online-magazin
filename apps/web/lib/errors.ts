@@ -119,3 +119,17 @@ export function errText(e: any): string {
   if (e?.field_errors && Object.keys(e.field_errors).length) return TEXT.VALIDATION_FAILED;
   return code ? `Xatolik yuz berdi (${code}). Qayta urinib ko‘ring.` : 'Xatolik yuz berdi. Qayta urinib ko‘ring.';
 }
+
+/** Plain Uzbek for technical status/kind values shown in staff tables (payouts, remittances, exceptions, promos). */
+const ST: Record<string, string> = {
+  requested: 'So‘rov yuborildi', approved: 'Tasdiqlandi', processing: 'O‘tkazilmoqda', processing_unknown: 'Natija noma’lum — tekshiring', paid: 'To‘landi', rejected: 'Rad etildi',
+  prepared: 'Tayyorlandi', open: 'Ochiq', resolved: 'Hal qilindi', closed: 'Yopilgan', pending: 'Kutilmoqda', expected: 'Kutilmoqda', declared: 'Kuryer e’lon qildi',
+  received: 'Qabul qilindi', reconciled: 'Solishtirildi', discrepancy: 'Farq bor', active: 'Faol', paused: 'To‘xtatilgan', ended: 'Tugagan', draft: 'Qoralama',
+  archived: 'Arxiv', expired: 'Muddati o‘tgan', cancelled: 'Bekor qilingan', canceled: 'Bekor qilingan', failed: 'Muvaffaqiyatsiz', succeeded: 'Muvaffaqiyatli',
+  needs_information: 'Ma’lumot kerak', probation: 'Sinov muddatida', restricted: 'Cheklangan', suspended: 'To‘xtatilgan',
+  cart_percent: 'Savatga foiz chegirma', cart_fixed: 'Savatga summa chegirma', free_delivery: 'Bepul yetkazish',
+  cod_discrepancy: 'Naqd pulda farq', extra_payment: 'Ortiqcha to‘lov', late_payment_no_stock: 'Kech to‘lov, mahsulot qolmagan', refund_unknown: 'Qaytarish natijasi noma’lum',
+  payout_unknown: 'To‘lov natijasi noma’lum', payment_unknown: 'To‘lov natijasi noma’lum', physical_deficit: 'Omborda kamomad',
+  owner_only: 'faqat egasi tasdiqlaydi',
+};
+export function stText(v: string | null | undefined): string { return v ? ST[v] ?? v : '—'; }

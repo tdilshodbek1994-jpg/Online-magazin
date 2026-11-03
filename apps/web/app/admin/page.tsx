@@ -5,7 +5,7 @@ import { api, getToken, som } from '@/lib/api';
 import { pick, useI18n } from '@/lib/i18n';
 import { ProductEditor } from './ProductEditor';
 import { AdminPrograms } from './Programs';
-import { errText } from '@/lib/errors';
+import { errText, stText } from '@/lib/errors';
 
 const today = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tashkent' }).format(new Date());
 
@@ -21,7 +21,7 @@ export default function Admin() {
         <h1>Boshqaruv paneli</h1>
         <button className="btn" onClick={() => { setTab('products'); setNewProduct((n) => n + 1); }}>+ Mahsulot qo‘shish</button>
       </div>
-      <div className="admin-tabs" role="tablist">{[['orders', '📦', 'Buyurtmalar'], ['products', '🛍️', 'Mahsulotlar'], ['partners', '🤝', 'Hamkorlar'], ['flow', '🏷️', 'Qabul qilingan tovarlar'], ['programs', '🏆', 'Konkurs va bonuslar'], ['summary', '📊', 'Hisobot'], ['payouts', '💳', 'To‘lovlar (payout)'], ['finance', '💰', 'Moliya'], ['promos', '🎟️', 'Promokodlar'], ['import', '📄', 'CSV import'], ['integrations', '⚙️', 'Integratsiyalar']].map(([k, i, l]) => <button key={k} role="tab" aria-selected={tab === k} className={`admin-tab ${tab === k ? 'on' : ''}`} onClick={() => setTab(k!)}><span aria-hidden>{i}</span>{l}</button>)}<a className="admin-tab" href="/admin/commission"><span aria-hidden>🧮</span>Komissiya matritsasi va kurs</a></div>
+      <div className="admin-tabs" role="tablist">{[['orders', '📦', 'Buyurtmalar'], ['products', '🛍️', 'Mahsulotlar'], ['partners', '🤝', 'Hamkorlar'], ['flow', '🏷️', 'Qabul qilingan tovarlar'], ['programs', '🏆', 'Konkurs va bonuslar'], ['summary', '📊', 'Hisobot'], ['payouts', '💳', 'Pul yechish so‘rovlari'], ['finance', '💰', 'Moliya'], ['promos', '🎟️', 'Promokodlar'], ['import', '📄', 'CSV import'], ['integrations', '⚙️', 'Integratsiyalar']].map(([k, i, l]) => <button key={k} role="tab" aria-selected={tab === k} className={`admin-tab ${tab === k ? 'on' : ''}`} onClick={() => setTab(k!)}><span aria-hidden>{i}</span>{l}</button>)}<a className="admin-tab" href="/admin/commission"><span aria-hidden>🧮</span>Komissiya matritsasi va kurs</a></div>
       {msg && <div className="notice" role="status">{msg}</div>}
       {tab === 'orders' && <Orders lang={lang} />}
       {tab === 'flow' && <Flow lang={lang} />}
@@ -337,7 +337,7 @@ function Payouts({ act }: { act: any }) {
       <Async loading={st.loading} error={st.error} onRetry={load}>
         <div className="table-wrap"><table><thead><tr><th>Hamkor</th><th>Summa</th><th>Holat</th><th>Rekvizit</th><th></th></tr></thead><tbody>
           {data?.items.map((p: any) => (
-            <tr key={p.id}><td>{p.code}</td><td>{som(p.amount_minor)}</td><td>{p.status}{p.approval_mode === 'owner_only' ? ' (owner_only)' : ''}</td><td>{p.destination_snapshot?.masked}</td>
+            <tr key={p.id}><td>{p.code}</td><td>{som(p.amount_minor)}</td><td>{stText(p.status)}{p.approval_mode === 'owner_only' ? ` (${stText('owner_only')})` : ''}</td><td>{p.destination_snapshot?.masked}</td>
               <td className="row">
                 {p.status === 'requested' && !p.prepared_by && <button className="btn secondary" onClick={() => act(() => api(`/admin/payouts/${p.id}/prepare`, { method: 'POST' }), load)}>Tayyorlash</button>}
                 {p.status === 'requested' && p.prepared_by && <button className="btn" onClick={() => act(() => api(`/admin/payouts/${p.id}/approve`, { method: 'POST' }), load)}>Tasdiqlash</button>}
@@ -362,14 +362,14 @@ function Finance({ act }: { act: any }) {
       <h2>COD topshiriqlari</h2>
       <Async loading={rem.st.loading} error={rem.st.error} onRetry={rem.load}>
         <div className="table-wrap"><table><tbody>{rem.data?.items.map((r: any) => (
-          <tr key={r.id}><td>{r.courier_name}</td><td>kutilgan {som(r.expected_minor)} · e’lon {som(r.declared_minor)}</td><td>{r.status}</td>
+          <tr key={r.id}><td>{r.courier_name}</td><td>kutilgan {som(r.expected_minor)} · e’lon {som(r.declared_minor)}</td><td>{stText(r.status)}</td>
             <td>{r.status === 'submitted' && <button className="btn" onClick={() => { const v = prompt('Kassaga tushgan summa (so‘m)'); if (v) act(() => api(`/finance/remittances/${r.id}/confirm`, { method: 'POST', body: { received_minor: String(BigInt(v.replace(/\D/g, '')) * 100n) } }), rem.load); }}>Qabul qilish</button>}</td></tr>
         ))}</tbody></table></div>
       </Async>
       <h2>Moliyaviy istisnolar</h2>
       <Async loading={ex.st.loading} error={ex.st.error} onRetry={ex.load}>
         <div className="table-wrap"><table><tbody>{ex.data?.items.map((x: any) => (
-          <tr key={x.id}><td>{x.kind}</td><td>{x.ref_type}:{x.ref_id.slice(0, 8)}</td><td>{som(x.amount_minor)}</td><td>{x.status}</td>
+          <tr key={x.id}><td>{stText(x.kind)}</td><td>{x.ref_type}:{x.ref_id.slice(0, 8)}</td><td>{som(x.amount_minor)}</td><td>{stText(x.status)}</td>
             <td>{x.status === 'open' && <button className="btn secondary" onClick={() => { const r = prompt('Yechim (kamida 10 belgi, dalil bilan)'); if (r) act(() => api(`/finance/exceptions/${x.id}/resolve`, { method: 'POST', body: { resolution: r } }), ex.load); }}>Yopish</button>}</td></tr>
         ))}</tbody></table></div>
       </Async>
@@ -436,7 +436,7 @@ function Promos({ act }: { act: any }) {
         <button className="btn" onClick={() => act(() => api('/admin/promotions', { method: 'POST', body: { code: f.code, name: { 'uz-Latn': f.code }, kind: 'cart_percent', value_bps: Number(f.percent) * 100, starts_at: `${f.from}:00+05:00`, ends_at: `${f.to}:00+05:00`, ...(f.max ? { max_redemptions: Number(f.max) } : {}) } }), load)}>Yaratish</button>
       </div>
       <Async loading={st.loading} error={st.error} onRetry={load}>
-        <div className="table-wrap"><table><tbody>{data?.items.map((p: any) => <tr key={p.id}><td><code>{p.code}</code></td><td>{p.kind} {p.value_bps ? p.value_bps / 100 + '%' : som(p.value_minor)}</td><td>{new Date(p.starts_at).toLocaleString('uz-UZ', { timeZone: 'Asia/Tashkent' })} → {new Date(p.ends_at).toLocaleString('uz-UZ', { timeZone: 'Asia/Tashkent' })}</td><td>{p.redemptions_reserved}/{p.max_redemptions ?? '∞'}</td><td>{p.status}</td>
+        <div className="table-wrap"><table><tbody>{data?.items.map((p: any) => <tr key={p.id}><td><code>{p.code}</code></td><td>{stText(p.kind)} {p.value_bps ? p.value_bps / 100 + '%' : som(p.value_minor)}</td><td>{new Date(p.starts_at).toLocaleString('uz-UZ', { timeZone: 'Asia/Tashkent' })} → {new Date(p.ends_at).toLocaleString('uz-UZ', { timeZone: 'Asia/Tashkent' })}</td><td>{p.redemptions_reserved}/{p.max_redemptions ?? '∞'}</td><td>{stText(p.status)}</td>
           <td>{p.status === 'active' && <button className="btn secondary" onClick={() => act(() => api(`/admin/promotions/${p.id}/pause`, { method: 'POST' }), load)}>To‘xtatish</button>}</td></tr>)}</tbody></table></div>
       </Async>
     </section>

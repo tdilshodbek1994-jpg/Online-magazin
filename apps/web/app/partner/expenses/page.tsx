@@ -39,17 +39,17 @@ export default function Expenses() {
     });
     try {
       const r = await api('/partner/ad-expenses', { method: 'POST', idem: crypto.randomUUID(), body: { ...f, amount: f.kind === 'zero_confirmed' ? '0' : f.amount, placement_name: f.placement_name || undefined, note: f.note || undefined, paid_at: f.paid_at || undefined, allocations } });
-      setMsg(r.fx_status === 'pending' ? 'Saqlandi. Bu sana uchun rasmiy kurs hali yo‘q — kurs kelguncha jamiga kirmaydi (FX_PENDING).' : 'Saqlandi ✓');
+      setMsg(r.fx_status === 'pending' ? 'Saqlandi ✓ Bu kun uchun dollar kursi hali yo‘q — kurs kelgach hisobga qo‘shiladi.' : 'Saqlandi ✓');
       setF({ ...f, amount: '', note: '', placement_name: '' }); load();
     } catch (e: any) { setMsg(e.code === 'ALLOCATION_EXCEEDS_EXPENSE' ? 'Taqsimot xarajatdan oshib ketdi' : e.code === 'SERVICE_PERIOD_INVALID' ? 'Xizmat davri noto‘g‘ri' : e.code ?? 'ERROR'); }
   };
   return (
     <div className="an">
       <div className="spread"><h1>Reklama xarajatlari</h1><Link href="/partner/analytics" className="see-all">Hisobot →</Link></div>
-      <p className="small muted">Xarajat kiritish hamyondan pul yechmaydi — faqat tahliliy natijani o‘zgartiradi. Telegram kanal adminiga to‘langan pul va Telegram Ads alohida kanal sifatida yoziladi.</p>
+
       {recon.length > 0 && (
         <section className="card an-sec">
-          <h2>Moslashtirish kerak ({recon.length})</h2>
+          <h2>Bir xil xarajat ikki marta keldi ({recon.length})</h2>
           <p className="small muted">Reklama kabinetidan kelgan sarf siz qo‘lda kiritgan xarajat bilan bir xil bo‘lishi mumkin. Ikkalasi qo‘shib yuborilmadi — qaysi birini qoldirishni tanlang.</p>
           {recon.map((e) => (
             <div key={e.id} className="pl-row">
@@ -63,37 +63,55 @@ export default function Expenses() {
         </section>
       )}
       <section className="card an-sec">
-        <h2>Yangi xarajat</h2>
+        <h2>Reklamaga qancha sarfladingiz?</h2>
+        <p className="small muted">4 ta savolga javob bering — qolganini tizim o‘zi hisoblaydi. Bu hamyoningizdan pul yechmaydi.</p>
         {msg && <div className="notice" role="status">{msg}</div>}
-        <div className="addr-grid">
-          <div><label htmlFor="xk">Turi</label><select id="xk" value={f.kind} onChange={(e) => setF({ ...f, kind: e.target.value })}><option value="actual">Haqiqiy sarf</option><option value="planned">Rejalashtirilgan byudjet (natijaga kirmaydi)</option><option value="adjustment">Tuzatish / qaytarilgan</option><option value="zero_confirmed">Bu davrda xarajat bo‘lmadi (0)</option></select></div>
-          <div><label htmlFor="xc">Reklama kanali</label><select id="xc" value={f.channel} onChange={(e) => setF({ ...f, channel: e.target.value })}>{['telegram_channel', 'telegram_ads', 'instagram_target', 'meta_mixed', 'organic', 'other'].map((c) => <option key={c} value={c}>{c === 'other' ? 'Boshqa xarajat' : CH_LABEL[c]}</option>)}</select></div>
-          {f.kind !== 'zero_confirmed' && <><div><label htmlFor="xa">Summa</label><input id="xa" inputMode="decimal" value={f.amount} onChange={(e) => setF({ ...f, amount: e.target.value.replace(/[^\d.]/g, '') })} placeholder="250000 yoki 100.50" /></div>
-            <div><label htmlFor="xcur">Valyuta</label><select id="xcur" value={f.currency} onChange={(e) => setF({ ...f, currency: e.target.value })}><option>UZS</option><option>USD</option><option>EUR</option><option>RUB</option></select></div></>}
-          <div><label htmlFor="xsf">Xizmat boshlanishi</label><input id="xsf" type="date" value={f.service_from} onChange={(e) => setF({ ...f, service_from: e.target.value })} /></div>
-          <div><label htmlFor="xst">Xizmat tugashi</label><input id="xst" type="date" value={f.service_to} onChange={(e) => setF({ ...f, service_to: e.target.value })} /></div>
-          <div><label htmlFor="xpa">To‘lov sanasi</label><input id="xpa" type="date" value={f.paid_at} onChange={(e) => setF({ ...f, paid_at: e.target.value })} /></div>
-          <div><label htmlFor="xpy">Kim to‘ladi?</label><select id="xpy" value={f.payer} onChange={(e) => setF({ ...f, payer: e.target.value })}><option value="partner">Men (hamkor)</option><option value="shop">Do‘kon</option></select></div>
+        <label>1. Qayerga reklama berdingiz?</label>
+        <div className="chips">
+          {([['telegram_channel', '📢 Telegram kanal'], ['instagram_target', '📸 Instagram'], ['telegram_ads', '🎯 Telegram Ads'], ['other', '➕ Boshqa xarajat']] as const).map(([k, l]) => (
+            <button key={k} type="button" className={`chip ${f.channel === k ? 'on' : ''}`} aria-pressed={f.channel === k} onClick={() => setF({ ...f, channel: k })}>{l}</button>
+          ))}
         </div>
-        <label htmlFor="xpl">Joylashtirish nomi</label><input id="xpl" value={f.placement_name} maxLength={120} onChange={(e) => setF({ ...f, placement_name: e.target.value })} placeholder="Masalan: @kanal posti 12-noyabr" />
-        <label htmlFor="xn">Izoh</label><input id="xn" value={f.note} maxLength={300} onChange={(e) => setF({ ...f, note: e.target.value })} />
-        <h3>Qaysi havolaga tegishli?</h3>
-        <p className="small muted">Bir xarajatni bir nechta havolaga bo‘lish mumkin ($100 = $60 + $40). Biriktirilmagan qismi “Taqsimlanmagan” bo‘lib ko‘rinadi va umumiy natijadan yo‘qolmaydi.</p>
-        {allocs.map((a, i) => (
-          <div key={i} className="row alloc-row">
-            <label className="sr-only" htmlFor={`at${i}`}>Havola</label>
-            <select id={`at${i}`} value={a.target} onChange={(e) => setAllocs(allocs.map((x, j) => (j === i ? { ...x, target: e.target.value } : x)))}>
-              <option value="">— tanlang —</option>
-              <optgroup label="Havolalar">{links.map((l: any) => <option key={l.id} value={`link:${l.id}`}>{l.name ?? l.code}</option>)}</optgroup>
-              <optgroup label="Telegram/Instagram joylari">{pls.map((p: any) => <option key={p.id} value={`pl:${p.id}`}>{p.link_name} · {p.name}</option>)}</optgroup>
+        <div className="addr-grid">
+          <div><label htmlFor="xa">2. Summa</label><input id="xa" inputMode="decimal" value={f.amount} onChange={(e) => setF({ ...f, amount: e.target.value.replace(/[^\d.]/g, '') })} placeholder="Masalan: 250000" /></div>
+          <div><label htmlFor="xcur">Valyuta</label><select id="xcur" value={f.currency} onChange={(e) => setF({ ...f, currency: e.target.value })}><option value="UZS">so‘m</option><option value="USD">dollar ($)</option><option value="EUR">yevro</option><option value="RUB">rubl</option></select></div>
+          <div><label htmlFor="xday">3. Qachon?</label><input id="xday" type="date" value={f.service_from} onChange={(e) => setF({ ...f, service_from: e.target.value, service_to: e.target.value < f.service_to && f.service_to !== f.service_from ? f.service_to : e.target.value, paid_at: e.target.value })} /></div>
+          <div><label htmlFor="xlink">4. Qaysi havola uchun?</label>
+            <select id="xlink" value={allocs.length === 1 && allocs[0]!.mode === 'share' && allocs[0]!.value === '100' ? allocs[0]!.target : ''} onChange={(e) => setAllocs(e.target.value ? [{ target: e.target.value, mode: 'share', value: '100' }] : [])}>
+              <option value="">Umumiy (aniq havola emas)</option>
+              {links.map((l: any) => <option key={l.id} value={`link:${l.id}`}>{l.name ?? l.code}</option>)}
+              {pls.map((p: any) => <option key={p.id} value={`pl:${p.id}`}>{p.link_name} · {p.name}</option>)}
             </select>
-            <select aria-label="Ulush turi" value={a.mode} onChange={(e) => setAllocs(allocs.map((x, j) => (j === i ? { ...x, mode: e.target.value as Alloc['mode'] } : x)))} style={{ maxWidth: 110 }}><option value="share">%</option><option value="amount">summa</option></select>
-            <input aria-label="Qiymat" inputMode="decimal" value={a.value} onChange={(e) => setAllocs(allocs.map((x, j) => (j === i ? { ...x, value: e.target.value.replace(/[^\d.]/g, '') } : x)))} style={{ maxWidth: 120 }} />
-            <button className="link-btn small" onClick={() => setAllocs(allocs.filter((_, j) => j !== i))}>×</button>
           </div>
-        ))}
-        <button className="link-btn" onClick={() => setAllocs([...allocs, { target: '', mode: 'share', value: '' }])}>+ Havolaga biriktirish</button>
-        <div><button className="btn mt8" disabled={f.kind !== 'zero_confirmed' && !f.amount} onClick={submit}>Saqlash</button></div>
+        </div>
+        <button className="btn big full mt8" disabled={f.kind !== 'zero_confirmed' && !f.amount} onClick={submit}>Saqlash</button>
+
+        <details className="mt8">
+          <summary className="small"><b>Batafsil: bir necha kunlik reklama, kim to‘lagani, bir nechta havolaga bo‘lish</b></summary>
+          <div className="addr-grid">
+            <div><label htmlFor="xk">Turi</label><select id="xk" value={f.kind} onChange={(e) => setF({ ...f, kind: e.target.value })}><option value="actual">Haqiqatan sarflandi</option><option value="planned">Faqat reja (hisobga kirmaydi)</option><option value="adjustment">Tuzatish / qaytarilgan pul</option><option value="zero_confirmed">Bu kunda reklama bo‘lmadi (0)</option></select></div>
+            <div><label htmlFor="xst">Reklama qaysi kungacha bo‘ldi?</label><input id="xst" type="date" value={f.service_to} onChange={(e) => setF({ ...f, service_to: e.target.value })} /></div>
+            <div><label htmlFor="xpy">Kim to‘ladi?</label><select id="xpy" value={f.payer} onChange={(e) => setF({ ...f, payer: e.target.value })}><option value="partner">Men</option><option value="shop">Do‘kon (mening hisobimdan ayirilmaydi)</option></select></div>
+            <div><label htmlFor="xpl">Reklama nomi</label><input id="xpl" value={f.placement_name} maxLength={120} onChange={(e) => setF({ ...f, placement_name: e.target.value })} placeholder="@kanal posti" /></div>
+          </div>
+          <label htmlFor="xn">Izoh</label><input id="xn" value={f.note} maxLength={300} onChange={(e) => setF({ ...f, note: e.target.value })} />
+          <h3>Bir nechta havolaga bo‘lish</h3>
+          <p className="small muted">Masalan $100 ning $60 i bir havolaga, $40 i boshqasiga. Biriktirilmagan qism umumiy hisobga kiradi.</p>
+          {allocs.map((a, i) => (
+            <div key={i} className="row alloc-row">
+              <label className="sr-only" htmlFor={`at${i}`}>Havola</label>
+              <select id={`at${i}`} value={a.target} onChange={(e) => setAllocs(allocs.map((x, j) => (j === i ? { ...x, target: e.target.value } : x)))}>
+                <option value="">— tanlang —</option>
+                {links.map((l: any) => <option key={l.id} value={`link:${l.id}`}>{l.name ?? l.code}</option>)}
+                {pls.map((p: any) => <option key={p.id} value={`pl:${p.id}`}>{p.link_name} · {p.name}</option>)}
+              </select>
+              <select aria-label="Ulush turi" value={a.mode} onChange={(e) => setAllocs(allocs.map((x, j) => (j === i ? { ...x, mode: e.target.value as Alloc['mode'] } : x)))} style={{ maxWidth: 110 }}><option value="share">%</option><option value="amount">summa</option></select>
+              <input aria-label="Qiymat" inputMode="decimal" value={a.value} onChange={(e) => setAllocs(allocs.map((x, j) => (j === i ? { ...x, value: e.target.value.replace(/[^\d.]/g, '') } : x)))} style={{ maxWidth: 120 }} />
+              <button className="link-btn small" onClick={() => setAllocs(allocs.filter((_, j) => j !== i))}>×</button>
+            </div>
+          ))}
+          <button className="link-btn" onClick={() => setAllocs([...allocs, { target: '', mode: 'share', value: '' }])}>+ Havola qo‘shish</button>
+        </details>
       </section>
 
       <details className="card an-sec">

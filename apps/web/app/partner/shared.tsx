@@ -46,13 +46,15 @@ export function Chips({ items, value, onChange, label }: { items: [string, strin
   );
 }
 
-export function BucketPills({ c }: { c: Record<string, number> }) {
+export function BucketPills({ c, href }: { c: Record<string, number>; href?: (status: string) => string }) {
   const total = c.total ?? 0;
   const pct = (n: number) => (total ? ` · ${Math.round((n / total) * 100)}%` : '');
+  const Pill = ({ k, cls, children }: { k: string; cls: string; children: React.ReactNode }) =>
+    href ? <Link className={`pill ${cls} pill-link`} href={href(k)}>{children} ›</Link> : <span className={`pill ${cls}`}>{children}</span>;
   return (
     <div className="pills">
-      <span className="pill">Jami: {total}</span>
-      {BUCKET_ORDER.map((b) => <span key={b} className={`pill b-${b}`}>{BUCKET_LABEL[b]}: {c[b] ?? 0}{b === 'delivered' || b === 'returned' ? pct(c[b] ?? 0) : ''}</span>)}
+      <Pill k="all" cls="">Jami: {total}</Pill>
+      {BUCKET_ORDER.map((b) => <Pill key={b} k={b} cls={`b-${b}`}>{BUCKET_LABEL[b]}: {c[b] ?? 0}{b === 'delivered' || b === 'returned' ? pct(c[b] ?? 0) : ''}</Pill>)}
     </div>
   );
 }

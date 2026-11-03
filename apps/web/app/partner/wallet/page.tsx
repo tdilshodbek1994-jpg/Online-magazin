@@ -25,7 +25,7 @@ export default function Wallet() {
   const [disp, setDisp] = useState({ order_id: '', subject: '', body: '' });
   const [dmsg, setDmsg] = useState<string | null>(null);
   const load = () => api('/partner/wallet').then(setW).catch((e) => setErr(e.code));
-  useEffect(() => { void load(); }, []);
+  useEffect(() => { void load(); try { const r = new URLSearchParams(location.search).get('reason'); if (r) { setFilter(r); setTimeout(() => document.getElementById('lines')?.scrollIntoView({ behavior: 'smooth' }), 400); } } catch {} }, []);
   const groups = (w?.groups ?? []).slice().sort((a: any, b: any) => ORDER.indexOf(a.reason) - ORDER.indexOf(b.reason));
   const lines = (w?.lines ?? []).filter((l: any) => filter === 'all' || l.reason === filter);
   return (
@@ -37,8 +37,8 @@ export default function Wallet() {
           <section className="balance-card">
             <div className="bc-main"><span>Yechish mumkin</span><b>{som(w.balances.available_minor)}</b></div>
             <div className="bc-row">
-              <div><span>Yo‘lda (taxminiy)</span><b>{som(w.balances.estimated_minor)}</b></div>
-              <div><span>Tekshiruvda</span><b>{som(w.balances.pending_minor)}</b></div>
+              <button type="button" className="bc-link" onClick={() => setFilter('not_delivered')}><span>Yo‘lda (taxminiy) ›</span><b>{som(w.balances.estimated_minor)}</b></button>
+              <button type="button" className="bc-link" onClick={() => setFilter('hold')}><span>Tekshiruvda ›</span><b>{som(w.balances.pending_minor)}</b></button>
               <div><span>To‘langan</span><b>{som(w.balances.paid_minor)}</b></div>
             </div>
             <a href="#yechish" className="btn bc-btn">Pul yechish</a>
@@ -61,7 +61,7 @@ export default function Wallet() {
           </div>
 
           {lines.length > 0 && (
-            <div className="slist">
+            <div className="slist" id="lines">
               {lines.slice(0, shown).map((l: any) => (
                 <Link key={l.id} href={`/partner/orders/${l.order_id}`} className="scard">
                   <div className="spread"><b>{l.masked_number} · {pick(l.product, lang)} × {l.qty}</b><b className={l.reason === 'reversed' ? 'no-t' : 'ok-t'}>{som(l.target_minor)}</b></div>

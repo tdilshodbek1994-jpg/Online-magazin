@@ -251,8 +251,8 @@ await step('E2E-14/V2-T01..T12', 'partner Order Studio: autosaved draft → orde
 
 await step('E2E-15/ADS', 'partner analytics: dashboard cards, expense entry, link report', async () => {
   await page.goto(BASE + '/partner/analytics');
-  await page.getByText('Komissiya daromadi').first().waitFor();
-  await page.getByText('Reklamadan keyingi natija').first().waitFor();
+  await page.getByText('Topdingiz').first().waitFor();
+  await page.getByText('Qo‘lingizda qoldi').first().waitFor();
   await page.goto(BASE + '/partner/expenses');
   await page.getByLabel('Summa').fill('150000');
   await page.getByRole('button', { name: 'Saqlash' }).click();

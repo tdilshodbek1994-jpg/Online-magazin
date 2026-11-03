@@ -83,89 +83,123 @@ export default function PartnerAnalytics() {
   };
   const t = d?.totals;
   const negative = t?.result && BigInt(t.result) < 0n;
+  const has = (v: string | null | undefined) => v !== null && v !== undefined;
+  const pos = (v: string | null | undefined) => has(v) && BigInt(v!) > 0n;
+  const verdict = (l: any) => l.result === null ? { cls: 'v-unknown', text: '❓ Xarajat kiritilmagan' } : BigInt(l.result) > 0n ? { cls: 'v-good', text: '✅ Foyda keltirdi' } : BigInt(l.result) < 0n ? { cls: 'v-bad', text: '⚠️ Zararda' } : { cls: 'v-unknown', text: '— Natija yo‘q' };
+  const pct = (r: any) => (r.value === null ? '—' : `${r.value}%`);
+  const SIMPLE: [string, string][] = [['today', 'Bugun'], ['this_week', 'Shu hafta'], ['this_month', 'Shu oy'], ['last_month', 'O‘tgan oy'], ['this_year', 'Shu yil']];
   return (
-    <div className="an">
-      <div className="spread"><h1>Reklama va daromad</h1><Link className="btn sm" href="/partner/expenses">+ Xarajat</Link></div>
-      <div className="an-filters">
-        <div className="sort-chips" role="group" aria-label="Davr">{PERIODS.map(([k, l]) => <button key={k} className={`schip ${period === k ? 'on' : ''}`} aria-pressed={period === k} onClick={() => setPeriod(k)}>{l}</button>)}</div>
-        {period === 'custom' && <div className="row"><label className="sr-only" htmlFor="af">Boshi</label><input id="af" type="date" value={range.from} onChange={(e) => setRange({ ...range, from: e.target.value })} /><label className="sr-only" htmlFor="at">Oxiri</label><input id="at" type="date" value={range.to} onChange={(e) => setRange({ ...range, to: e.target.value })} /></div>}
-        <div className="sort-chips" role="group" aria-label="Hisobot turi">
-          <button className={`schip ${basis === 'financial' ? 'on' : ''}`} aria-pressed={basis === 'financial'} onClick={() => setBasis('financial')} title="Shu davrda tan olingan komissiya va shu davrga tegishli reklama">Davrdagi moliyaviy natija</button>
-          <button className={`schip ${basis === 'cohort' ? 'on' : ''}`} aria-pressed={basis === 'cohort'} onClick={() => setBasis('cohort')} title="Shu davrda kelgan mijozlar buyurtmalari va ularning hozirgi holati">Reklama/kampaniya natijasi</button>
-          <button className={`schip ${currency === 'UZS' ? 'on' : ''}`} aria-pressed={currency === 'UZS'} onClick={() => setCurrency('UZS')}>so‘m</button>
-          <button className={`schip ${currency === 'USD' ? 'on' : ''}`} aria-pressed={currency === 'USD'} onClick={() => setCurrency('USD')}>USD</button>
-          <label className="sr-only" htmlFor="ach">Manba</label>
-          <select id="ach" className="schip" value={channel} onChange={(e) => setChannel(e.target.value)}>
-            <option value="">Barcha manbalar</option><option value="telegram">Telegram (hammasi)</option><option value="telegram_channel">Telegram kanal</option><option value="telegram_ads">Telegram Ads</option><option value="instagram_target">Instagram target</option><option value="unknown">Manba ajratilmagan</option>
-          </select>
-        </div>
+    <div className="an an-simple">
+      <h1>Reklama va daromad</h1>
+      <p className="an-lead">Bu yerda bitta savolga javob bor: <b>qancha pul topdim, reklamaga qancha ketdi va qo‘limda qancha qoldi?</b></p>
+
+      <div className="sort-chips" role="group" aria-label="Davr">
+        {SIMPLE.map(([k, l]) => <button key={k} className={`schip ${period === k ? 'on' : ''}`} aria-pressed={period === k} onClick={() => setPeriod(k)}>{l}</button>)}
       </div>
-      {err && <div className="notice" role="alert">{err === 'PERIOD_INVALID' ? 'Sana oralig‘ini to‘g‘ri tanlang' : err}</div>}
+
+      {err && <div className="notice" role="alert">{err === 'PERIOD_INVALID' ? 'Sanani to‘g‘ri tanlang' : 'Ma’lumotni yuklab bo‘lmadi. Qayta urinib ko‘ring.'}</div>}
       {!d && !err && <div className="loading" role="status"><span className="spinner" aria-hidden />Yuklanmoqda…</div>}
       {d && (
         <>
-          <div className="an-cards">
-            <div className="an-card"><span>Komissiya daromadi</span><b>{money(t.commission)}</b><small>{basis === 'financial' ? 'Shu davrda tan olingan (qaytarishlar hisobga olingan)' : 'Shu davr mijozlaridan tasdiqlangan'}</small></div>
-            <div className="an-card"><span>Reklama xarajati</span><b>{money(t.ad)}</b><small>{t.ad === null ? 'Xarajat kiritilmagan' : d.completeness.expense_zero_confirmed && t.ad === '0' ? 'Siz “xarajat yo‘q” deb tasdiqlagansiz' : 'Siz to‘lagan; xizmat kunlari bo‘yicha'}</small></div>
-            <div className={`an-card main ${negative ? 'neg' : ''}`}><span>Reklamadan keyingi natija</span><b>{t.result === null ? 'Hisob to‘liq emas' : money(t.result)}</b><small>komissiya − reklama − boshqa xarajat{t.other && t.other !== '0' ? ` (${money(t.other)})` : ''}</small></div>
-            <div className="an-card"><span>Kutilayotgan komissiya</span><b>{money(t.expected)}</b><small>Shartlar hali bajarilmagan — natijaga qo‘shilmaydi</small></div>
-          </div>
-          <div className="an-sub">
-            {d.wallet && <><span>Yechish mumkin: <b>{som(d.wallet.available_minor)}</b></span><span>So‘rovda: <b>{som(d.wallet.reserved_minor)}</b></span><span>To‘langan: <b>{som(d.wallet.paid_minor)}</b></span></>}
-            <span>Buyurtma: <b>{d.counts.orders}</b> · tasdiqlangan <b>{d.counts.confirmed}</b> · yetkazilgan <b>{d.counts.delivered}</b> · dona <b>{d.counts.units}</b></span>
-            {t.ad_shop_paid !== '0' && <span>Do‘kon to‘lagan reklama: <b>{money(t.ad_shop_paid)}</b> (natijangizdan ayirilmaydi)</span>}
-          </div>
-          {d.completeness.notes.length > 0 && <div className="notice small">{d.completeness.notes.join(' · ')}</div>}
-
-          <section className="card an-sec"><h2>Oy xulosasi</h2><p>{d.summary_text}</p>
-            {d.compare?.commission_growth_pct !== null && d.compare?.commission_growth_pct !== undefined && <p className="small muted">O‘tgan teng davrga nisbatan komissiya: {d.compare.commission_growth_pct > 0 ? '+' : ''}{d.compare.commission_growth_pct}%</p>}
+          {/* The whole page in one line: earned − spent = left */}
+          <section className="eq" aria-label="Asosiy natija">
+            <Link href="/partner/wallet?reason=available" className="eq-item earn"><span>💰 Topdingiz ›</span><b>{money(t.commission)}</b><small>Komissiya — mahsulot mijozga yetib, pul tushgandan keyin</small></Link>
+            <div className="eq-op" aria-hidden>−</div>
+            <Link href="/partner/expenses" className="eq-item spend"><span>📣 Reklamaga sarfladingiz ›</span><b>{t.ad === null ? '?' : money(t.ad)}</b><small>{t.ad === null ? 'Hali kiritmagansiz' : 'Siz kiritgan reklama xarajati'}</small></Link>
+            <div className="eq-op" aria-hidden>=</div>
+            <div className={`eq-item left ${negative ? 'neg' : ''}`}><span>{negative ? '⚠️ Zarar' : '✅ Qo‘lingizda qoldi'}</span><b>{t.result === null ? '?' : money(t.result)}</b><small>{t.result === null ? 'Reklama xarajatini kiriting — shunda hisoblanadi' : negative ? 'Reklama topganingizdan ko‘p bo‘ldi' : 'Reklamadan keyingi sof natija'}</small></div>
           </section>
+          {t.ad === null && <Link className="btn big full" href="/partner/expenses">📣 Reklamaga qancha sarflaganingizni kiriting</Link>}
 
-          <section className="card an-sec"><h2>Vaqt bo‘yicha</h2><SeriesChart series={d.series} money={(v) => money(v)} /></section>
+          <Link href="/partner/wallet?reason=not_delivered" className="an-wait">
+            <span>⏳ <b>Yana kutilmoqda: {money(t.expected)}</b> ›</span>
+            <small>Bu buyurtmalar hali yetkazilmagan yoki pul tushmagan. Yetkazilgach “Topdingiz”ga qo‘shiladi. Hozircha yuqoridagi hisobga kirmaydi.</small>
+          </Link>
+
+          <details className="card an-how">
+            <summary><b>❔ Komissiya qanday hisoblanadi?</b></summary>
+            <ul>
+              <li>Komissiya mahsulot narxi emas — bu har bir sotuv uchun sizga beriladigan haq.</li>
+              <li>Mijoz bir buyurtmada 2–3 dona olsa, keyingi donalar uchun ham qo‘shimcha beriladi. Masalan, komissiya 30 000 bo‘lsa: <b>1 dona = 30 000</b>, <b>2 dona = 30 000 + 7 500 = 37 500</b>, <b>3 dona = 30 000 + 15 000 + 7 500 = 52 500</b>.</li>
+              <li>Mijoz mahsulotni qaytarsa, komissiya qolgan donalar bo‘yicha qayta hisoblanadi (masalan 2 donadan 1 tasi qaytsa: 37 500 → 30 000).</li>
+              <li>Reklama xarajatini kiritish hamyoningizdan pul yechmaydi — faqat “qancha qoldi”ni ko‘rsatadi.</li>
+            </ul>
+          </details>
 
           <section className="card an-sec">
-            <h2>Foizlar</h2>
-            <div className="an-ratios">
-              {(['confirmation', 'delivery', 'delivery_total', 'ad_result_pct'] as const).map((k) => (
-                <div key={k} title={d.ratios[k].formula}><span>{d.ratios[k].label}</span><b>{d.ratios[k].value === null ? 'Hisoblanmaydi' : `${d.ratios[k].value}%`}</b><small>{k === 'ad_result_pct' ? 'natija / reklama' : `${d.ratios[k].num}/${d.ratios[k].den}`}</small></div>
-              ))}
-              <div><span>Komissiya / reklama</span><b>{d.ratios.commission_per_ad.value ?? 'Hisoblanmaydi'}</b></div>
-              <div><span>1 yetkazilgan buyurtma xarajati</span><b>{d.ratios.cost_per_delivered_order === null ? 'Hisoblanmaydi' : money(d.ratios.cost_per_delivered_order)}</b></div>
+            <h2>Buyurtmalar</h2>
+            <div className="funnel">
+              <Link href="/partner/orders?status=all"><b>{d.counts.orders}</b><span>ta buyurtma keldi ›</span></Link>
+              <Link href="/partner/orders?status=accepted"><b>{d.counts.confirmed}</b><span>tasini mijoz tasdiqladi ›</span><small>{pct(d.ratios.confirmation)}</small></Link>
+              <Link href="/partner/orders?status=delivered"><b>{d.counts.delivered}</b><span>tasi yetkazildi ›</span><small>{pct(d.ratios.delivery_total)}</small></Link>
+              <div><b>{d.counts.units}</b><span>dona sotildi</span></div>
             </div>
           </section>
 
+          <h2>Qaysi havola qancha olib keldi?</h2>
+          <div className="slist">
+            {d.links.filter((l: any) => l.orders > 0 || BigInt(l.commission) !== 0n || (l.ad && l.ad !== '0') || BigInt(l.expected) > 0n).slice(0, shown).map((l: any) => {
+              const v = verdict(l);
+              return (
+                <article key={l.link_id ?? 'none'} className={`scard an-link2 ${v.cls}`}>
+                  <div className="spread"><b>{l.link_id ? l.name : 'O‘zingiz kiritgan buyurtmalar'}{l.archived ? ' · arxiv' : ''}</b><span className={`verdict ${v.cls}`}>{v.text}</span></div>
+                  {l.product && <div className="small muted">{pick(l.product, lang)}</div>}
+                  <div className="eq-mini">
+                    <span>Topdingiz <b>{money(l.commission)}</b></span>
+                    <span>Reklama <b>{l.ad === null ? '?' : money(l.ad)}</b></span>
+                    <span>Qoldi <b className={l.result && BigInt(l.result) < 0n ? 'no-t' : 'ok-t'}>{l.result === null ? '?' : money(l.result)}</b></span>
+                  </div>
+                  {l.link_id ? <Link className="small" href={`/partner/orders?link=${l.link_id}&link_name=${encodeURIComponent(l.name)}&status=all`}>{l.orders} buyurtma · {l.delivered} yetkazildi{BigInt(l.expected) > 0n ? ` · yana ${money(l.expected)} kutilmoqda` : ''} ›</Link> : <div className="small muted">{l.orders} buyurtma · {l.delivered} yetkazildi</div>}
+                  {l.link_id && <div className="row" style={{ gap: 8 }}><Link className="btn secondary sm" href={`/partner/analytics/link/${l.link_id}?period=${period}`}>Batafsil</Link><Link className="btn secondary sm" href={`/partner/expenses?link=${l.link_id}`}>Reklama xarajati qo‘shish</Link></div>}
+                </article>
+              );
+            })}
+            {d.links.length > shown && <button className="btn secondary full" onClick={() => setShown(shown + 20)}>Yana ko‘rsatish</button>}
+            {(d.unallocated.ad !== '0' || d.unallocated.other !== '0') && <p className="small muted">Yana {money((BigInt(d.unallocated.ad) + BigInt(d.unallocated.other)).toString())} reklama xarajati hech qaysi havolaga biriktirilmagan — u yuqoridagi umumiy hisobga kirgan.</p>}
+          </div>
+
           <section className="card an-sec">
-            <h2>Manbalar</h2>
-            {d.channels.length === 0 ? <p className="muted small">Ma’lumot yo‘q</p> : d.channels.map((c: any) => (
-              <div key={c.channel} className="sum-row"><span>{CH_LABEL[c.channel] ?? c.channel}</span><span>{c.orders} buyurtma · <b>{money(c.commission)}</b> · reklama {money(c.ad)}</span></div>
-            ))}
-            <p className="small muted">“Manba ajratilmagan” — eski havola Telegram va Instagram’da birga tarqatilgan; tarix taxmin bilan bo‘linmaydi.</p>
+            <h2>Oy xulosasi</h2>
+            <p>{d.summary_text}</p>
           </section>
 
-          <h2>Havolalar</h2>
-          <div className="small muted">Yangi: {d.link_counts.created_in_period} · Faol: {d.link_counts.active} · Daromad keltirgan: {d.link_counts.with_revenue}</div>
-          <div className="slist">
-            {d.links.slice(0, shown).map((l: any) => (
-              <article key={l.link_id ?? 'none'} className={`scard an-link ${l.archived ? 'muted-card' : ''}`}>
-                <div className="spread"><b>{l.name}{l.archived ? ' · arxiv' : ''}</b><span className="small muted">{l.product ? pick(l.product, lang) : ''}</span></div>
-                <div className="an-link-grid">
-                  <div><span>Komissiya</span><b>{money(l.commission)}</b></div>
-                  <div><span>Reklama</span><b>{money(l.ad)}</b></div>
-                  <div><span>Natija</span><b className={l.result && BigInt(l.result) < 0n ? 'no-t' : ''}>{l.result === null ? 'Hisob to‘liq emas' : money(l.result)}</b></div>
-                  <div><span>Kutilmoqda</span><b>{money(l.expected)}</b></div>
-                </div>
-                <div className="small muted">{l.orders} buyurtma · {l.delivered} yetkazilgan · {l.units} dona · 1/2/3 dona: {l.qty_distribution['1']}/{l.qty_distribution['2']}/{l.qty_distribution['3']}{l.qty_distribution['4+'] ? ` · 4+: ${l.qty_distribution['4+']}` : ''}</div>
-                {l.link_id && <div className="row" style={{ gap: 8 }}><Link className="btn secondary sm" href={`/partner/analytics/link/${l.link_id}?period=${period}`}>Hisob-kitob</Link><Link className="btn secondary sm" href={`/partner/expenses?link=${l.link_id}`}>Xarajat qo‘shish</Link></div>}
-              </article>
-            ))}
-            {d.links.length > shown && <button className="btn secondary full" onClick={() => setShown(shown + 20)}>Yana ko‘rsatish ({d.links.length - shown} ta havola)</button>}
-            {(d.unallocated.ad !== '0' || d.unallocated.other !== '0') && <article className="scard"><div className="spread"><b>Taqsimlanmagan xarajat</b><b>{money((BigInt(d.unallocated.ad) + BigInt(d.unallocated.other)).toString())}</b></div><div className="small muted">Havolaga biriktirilmagan, lekin umumiy natijaga kiradi.</div></article>}
-          </div>
-          <div className="row" style={{ marginTop: 12, gap: 8 }}>
-            <button className="btn secondary" onClick={exportCsv}>CSV yuklab olish</button>
-            <Link className="btn secondary" href="/partner/analytics/plan">Rejalashtirish (taxmin)</Link>
-          </div>
-          <p className="small muted">Hisobot: {basis === 'financial' ? 'davrdagi moliyaviy natija' : 'reklama/kampaniya natijasi'} · {d.fx_method} · Asia/Tashkent · yangilangan {updated?.toLocaleTimeString('uz-UZ')}. Bu tahliliy hisob — buxgalteriyaning yakuniy sof foyda hisoboti emas va hamyondan pul yechmaydi.</p>
+          {d.completeness.fx_pending > 0 && <p className="small muted">💱 Ba’zi dollardagi xarajatlar uchun kurs hali yo‘q — ular hisobga kurs kelgach qo‘shiladi.</p>}
+          {d.completeness.not_final && <p className="small muted">🕒 Ba’zi buyurtmalar hali yo‘lda — natija o‘zgarishi mumkin.</p>}
+
+          <details className="card an-adv">
+            <summary><b>⚙️ Batafsil (tajribali foydalanuvchilar uchun)</b></summary>
+            <div className="an-filters">
+              <div className="sort-chips" role="group" aria-label="Boshqa davrlar">{PERIODS.map(([k, l]) => <button key={k} className={`schip ${period === k ? 'on' : ''}`} aria-pressed={period === k} onClick={() => setPeriod(k)}>{l}</button>)}</div>
+              {period === 'custom' && <div className="row"><label className="sr-only" htmlFor="af">Boshi</label><input id="af" type="date" value={range.from} onChange={(e) => setRange({ ...range, from: e.target.value })} /><label className="sr-only" htmlFor="at">Oxiri</label><input id="at" type="date" value={range.to} onChange={(e) => setRange({ ...range, to: e.target.value })} /></div>}
+              <div className="sort-chips" role="group" aria-label="Hisob usuli">
+                <button className={`schip ${basis === 'financial' ? 'on' : ''}`} aria-pressed={basis === 'financial'} onClick={() => setBasis('financial')}>Shu davrda tushgan pul</button>
+                <button className={`schip ${basis === 'cohort' ? 'on' : ''}`} aria-pressed={basis === 'cohort'} onClick={() => setBasis('cohort')}>Shu davrda kelgan mijozlar</button>
+                <button className={`schip ${currency === 'UZS' ? 'on' : ''}`} aria-pressed={currency === 'UZS'} onClick={() => setCurrency('UZS')}>so‘m</button>
+                <button className={`schip ${currency === 'USD' ? 'on' : ''}`} aria-pressed={currency === 'USD'} onClick={() => setCurrency('USD')}>dollar</button>
+                <label className="sr-only" htmlFor="ach">Reklama manbasi</label>
+                <select id="ach" className="schip" value={channel} onChange={(e) => setChannel(e.target.value)}>
+                  <option value="">Barcha reklamalar</option><option value="telegram">Telegram</option><option value="instagram_target">Instagram</option><option value="unknown">Manbasi noma’lum</option>
+                </select>
+              </div>
+              <p className="small muted">“Shu davrda tushgan pul” — shu oyda hisobingizga o‘tgan komissiya. “Shu davrda kelgan mijozlar” — shu oyda havolangizni bosib kelganlarning buyurtmalari (keyin yetkazilgan bo‘lsa ham).</p>
+            </div>
+            <h3>Vaqt bo‘yicha</h3>
+            <SeriesChart series={d.series} money={(v) => money(v)} />
+            <h3>Reklama manbalari</h3>
+            {d.channels.map((c: any) => <div key={c.channel} className="sum-row"><span>{CH_LABEL[c.channel] ?? c.channel}</span><span>{c.orders} buyurtma · {money(c.commission)}</span></div>)}
+            <h3>Ko‘rsatkichlar</h3>
+            <div className="an-ratios">
+              <div><span>1 ta yetkazilgan buyurtmaga reklama</span><b>{d.ratios.cost_per_delivered_order === null ? '—' : money(d.ratios.cost_per_delivered_order)}</b></div>
+              <div><span>1 so‘m reklamadan topilgan komissiya</span><b>{d.ratios.commission_per_ad.value ?? '—'}</b></div>
+            </div>
+            {d.wallet && <p className="small">Hamyon: yechish mumkin <b>{som(d.wallet.available_minor)}</b> · so‘rovda <b>{som(d.wallet.reserved_minor)}</b> · to‘langan <b>{som(d.wallet.paid_minor)}</b></p>}
+            {t.ad_shop_paid !== '0' && <p className="small muted">Do‘kon o‘zi to‘lagan reklama ({money(t.ad_shop_paid)}) sizning hisobingizdan ayirilmaydi.</p>}
+            <div className="row" style={{ gap: 8 }}>
+              <button className="btn secondary sm" onClick={exportCsv}>Excel uchun yuklab olish (CSV)</button>
+              <Link className="btn secondary sm" href="/partner/analytics/plan">Oldindan hisoblab ko‘rish</Link>
+            </div>
+          </details>
+          <p className="small muted">Yangilangan: {updated?.toLocaleTimeString('uz-UZ')}. Bu hisob ma’lumot uchun; hamyoningizdagi pulga ta’sir qilmaydi.</p>
         </>
       )}
     </div>

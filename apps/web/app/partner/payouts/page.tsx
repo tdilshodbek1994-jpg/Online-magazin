@@ -29,7 +29,7 @@ export default function PartnerPayouts() {
         <>
           <h1>To‘lov</h1>
           {msg && <div className="notice" role="status">{msg}</div>}
-          <div className="bal-grid">{BUCKETS.map(([k, label]) => <div key={k} className={`card bal ${k === 'available_minor' ? 'bal-main' : ''}`}><span className="muted">{label}</span><b>{som(me.balances[k])}</b></div>)}</div>
+          <div className="bal-grid">{BUCKETS.map(([k, label]) => { const r = ({ estimated_minor: 'not_delivered', pending_minor: 'hold', available_minor: 'available' } as Record<string, string>)[k]; return r ? <a key={k} href={`/partner/wallet?reason=${r}`} className={`card bal bal-link ${k === 'available_minor' ? 'bal-main' : ''}`}><span className="muted">{label} ›</span><b>{som(me.balances[k])}</b></a> : <div key={k} className="card bal"><span className="muted">{label}</span><b>{som(me.balances[k])}</b></div>; })}</div>
           <p className="muted small">Taxminiy → buyurtma yetkazilgach «Kutilmoqda» → to‘lov kassaga tushib, kutish muddati o‘tgach «Yechish mumkin».</p>
 
           <section className="card" style={{ marginTop: 12 }}>

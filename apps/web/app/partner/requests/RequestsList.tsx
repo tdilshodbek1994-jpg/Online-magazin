@@ -11,6 +11,8 @@ function Requests({ embedded = false }: { embedded?: boolean }) {
   const sp = useSearchParams();
   const [status, setStatus] = useState(sp.get('status') ?? 'all');
   const [period, setPeriod] = useState(sp.get('period') ?? 'all');
+  const [link, setLink] = useState(sp.get('link') ?? '');
+  const linkName = sp.get('link_name') ?? '';
   const [q, setQ] = useState('');
   const [query, setQuery] = useState('');
   const [data, setData] = useState<any>(null);
@@ -19,12 +21,14 @@ function Requests({ embedded = false }: { embedded?: boolean }) {
     setErr(null);
     const qs = new URLSearchParams({ status, period });
     if (query) qs.set('q', query);
+    if (link) qs.set('link', link);
     api(`/partner/requests?${qs}`).then(setData).catch(setErr);
-  }, [status, period, query]);
+  }, [status, period, query, link]);
   const c = data?.counts ?? {};
   return (
     <>
       {!embedded && <h1>So‘rovlar</h1>}
+      {link && <div className="filter-chip">Faqat oqim: <b>{linkName || 'tanlangan havola'}</b> <button className="link-btn small" onClick={() => setLink('')} aria-label="Oqim filtrini olib tashlash">× Hammasi</button></div>}
       <form className="search plain" role="search" onSubmit={(e) => { e.preventDefault(); setQuery(q.trim()); }}>
         <label htmlFor="rq" className="sr-only">Buyurtma qidirish</label>
         <input id="rq" type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buyurtma raqami yoki mahsulot…" />

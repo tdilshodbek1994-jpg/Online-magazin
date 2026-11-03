@@ -58,9 +58,9 @@ export default function PartnerDashboard() {
           <section className="balance-card">
             <div className="bc-main"><span>Hisobingizda</span><b>{som(me.balances.available_minor)}</b></div>
             <div className="bc-row">
-              <div><span>Taxminiy</span><b>{som(me.balances.estimated_minor)}</b></div>
-              <div><span>Kutilmoqda</span><b>{som(me.balances.pending_minor)}</b></div>
-              <div><span>Yechish mumkin</span><b>{som(me.balances.available_minor)}</b></div>
+              <Link href="/partner/wallet?reason=not_delivered" className="bc-link"><span>Taxminiy ›</span><b>{som(me.balances.estimated_minor)}</b></Link>
+              <Link href="/partner/wallet?reason=hold" className="bc-link"><span>Kutilmoqda ›</span><b>{som(me.balances.pending_minor)}</b></Link>
+              <Link href="/partner/wallet?reason=available" className="bc-link"><span>Yechish mumkin</span><b>{som(me.balances.available_minor)}</b></Link>
             </div>
             <Link href="/partner/wallet" className="btn bc-btn">Hamyon va pul yechish</Link>
           </section>
@@ -113,18 +113,18 @@ export default function PartnerDashboard() {
           {d && (
             <>
               <div className="stat-grid">
-                <div className="stat s-total"><b>{d.orders.total}</b><span>Jami buyurtmalar</span></div>
+                <Link href={`/partner/orders?status=all&period=${period}`} className="stat s-total"><b>{d.orders.total}</b><span>Jami buyurtmalar ›</span></Link>
                 {(['new', 'accepted', 'shipping', 'delivered', 'returned', 'cancelled'] as const).map((k) => (
-                  <Link key={k} href={`/partner/requests?status=${k}&period=${period}`} className={`stat s-${k}`}><b>{d.orders[k]}</b><span>{BUCKET_LABEL[k]}</span></Link>
+                  <Link key={k} href={`/partner/orders?status=${k}&period=${period}`} className={`stat s-${k}`}><b>{d.orders[k]}</b><span>{BUCKET_LABEL[k]} ›</span></Link>
                 ))}
-                <div className="stat s-rate"><b>{d.delivery_rate_30d === null ? '—' : `${d.delivery_rate_30d}%`}</b><span>Yetkazish foizi (30 kun)</span></div>
+                <Link href="/partner/stats" className="stat s-rate"><b>{d.delivery_rate_30d === null ? '—' : `${d.delivery_rate_30d}%`}</b><span>Yetkazish foizi (30 kun) ›</span></Link>
               </div>
               <div className="kpi-row">
-                <div className="card kpi"><span className="muted">Bosishlar</span><b>{d.clicks}</b></div>
+                <Link href="/partner/streams" className="card kpi kpi-link"><span className="muted">Bosishlar ›</span><b>{d.clicks}</b></Link>
                 <div className="card kpi" title={d.conversion?.formula}><span className="muted">Konversiya (veb)</span><b>{d.conversion_pct === null ? '—' : `${d.conversion_pct}%`}</b>
                   <small className="muted">{d.conversion ? (d.conversion.clicks < d.conversion.min_sample ? `Ma’lumot kam: ${d.conversion.clicks} bosish (kamida ${d.conversion.min_sample} kerak)` : `${d.conversion.web_orders} buyurtma / ${d.conversion.clicks} bosish`) : ''}</small></div>
-                <div className="card kpi"><span className="muted">Kutilayotgan daromad</span><b>{som(d.earned.estimated_minor)}</b></div>
-                <div className="card kpi"><span className="muted">Tasdiqlangan daromad</span><b>{som(d.earned.confirmed_minor)}</b></div>
+                <Link href="/partner/wallet?reason=not_delivered" className="card kpi kpi-link"><span className="muted">Kutilayotgan daromad ›</span><b>{som(d.earned.estimated_minor)}</b></Link>
+                <Link href="/partner/wallet?reason=available" className="card kpi kpi-link"><span className="muted">Tasdiqlangan daromad ›</span><b>{som(d.earned.confirmed_minor)}</b></Link>
               </div>
             </>
           )}

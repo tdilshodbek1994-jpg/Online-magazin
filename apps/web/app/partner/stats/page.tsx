@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import { api, som } from '@/lib/api';
 import { pick, useI18n } from '@/lib/i18n';
+import Link from 'next/link';
 import { BucketPills, Chips, PERIODS } from '../shared';
 import { Insights } from './Insights';
 
@@ -44,10 +45,10 @@ export default function PartnerStats() {
             </div>
             <div className="muted small">👆 {r.clicks} bosish · Yetkazish foizi: {r.delivery_rate_pct === null ? '—' : `${r.delivery_rate_pct}%`}</div>
             <div className="money-row">
-              <div className="m-ok"><span>Daromad</span><b>{som(r.earned_minor)}</b></div>
-              <div className="m-wait"><span>Kutilmoqda</span><b>{som(r.pending_minor)}</b></div>
+              <Link className="m-ok m-link" href={group === 'stream' && r.key !== 'direct' ? `/partner/analytics/link/${r.key}` : '/partner/wallet'}><span>Daromad ›</span><b>{som(r.earned_minor)}</b></Link>
+              <Link className="m-wait m-link" href="/partner/wallet"><span>Kutilmoqda ›</span><b>{som(r.pending_minor)}</b></Link>
             </div>
-            <BucketPills c={r.orders} />
+            <BucketPills c={r.orders} href={(st) => `/partner/orders?status=${st}&period=${period}${group === 'stream' && r.key !== 'direct' ? `&link=${r.key}&link_name=${encodeURIComponent(r.label ?? '')}` : ''}`} />
           </article>
         ))}
       </div>

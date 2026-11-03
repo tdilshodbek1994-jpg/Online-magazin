@@ -34,7 +34,8 @@ export default function PartnerStreams() {
       <div className="slist">
         {items?.map((s) => {
           const name = s.product_name ? pick(s.product_name, lang) : 'Umumiy havola';
-          const conv = s.clicks ? Math.round((s.orders.total / s.clicks) * 1000) / 10 : null;
+          const conv = s.clicks >= 30 ? Math.round((s.orders.total / s.clicks) * 1000) / 10 : null; // fewer than 30 clicks: no misleading %
+          const ordersHref = (st: string) => `/partner/orders?link=${s.id}&link_name=${encodeURIComponent(s.name ?? name)}&status=${st}&period=${period}`;
           return (
             <article key={s.id} className="scard">
               <div className="scard-top">
@@ -54,15 +55,15 @@ export default function PartnerStreams() {
               </div>
               <LinkBox url={s.url} shareText={`${name}${s.price_minor ? ` — ${som(s.price_minor)}` : ''}`} />
               <div className="money-row">
-                <div className="m-ok"><span>Komissiya daromadi</span><b>{som(s.earned_minor)}</b></div>
-                <div className="m-wait"><span>Kutilmoqda</span><b>{som(s.pending_minor)}</b></div>
+                <Link className="m-ok m-link" href={`/partner/analytics/link/${s.id}`}><span>Komissiya daromadi ›</span><b>{som(s.earned_minor)}</b></Link>
+                <Link className="m-wait m-link" href={ordersHref('all')}><span>Kutilmoqda ›</span><b>{som(s.pending_minor)}</b></Link>
               </div>
-              <div className="muted small">👆 {s.clicks} bosish{conv !== null ? ` · konversiya ${conv}%` : ''}</div>
+              <div className="muted small">👆 {s.clicks} bosish{conv !== null ? ` · konversiya ${conv}%` : s.clicks ? ' · konversiya: ma’lumot kam' : ''}</div>
               <div className="row" style={{ gap: 8, marginTop: 6 }}>
                 <Link className="btn secondary sm" href={`/partner/analytics/link/${s.id}`}>Hisob-kitob</Link>
                 <Link className="btn secondary sm" href={`/partner/expenses?link=${s.id}`}>Xarajat qo‘shish</Link>
               </div>
-              <BucketPills c={s.orders} />
+              <BucketPills c={s.orders} href={ordersHref} />
               <div className="muted small">🕒 {new Date(s.created_at).toLocaleString('uz-UZ', { dateStyle: 'short', timeStyle: 'short' })}</div>
             </article>
           );

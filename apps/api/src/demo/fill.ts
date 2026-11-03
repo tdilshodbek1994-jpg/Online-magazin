@@ -353,6 +353,29 @@ if (someOrder) {
   if (owner) await call('POST', '/partner/disputes', { token: owner.token, body: { order_id: someOrder.id, subject: 'Komissiya miqdori', body: 'Ikki dona edi, komissiya bittaga hisoblanganga o‘xshaydi — tekshirib bering (DEMO).' } });
 }
 
+// P2: offer sets (one chosen, one being considered, one fresh), partner-entered ad spend, waitlist on sold-out products.
+try {
+  const prodPool = [...new Set(skuPool.map((x) => x.product_id))];
+  const offerTok = async (ids: string[], note: string) => (await call('POST', '/partner/offers', { token: P0.token, body: { product_ids: ids, note } })).json.url.split('/t/')[1] as string;
+  const t1 = await offerTok([pickOne(prodPool), pickOne(prodPool)], 'Ikkalasi ham yaxshi — birinchisi arzonroq, ikkinchisi sifatliroq');
+  await call('POST', `/offer/${t1}/seen`);
+  const offer1 = await call('GET', `/offer/${t1}`);
+  const v = offer1.json.products[0]?.variants?.find((x: any) => x.available > 0);
+  if (v) await call('POST', `/offer/${t1}/choose`, { body: { sku_id: v.sku_id, qty: 1, name: 'Nilufar', phone: fakePhone(), delivery_zone_id: zone.id, address: { district: pickOne(DISTRICTS), street: pickOne(STREETS), house: String(int(1, 90)) }, accept_terms: true } });
+  const t2 = await offerTok([pickOne(prodPool), pickOne(prodPool), pickOne(prodPool)], 'Uchtasidan birini tanlang, savol bo‘lsa yozing');
+  await call('POST', `/offer/${t2}/seen`);
+  await call('POST', `/offer/${t2}/later`, { body: { remind: true, when: 'tomorrow', phone: fakePhone(), consent: true } });
+  await offerTok([pickOne(prodPool), pickOne(prodPool)], 'Sovg‘a uchun yaxshi variantlar');
+  for (let i = 0; i < 6; i++) {
+    const day = new Date(Date.now() - int(0, 28) * 86400_000).toISOString().slice(0, 10);
+    await call('POST', '/partner/ad-spend', { token: P0.token, body: { spent_on: day, amount_minor: String(round1k(int(30_000, 250_000)) * 100), channel: pickOne(['Instagram', 'Telegram kanal', 'TikTok']) } });
+  }
+  const sold = await q<{ id: string }>(`SELECT p.id FROM products p WHERE p.slug LIKE 'demo-%' AND NOT EXISTS (SELECT 1 FROM skus s JOIN stock_atp a ON a.sku_id=s.id WHERE s.product_id=p.id AND a.atp > 0) LIMIT 8`);
+  for (const pr of sold) for (let i = 0; i < int(1, 4); i++) await call('POST', '/waitlist', { body: { product_id: pr.id, phone: fakePhone(), consent: true } });
+  // a few streams on sold-out products, so the "out of stock" warning and waitlist count show in the cabinet
+  for (const pr of sold.slice(0, 2)) await call('POST', '/partner/streams', { token: P0.token, body: { product_id: pr.id, name: 'Instagram post' } });
+} catch (e) { console.warn('  P2 extras skipped:', (e as Error).message); }
+
 // Script sessions are not needed after the run.
 await q(`DELETE FROM sessions WHERE expires_at <= now() + interval '2 hours' AND created_at > now() - interval '3 hours' AND user_id IN (SELECT id FROM users WHERE phone_e164 LIKE '+99890%')`).catch(() => {});
 

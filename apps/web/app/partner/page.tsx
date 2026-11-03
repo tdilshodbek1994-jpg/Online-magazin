@@ -121,7 +121,8 @@ export default function PartnerDashboard() {
               </div>
               <div className="kpi-row">
                 <div className="card kpi"><span className="muted">Bosishlar</span><b>{d.clicks}</b></div>
-                <div className="card kpi"><span className="muted">Konversiya</span><b>{d.conversion_pct === null ? '—' : `${d.conversion_pct}%`}</b></div>
+                <div className="card kpi" title={d.conversion?.formula}><span className="muted">Konversiya (veb)</span><b>{d.conversion_pct === null ? '—' : `${d.conversion_pct}%`}</b>
+                  <small className="muted">{d.conversion ? (d.conversion.clicks < d.conversion.min_sample ? `Ma’lumot kam: ${d.conversion.clicks} bosish (kamida ${d.conversion.min_sample} kerak)` : `${d.conversion.web_orders} buyurtma / ${d.conversion.clicks} bosish`) : ''}</small></div>
                 <div className="card kpi"><span className="muted">Kutilayotgan daromad</span><b>{som(d.earned.estimated_minor)}</b></div>
                 <div className="card kpi"><span className="muted">Tasdiqlangan daromad</span><b>{som(d.earned.confirmed_minor)}</b></div>
               </div>
@@ -133,6 +134,8 @@ export default function PartnerDashboard() {
             <Link href="/partner/market" className="tile-link"><span>🛍️</span>Market — mahsulot tanlash</Link>
             <Link href="/partner/streams" className="tile-link"><span>🔗</span>Oqimlarim</Link>
             <Link href="/partner/new" className="tile-link"><span>📞</span>Mijoz uchun buyurtma</Link>
+            <Link href="/partner/offers" className="tile-link"><span>🧺</span>Taklif to‘plami (2–3 variant)</Link>
+            <Link href="/partner/contacts" className="tile-link"><span>📒</span>Mijozlar daftari</Link>
             <Link href="/partner/wallet" className="tile-link"><span>💳</span>Hamyon: komissiya va to‘lovlar</Link>
             <Link href="/partner/stats" className="tile-link"><span>📊</span>Statistika</Link>
             <Link href="/partner/programs#konkurs" className="tile-link"><span>🏆</span>Konkurs</Link>

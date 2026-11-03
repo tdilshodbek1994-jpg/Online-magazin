@@ -70,6 +70,7 @@ function MarketCard({ p, onCreated }: { p: any; onCreated: () => void }) {
           <button type="button" className="btn big" disabled={p.stock === 0 || !p.payout_minor} onClick={() => setOpen(true)}>Oqim yaratish</button>
         )}
         {p.stock > 0 && <Link href={`/partner/new?product=${encodeURIComponent(p.slug)}`} className="btn secondary full mt8">📞 Mijoz uchun buyurtma</Link>}
+        <AdTexts productId={p.id} />
       </div>
     </article>
   );
@@ -112,5 +113,28 @@ export default function PartnerMarket() {
       {items && <div className="mgrid">{items.map((p) => <MarketCard key={p.id} p={p} onCreated={() => {}} />)}</div>}
       <p className="muted small">“Siz olasiz” — eng arzon variant narxidan hisoblangan joriy komissiya. Haqiqiy summa buyurtma vaqtidagi qoida bo‘yicha qayd etiladi va yetkazilgandan keyin tasdiqlanadi.</p>
     </>
+  );
+}
+
+/** Ready ad texts built only from catalog facts (V2 §18-B) — copy, paste, done. */
+function AdTexts({ productId }: { productId: string }) {
+  const [d, setD] = useState<any>(null);
+  const [open, setOpen] = useState(false);
+  const [copied, setCopied] = useState<number | null>(null);
+  return (
+    <div className="ad-texts">
+      <button type="button" className="link-btn small" aria-expanded={open} onClick={async () => { setOpen(!open); if (!d) setD(await api(`/partner/products/${productId}/ad-texts`).catch(() => null)); }}>📝 Tayyor reklama matni</button>
+      {open && d && (
+        <div className="ad-list">
+          {d.items.map((x: any, i: number) => (
+            <div key={i} className="ad-item">
+              <div className="spread"><b className="small">{x.style}</b><button type="button" className="btn secondary sm" onClick={async () => { if (await copyText(x.text)) { setCopied(i); setTimeout(() => setCopied(null), 1500); } }}>{copied === i ? 'Nusxalandi ✓' : 'Nusxalash'}</button></div>
+              <pre>{x.text}</pre>
+            </div>
+          ))}
+          <p className="small muted">{d.note}</p>
+        </div>
+      )}
+    </div>
   );
 }

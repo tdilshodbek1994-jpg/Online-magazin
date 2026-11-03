@@ -57,6 +57,8 @@ export function Header() {
             <summary aria-label="Profil menyusi"><IconUser /></summary>
             <div className="pmenu-pop">
               <Link href="/partner/orders">Buyurtmalar</Link>
+              <Link href="/partner/offers">Taklif to‘plami</Link>
+              <Link href="/partner/contacts">Mijozlar daftari</Link>
               <Link href="/partner/streams">Oqimlarim</Link>
               <Link href="/partner/stats">Statistika</Link>
               <Link href="/partner/programs">Konkurs va bonuslar</Link>

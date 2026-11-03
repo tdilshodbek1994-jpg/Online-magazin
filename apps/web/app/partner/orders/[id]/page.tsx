@@ -10,8 +10,10 @@ const STEPS: [string, string][] = [['new', 'Qabul qilindi'], ['accepted', 'Tasdi
 const STATUS_TEXT: Record<string, string> = {
   awaiting_confirmation: 'Tasdiqlash kutilmoqda', confirmed: 'Tasdiqlandi', cancelled: 'Bekor qilindi', completed: 'Yakunlandi',
   pending: 'Kutilmoqda', packed: 'Qadoqlandi', shipped: 'Jo‘natildi', delivered: 'Yetkazildi', returned: 'Qaytarildi', failed: 'Yetkazilmadi',
-  paid: 'To‘landi', unpaid: 'To‘lanmagan',
+  paid: 'To‘landi', unpaid: 'To‘lanmagan', picking: 'Yig‘ilmoqda', picked: 'Yig‘ildi', unfulfilled: 'Kutilmoqda', refunded: 'Qaytarildi',
 };
+const MONEY: Record<string, string> = { external: 'Yangi', estimated: 'Taxminiy', pending: 'Tekshiruvda', available: 'Yechish mumkin', reserved: 'So‘rovda', paid: 'To‘langan', debt: 'Qarz' };
+const MONEY_REASON: Record<string, string> = { order_created: 'buyurtma yaratildi', delivered_and_settled: 'yetkazildi va pul tushdi', hold_elapsed: 'qaytarish muddati tugadi', order_cancelled: 'buyurtma bekor bo‘ldi' };
 const DIM: Record<string, string> = { commercial: 'Buyurtma', fulfillment: 'Yetkazish', payment: 'To‘lov', refund: 'Qaytarish' };
 
 function ruleText(r: any): string {
@@ -42,7 +44,13 @@ export default function SalesPassport({ params }: { params: Promise<{ id: string
               {STEPS.map(([k, l], i) => <li key={k} className={i < stepIdx ? 'done' : i === stepIdx ? 'now' : ''} aria-current={i === stepIdx ? 'step' : undefined}>{l}</li>)}
             </ol>
           )}
-          {d.channel === 'partner_assisted' && d.confirmation_status === 'pending' && !off && <div className="notice">Mijoz SMS kod bilan tasdiqlashini kutyapmiz. Mijozga qo‘ng‘iroq qilib, kelgan SMS’ni eslatib qo‘ying.</div>}
+          {d.explain && (
+            <section className={`explain-box t-${d.explain.whose_turn}`} aria-label="Nima bo‘ldi va keyingi qadam">
+              <div><b>Nima bo‘ldi:</b> {d.explain.what}</div>
+              <div><b>Navbat:</b> {({ partner: 'Sizda', customer: 'Mijozda', shop: 'Do‘konda', none: 'Hech kimda — kutish' } as Record<string, string>)[d.explain.whose_turn]}</div>
+              <div><b>Keyingi qadam:</b> {d.explain.next}</div>
+            </section>
+          )}
 
           <section className="card">
             <h2>Kimniki va nega</h2>
@@ -74,7 +82,7 @@ export default function SalesPassport({ params }: { params: Promise<{ id: string
               {d.timeline.map((e: any, i: number) => (
                 <li key={i}><b>{DIM[e.dimension] ?? e.dimension}: {STATUS_TEXT[e.to_status] ?? e.to_status}</b><span className="muted small"> · {new Date(e.created_at).toLocaleString('uz-UZ', { dateStyle: 'short', timeStyle: 'short' })}</span></li>
               ))}
-              {d.entries.map((e: any, i: number) => <li key={`m${i}`} className="money"><b>💰 {som(e.amount_minor)}: {e.from_bucket} → {e.to_bucket}</b>{e.reason && <span className="muted small"> · {e.reason}</span>}</li>)}
+              {d.entries.map((e: any, i: number) => <li key={`m${i}`} className="money"><b>💰 {som(e.amount_minor)}: {MONEY[e.from_bucket] ?? e.from_bucket} → {MONEY[e.to_bucket] ?? e.to_bucket}</b>{e.reason && <span className="muted small"> · {MONEY_REASON[e.reason] ?? e.reason}</span>}</li>)}
             </ul>
           </section>
           <p className="muted small">Savol bo‘lsa, <Link href="/partner/wallet#murojaat">Hamyon → Murojaat</Link> orqali shu buyurtma bo‘yicha yozing.</p>

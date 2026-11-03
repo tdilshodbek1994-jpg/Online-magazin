@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { api, som } from '@/lib/api';
 import { pick, useI18n } from '@/lib/i18n';
 import { BucketPills, Chips, PERIODS } from '../shared';
+import { Insights } from './Insights';
 
 export default function PartnerStats() {
   const { lang } = useI18n();
@@ -15,6 +16,8 @@ export default function PartnerStats() {
   return (
     <>
       <h1>Statistika</h1>
+      <Insights />
+      <h2>Batafsil jadval</h2>
       <Chips items={[['stream', 'Oqim bo‘yicha'], ['day', 'Sana bo‘yicha']]} value={group} onChange={setGroup} label="Guruhlash" />
       <Chips items={PERIODS} value={period} onChange={setPeriod} label="Davr" />
       {err && <div className="notice" role="alert">{err.code}</div>}

@@ -259,6 +259,7 @@ export default function OrderStudio() {
           {mode !== 'link' && (
             <>
               {missing.length > 0 && <div className="missing"><b>Yetishmayapti:</b> {missing.map((m) => MISSING_LABEL[m] ?? m).join(', ')}</div>}
+              {draft && missing.length === 0 && <HoldBox draft={draft} onChange={reloadDraft} />}
               <button className="btn big full" disabled={busy || missing.length > 0} onClick={submit}>Buyurtmani yuborish</button>
               <p className="muted small">Mijozga SMS kod boradi. Mijoz tasdiqlamaguncha buyurtma jo‘natilmaydi. Mijozdan karta yoki bank kodlarini hech qachon so‘ramang.</p>
             </>
@@ -266,6 +267,35 @@ export default function OrderStudio() {
           {draft && <button className="link-btn small" onClick={async () => { if (confirm('Qoralama bekor qilinsinmi?')) { await api(`/partner/drafts/${draft.id}`, { method: 'DELETE' }).catch(() => {}); location.href = '/partner/orders?tab=drafts'; } }}>Qoralamani bekor qilish</button>}
         </aside>
       </div>
+    </div>
+  );
+}
+
+/** Short hold (V2 §09): a real reservation on the server, with a visible countdown; not just a timer picture. */
+function HoldBox({ draft, onChange }: { draft: any; onChange: () => void }) {
+  const [now, setNow] = useState(Date.now());
+  const [err, setErr] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
+  const left = draft.hold ? Math.max(0, new Date(draft.hold.expires_at).getTime() - now) : 0;
+  useEffect(() => { if (draft.hold && left === 0) onChange(); }, [left === 0]); // eslint-disable-line react-hooks/exhaustive-deps
+  const mm = Math.floor(left / 60000), ss = Math.floor((left % 60000) / 1000);
+  const act = async (fn: () => Promise<any>) => {
+    setErr(null); setBusy(true);
+    try { await fn(); onChange(); } catch (e: any) { setErr(e.code === 'HOLD_LIMIT' ? `Bir vaqtda ${e.details?.max ?? ''} tadan ortiq bron qilib bo‘lmaydi` : e.code === 'OUT_OF_STOCK' ? 'Omborda yetarli emas' : e.code === 'POLICY_NOT_SET' ? 'Bron qoidasi hali admin tomonidan belgilanmagan' : e.code ?? 'ERROR'); } finally { setBusy(false); }
+  };
+  if (draft.hold && left > 0) return (
+    <div className="hold-box on" role="status">
+      <b>🔒 Mahsulot siz uchun bron qilindi: {mm}:{String(ss).padStart(2, '0')}</b>
+      <small>Shu vaqt ichida buyurtmani yuboring. Vaqt tugasa, mahsulot boshqalarga ochiladi.</small>
+      <button className="link-btn small" disabled={busy} onClick={() => act(() => api(`/partner/drafts/${draft.id}/hold`, { method: 'DELETE' }))}>Bronni bekor qilish</button>
+    </div>
+  );
+  return (
+    <div className="hold-box">
+      <button className="btn secondary full" disabled={busy} onClick={() => act(() => api(`/partner/drafts/${draft.id}/hold`, { method: 'POST' }))}>🔒 Mijoz o‘ylab turguncha bron qilish</button>
+      <small className="muted">Mahsulot qisqa vaqtga (DEMO: 15 daqiqa) faqat siz uchun ushlab turiladi.</small>
+      {err && <div className="field-error" role="alert">{err}</div>}
     </div>
   );
 }

@@ -69,6 +69,7 @@ export function registerPartnerCabinet(app: FastifyInstance, deps: Deps): void {
       const d30 = counts(await many(db, `SELECT ${BUCKET_SQL} AS bucket, COUNT(*)::int AS n FROM orders o WHERE o.attributed_partner_id=$1 AND o.created_at >= now() - interval '30 days' GROUP BY 1`, [p.id]));
       const finished = d30.delivered + d30.returned + d30.cancelled;
       const clicks = await one<{ n: number }>(db, `SELECT COUNT(*)::int AS n FROM referral_touches t WHERE t.partner_id=$1 AND t.eligible AND ${periodSql('t.touched_at', query.period)}`, [p.id]);
+      const webOrders = await one<{ n: number }>(db, `SELECT COUNT(*)::int AS n FROM orders o WHERE o.attributed_partner_id=$1 AND o.channel='web' AND ${periodSql('o.created_at', query.period)}`, [p.id]);
       const earned = await one<{ estimated: string; confirmed: string }>(db, `
         SELECT COALESCE(SUM(a.target_minor) FILTER (WHERE a.state IN ('estimated','pending')),0)::text AS estimated,
                COALESCE(SUM(a.target_minor) FILTER (WHERE a.state='available'),0)::text AS confirmed
@@ -81,7 +82,10 @@ export function registerPartnerCabinet(app: FastifyInstance, deps: Deps): void {
       return {
         partner: { id: p.id, code: p.code, display_name: p.display_name, status: p.status, since: (p as unknown as { created_at?: string }).created_at ?? null },
         period: query.period, orders: per, clicks: clicks.n,
-        conversion_pct: clicks.n ? Math.round((per.total / clicks.n) * 1000) / 10 : null,
+        // Web conversion only: web orders ÷ eligible clicks in the same period; manual orders never inflate it (T29).
+        // Fewer than 30 clicks → no percentage (a 1-of-1 "100%" would mislead, T30).
+        conversion_pct: clicks.n >= 30 ? Math.round((webOrders.n / clicks.n) * 1000) / 10 : null,
+        conversion: { web_orders: webOrders.n, clicks: clicks.n, min_sample: 30, formula: 'Havola orqali kelgan veb-buyurtmalar ÷ havola bosishlari (siz kiritgan buyurtmalar kirmaydi)' },
         delivery_rate_30d: finished ? Math.round((d30.delivered / finished) * 1000) / 10 : null,
         earned: { estimated_minor: earned.estimated, confirmed_minor: earned.confirmed },
         balances: bal ?? { estimated_minor: '0', pending_minor: '0', available_minor: '0', reserved_minor: '0', paid_minor: '0', debt_minor: '0' },
@@ -229,11 +233,12 @@ export function registerPartnerCabinet(app: FastifyInstance, deps: Deps): void {
       const rows = await many<{ pid: string; display_name: string; delivered: number; total: number; rank: number }>(db, `
         WITH r AS (SELECT o.attributed_partner_id AS pid, COUNT(*) FILTER (WHERE ${BUCKET_SQL}='delivered')::int AS delivered, COUNT(*)::int AS total
                      FROM orders o WHERE o.attributed_partner_id IS NOT NULL AND ${periodSql('o.created_at', query.period)} GROUP BY 1)
-        SELECT r.pid, pa.display_name, r.delivered, r.total, RANK() OVER (ORDER BY r.delivered DESC, r.total DESC)::int AS rank FROM r JOIN partners pa ON pa.id=r.pid ORDER BY rank LIMIT 50`);
+        SELECT r.pid, pa.display_name, r.delivered, r.total, RANK() OVER (ORDER BY r.delivered DESC, r.total DESC)::int AS rank FROM r JOIN partners pa ON pa.id=r.pid ORDER BY rank`);
       const mask = (s: string) => { const a = Array.from(s.trim()); return a.length <= 2 ? `${a[0] ?? ''}*` : `${a.slice(0, 2).join('')}${'*'.repeat(Math.min(4, a.length - 2))}`; };
       return {
         period: query.period,
-        items: rows.slice(0, 10).map((r) => ({ rank: r.rank, name: r.pid === p.id ? r.display_name : mask(r.display_name), delivered: r.delivered, total: r.total, me: r.pid === p.id })),
+        // Top 10 plus the partner's own row when they are further down — everyone sees where they stand.
+        items: [...rows.slice(0, 10), ...rows.slice(10).filter((r) => r.pid === p.id)].map((r) => ({ rank: r.rank, name: r.pid === p.id ? r.display_name : mask(r.display_name), delivered: r.delivered, total: r.total, me: r.pid === p.id })),
         me: rows.find((r) => r.pid === p.id) ? { rank: rows.find((r) => r.pid === p.id)!.rank, delivered: rows.find((r) => r.pid === p.id)!.delivered } : null,
       };
     });

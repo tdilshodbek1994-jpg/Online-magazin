@@ -113,3 +113,49 @@ export async function moveStock(
   );
   return true;
 }
+
+/**
+ * Partner short hold (V2 §09): a real server-side reservation for a complete draft, with expiry.
+ * Same atomic ATP guard as orders, so two buyers can never both get the last unit (T22).
+ */
+export async function reserveForDraft(tx: Tx, draftId: string, partnerId: string, lines: { skuId: string; qty: number }[], minutes: number): Promise<{ id: string; expires_at: string }> {
+  const wh = await mainWarehouseId(tx);
+  const res = await tx.query(
+    `INSERT INTO reservations (order_id, sales_draft_id, partner_id, status, expires_at) VALUES (NULL, $1, $2, 'active_unpaid', now() + make_interval(mins => $3::int)) RETURNING id, expires_at`,
+    [draftId, partnerId, minutes],
+  );
+  const id = res.rows[0].id as string;
+  const sorted = [...lines].sort((a, b) => (a.skuId < b.skuId ? -1 : a.skuId > b.skuId ? 1 : 0));
+  for (const l of sorted) {
+    const u = await tx.query(
+      `UPDATE stock_balances sb SET reserved = sb.reserved + $3, version = sb.version + 1, updated_at = now()
+         FROM offers o
+        WHERE o.sku_id = sb.sku_id AND o.merchant_org_id = sb.merchant_org_id AND o.status='active'
+          AND sb.sku_id=$1 AND sb.warehouse_id=$2 AND sb.on_hand_sellable - sb.reserved - sb.safety_buffer >= $3
+        RETURNING sb.merchant_org_id`,
+      [l.skuId, wh, l.qty],
+    );
+    if (!u.rowCount) throw conflict('OUT_OF_STOCK', { sku_id: l.skuId });
+    await tx.query(`INSERT INTO reservation_lines (reservation_id, order_line_id, sku_id, merchant_org_id, warehouse_id, qty) VALUES ($1, NULL, $2, $3, $4, $5)`,
+      [id, l.skuId, u.rows[0].merchant_org_id, wh, l.qty]);
+  }
+  return { id, expires_at: res.rows[0].expires_at };
+}
+
+/** Release a draft hold exactly once (cancel, submit, or expiry). */
+export async function releaseDraftHold(tx: Tx, where: { draftId?: string; reservationId?: string }, to: 'released' | 'expired'): Promise<boolean> {
+  const r = await tx.query(
+    `UPDATE reservations SET status=$3::text, version=version+1, updated_at=now()
+      WHERE status='active_unpaid' AND sales_draft_id IS NOT NULL AND (sales_draft_id=$1::uuid OR id=$2::uuid) ${to === 'expired' ? 'AND expires_at <= now()' : ''}
+      RETURNING id`,
+    [where.draftId ?? null, where.reservationId ?? null, to],
+  );
+  if (!r.rowCount) return false;
+  await tx.query(
+    `UPDATE stock_balances sb SET reserved = sb.reserved - rl.qty, version = sb.version + 1, updated_at = now()
+       FROM reservation_lines rl
+      WHERE rl.reservation_id = $1 AND sb.sku_id = rl.sku_id AND sb.merchant_org_id = rl.merchant_org_id AND sb.warehouse_id = rl.warehouse_id`,
+    [r.rows[0].id],
+  );
+  return true;
+}

@@ -78,15 +78,20 @@ export function registerPartnerWallet(app: FastifyInstance, deps: Deps): void {
     }
 
     // Streams whose product is gone or nearly gone: the partner's post would sell something we cannot ship (V2 §11).
-    const streams = await many<{ id: string; name: string | null; product: Record<string, string>; atp: number }>(db, `
-      SELECT l.id, l.name, pr.name AS product, COALESCE((SELECT SUM(s.atp) FROM stock_atp s JOIN skus k ON k.id=s.sku_id WHERE k.product_id=pr.id),0)::int AS atp
+    const streams = await many<{ id: string; name: string | null; product: Record<string, string>; atp: number; waiting: number }>(db, `
+      SELECT l.id, l.name, pr.name AS product, COALESCE((SELECT SUM(s.atp) FROM stock_atp s JOIN skus k ON k.id=s.sku_id WHERE k.product_id=pr.id),0)::int AS atp,
+             (SELECT COUNT(*) FROM stock_waitlist w WHERE w.product_id=pr.id AND w.status='waiting')::int AS waiting
         FROM referral_links l JOIN products pr ON pr.id=l.product_id WHERE l.partner_id=$1 AND l.status='active'`, [p.id]);
     for (const s of streams) {
       const pname = s.product?.uz ?? Object.values(s.product ?? {})[0] ?? '';
-      if (s.atp <= 0) action.push({ kind: 'stream_out_of_stock', title: `Oqim «${s.name ?? pname}»: mahsulot tugadi`, detail: 'Postni vaqtincha to‘xtating yoki boshqa mahsulot tanlang', href: '/partner/streams', ref_id: s.id });
+      if (s.atp <= 0) action.push({ kind: 'stream_out_of_stock', title: `Oqim «${s.name ?? pname}»: mahsulot tugadi`, detail: `Postni vaqtincha to‘xtating yoki boshqa mahsulot tanlang. Havola endi «Hozir mavjud emas» sahifasini, kutish ro‘yxati va o‘xshash mahsulotlarni ko‘rsatadi${s.waiting ? ` · ${s.waiting} kishi kutish ro‘yxatida` : ''}`, href: '/partner/streams', ref_id: s.id });
       else if (s.atp <= 3) action.push({ kind: 'stream_low_stock', title: `Oqim «${s.name ?? pname}»: ${s.atp} dona qoldi`, href: '/partner/streams', ref_id: s.id });
     }
 
+    const holds = await many<{ draft_id: string; expires_at: string }>(db, `SELECT sales_draft_id AS draft_id, expires_at FROM reservations WHERE partner_id=$1 AND status='active_unpaid' AND expires_at > now() ORDER BY expires_at`, [p.id]);
+    for (const h of holds) action.push({ kind: 'hold_active', title: `Bron qilingan mahsulot: ${Math.max(1, Math.round((new Date(h.expires_at).getTime() - Date.now()) / 60000))} daqiqa qoldi`, detail: 'Buyurtmani yuboring, aks holda bron bekor bo‘lib, mahsulot boshqalarga ochiladi', href: `/partner/new?draft=${h.draft_id}`, at: h.expires_at, ref_id: h.draft_id });
+    const offers = await many<{ id: string; status: string; seen_at: string | null; remind_at: string | null; created_at: string }>(db, `SELECT id, status, seen_at, remind_at, created_at FROM partner_offers WHERE partner_id=$1 AND status IN ('open','thinking') AND expires_at > now() ORDER BY created_at DESC LIMIT 20`, [p.id]);
+    for (const f of offers) waiting.push({ kind: 'offer_open', title: f.status === 'thinking' ? 'Mijoz taklif to‘plamini o‘ylab ko‘ryapti' : f.seen_at ? 'Mijoz taklifni ochdi, hali tanlamadi' : 'Taklif to‘plami yuborildi, mijoz hali ochmadi', detail: f.remind_at ? 'Mijoz eslatma so‘radi — o‘zimiz bir marta eslatamiz' : undefined, href: '/partner/offers', at: f.created_at, ref_id: f.id });
     const disputes = await many<{ id: string; subject: string; created_at: string }>(db, `SELECT id, subject, created_at FROM partner_disputes WHERE partner_id=$1 AND status='open' ORDER BY created_at DESC`, [p.id]);
     for (const d of disputes) waiting.push({ kind: 'dispute_open', title: `Murojaat ko‘rib chiqilmoqda: ${d.subject}`, at: d.created_at, href: '/partner/wallet', ref_id: d.id });
 
@@ -145,6 +150,29 @@ export function registerPartnerWallet(app: FastifyInstance, deps: Deps): void {
       attribution: { reason: attribution?.reason ?? null, reason_label: reasonText[String(attribution?.reason)] ?? String(attribution?.reason ?? '—') },
       commission: { total_minor: total.toString(), lines: accruals.map((a: Record<string, unknown>) => ({ ...a, reason_label: REASON_LABEL[a.reason as string] ?? a.reason })) },
       timeline, entries,
+      explain: explainOrder({ bucket: String(o.bucket), channel: String(o.channel), confirmation_status: String(o.confirmation_status), payment_status: String(o.payment_status), reasons: accruals.map((a: Record<string, unknown>) => String(a.reason)), available_after: (accruals.find((a: Record<string, unknown>) => a.state === 'pending') as { available_after?: string } | undefined)?.available_after ?? null }),
     };
   });
+}
+
+/**
+ * "Nima bo'ldi va keyingi amal nima?" (V2 §18-D) — a plain explanation derived only from backend state
+ * (no model guesses): what happened, whose turn it is, and the next action.
+ */
+export function explainOrder(o: { bucket: string; channel: string; confirmation_status: string; payment_status: string; reasons: string[]; available_after: string | null }): { what: string; whose_turn: 'partner' | 'customer' | 'shop' | 'none'; next: string } {
+  if (o.reasons.includes('dispute')) return { what: 'Siz yozgan murojaat ko‘rib chiqilmoqda.', whose_turn: 'shop', next: 'Javob Hamyon va Telegram’da keladi. Qo‘shimcha dalil bo‘lsa, murojaatga yozing.' };
+  if (o.bucket === 'new' && o.channel === 'partner_assisted' && o.confirmation_status === 'pending') return { what: 'Buyurtma yaratildi, mijozga SMS kod yuborildi.', whose_turn: 'customer', next: 'Mijozga qo‘ng‘iroq qilib, SMS’dagi havolani ochib kodni kiritishini eslating.' };
+  if (o.bucket === 'new') return { what: 'Buyurtma operatorga tushdi.', whose_turn: 'shop', next: 'Operator mijozga qo‘ng‘iroq qilib tasdiqlaydi. Sizdan hozir hech narsa talab qilinmaydi.' };
+  if (o.bucket === 'accepted') return { what: 'Buyurtma tasdiqlandi, omborda yig‘ilmoqda.', whose_turn: 'shop', next: 'Jo‘natilgach holat «Yo‘lda» bo‘ladi.' };
+  if (o.bucket === 'shipping') return { what: 'Buyurtma kuryerda, yo‘lda.', whose_turn: 'customer', next: 'Mijozni telefonni ko‘tarishga va mahsulotni qabul qilishga tayyor bo‘lishini eslating.' };
+  if (o.bucket === 'delivered') {
+    if (o.reasons.includes('available')) return { what: 'Yetkazildi, komissiya tasdiqlandi.', whose_turn: 'partner', next: 'Hamyondan pul yechish so‘rovini yuborishingiz mumkin.' };
+    if (o.reasons.includes('awaiting_cash')) return { what: 'Yetkazildi, kuryer pulni do‘konga topshirishi va moliya tekshiruvi kutilmoqda.', whose_turn: 'shop', next: 'Pul tushumi solishtirilgach, qaytarish muddati boshlanadi.' };
+    if (o.reasons.includes('hold')) return { what: 'Yetkazildi va pul tushdi. Qaytarish muddati kutilmoqda.', whose_turn: 'none', next: o.available_after ? `${new Date(o.available_after).toLocaleDateString('uz-UZ', { timeZone: 'Asia/Tashkent' })} dan keyin komissiya «Yechish mumkin» bo‘ladi.` : 'Muddat tugagach komissiya «Yechish mumkin» bo‘ladi.' };
+    return { what: 'Yetkazildi.', whose_turn: 'none', next: 'Bu mahsulot uchun komissiya qoidasi belgilanmagan bo‘lishi mumkin — savol bo‘lsa murojaat qiling.' };
+  }
+  if (o.bucket === 'returned') return { what: 'Mahsulot yetkazilmadi yoki qaytarildi.', whose_turn: 'partner', next: 'Bu buyurtma uchun komissiya yo‘q. Mijoz hali xohlasa, «Mijozlar daftari»dan qayta buyurtma tuzing.' };
+  if (o.confirmation_status === 'expired') return { what: 'Mijoz SMS kodni belgilangan vaqtda kiritmadi — buyurtma bekor bo‘ldi.', whose_turn: 'partner', next: 'Mijoz bilan gaplashib, yangi buyurtma kiriting yoki unga to‘ldirish havolasini yuboring.' };
+  if (o.confirmation_status === 'rejected') return { what: 'Mijoz buyurtmani rad etdi.', whose_turn: 'none', next: 'Sababini so‘rang — boshqa variant yoki taklif to‘plamini yuborish mumkin.' };
+  return { what: 'Buyurtma bekor qilindi.', whose_turn: 'none', next: 'Bu buyurtma uchun komissiya yo‘q.' };
 }

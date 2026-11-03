@@ -2,7 +2,8 @@ import type { AppConfig } from './config.js';
 import type { Db } from './platform/db.js';
 import { withTx } from './platform/db.js';
 import { releaseMatured } from './modules/commissions/service.js';
-import { releaseReservation } from './modules/inventory/service.js';
+import { releaseDraftHold, releaseReservation } from './modules/inventory/service.js';
+import { runP2Scheduled } from './modules/partners/p2.js';
 import { renderText, sendTelegram } from './modules/notifications/telegram.js';
 
 /**
@@ -55,11 +56,15 @@ export async function runScheduledOnce(db: Db, now: Date = new Date()): Promise<
     const got = await client.query('SELECT pg_try_advisory_lock(727100) AS ok');
     if (!got.rows[0].ok) return null; // another scheduler is active
     try {
-      const expiredOrders = await db.query(`SELECT order_id FROM reservations WHERE status='active_unpaid' AND expires_at <= $1 LIMIT 500`, [now]);
+      const expiredOrders = await db.query(`SELECT order_id FROM reservations WHERE status='active_unpaid' AND order_id IS NOT NULL AND expires_at <= $1 LIMIT 500`, [now]);
       let expired = 0;
       for (const r of expiredOrders.rows) {
         if (await withTx(db, (tx) => releaseReservation(tx, r.order_id, 'expired'))) expired++;
       }
+      // Partner short holds (V2 §09) return to stock when they expire.
+      const holds = await db.query(`SELECT id FROM reservations WHERE status='active_unpaid' AND sales_draft_id IS NOT NULL AND expires_at <= $1 LIMIT 500`, [now]);
+      for (const h of holds.rows) if (await withTx(db, (tx) => releaseDraftHold(tx, { reservationId: h.id }, 'expired'))) expired++;
+      await runP2Scheduled(db).catch(() => {});
       const released = await withTx(db, (tx) => releaseMatured(tx, now));
       await db.query(`UPDATE outbox_events SET dispatched_at=now() WHERE dispatched_at IS NULL AND id IN (SELECT id FROM outbox_events WHERE dispatched_at IS NULL ORDER BY id LIMIT 1000)`);
       return { expired, released };

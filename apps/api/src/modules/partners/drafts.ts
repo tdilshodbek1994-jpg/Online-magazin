@@ -9,6 +9,8 @@ import { many, maybeOne, one, type Tx, withTx } from '../../platform/db.js';
 import { AppError, badRequest, conflict, notFound, unprocessable } from '../../platform/errors.js';
 import { type Deps, route, zIdParam } from '../../platform/http.js';
 import { computeTarget, ruleForProduct } from '../commissions/service.js';
+import { releaseDraftHold } from '../inventory/service.js';
+import { maskedNumber, notifyPartner } from '../notifications/telegram.js';
 import { priceLines, pricedToJson, storeQuote } from '../orders/service.js';
 import { parseMessage, type CatalogItem } from './parse.js';
 import { createAssistedOrder, myPartner } from './routes.js';
@@ -32,7 +34,7 @@ const zDraft = z.object({
   source: z.enum(['manual', 'message']).optional(),
   raw_message: z.string().max(2000).nullable().optional(),
 });
-type DraftRow = { id: string; partner_id: string; created_by: string; status: string; source: string; lines: { sku_id: string; qty: number }[]; customer_name: string | null; customer_phone: string | null; delivery_zone_id: string | null;
+export type DraftRow = { id: string; partner_id: string; created_by: string; status: string; source: string; lines: { sku_id: string; qty: number }[]; customer_name: string | null; customer_phone: string | null; delivery_zone_id: string | null;
   address: Record<string, string>; address_later: boolean; contact_time: string | null; note: string | null; fill_status: string; fill_expires_at: string | null; order_id: string | null; version: number; created_at: string; updated_at: string };
 
 /** What is still missing before the draft can become an order (server is the source of truth, T05). */
@@ -51,7 +53,7 @@ async function defaultZone(q: Tx | Deps['db']) {
 }
 
 /** Server quote + commission estimate for the partner (estimate only — the order snapshot is authoritative, T16). */
-async function quoteDraft(q: Tx | Deps['db'], d: Pick<DraftRow, 'lines' | 'delivery_zone_id'>) {
+export async function quoteDraft(q: Tx | Deps['db'], d: Pick<DraftRow, 'lines' | 'delivery_zone_id'>) {
   if (!d.lines?.length) return null;
   const zone = d.delivery_zone_id ?? (await defaultZone(q))?.id;
   if (!zone) return null;
@@ -68,24 +70,28 @@ async function quoteDraft(q: Tx | Deps['db'], d: Pick<DraftRow, 'lines' | 'deliv
 }
 
 /** A quote failure (e.g. variant sold out) must not block autosave: the draft is saved and the reason is shown. */
-async function safeQuote(q: Tx | Deps['db'], d: Pick<DraftRow, 'lines' | 'delivery_zone_id'>) {
+export async function safeQuote(q: Tx | Deps['db'], d: Pick<DraftRow, 'lines' | 'delivery_zone_id'>) {
   try { return await quoteDraft(q, d); } catch (e) { return { error: (e as { code?: string }).code ?? 'QUOTE_FAILED' }; }
 }
 
-async function loadDraft(q: Tx | Deps['db'], id: string, partnerId: string, lock = false): Promise<DraftRow> {
+export async function liveHold(q: Tx | Deps['db'], draftId: string) {
+  return maybeOne<{ id: string; expires_at: string }>(q, `SELECT id, expires_at FROM reservations WHERE sales_draft_id=$1 AND status='active_unpaid' AND expires_at > now()`, [draftId]);
+}
+
+export async function loadDraft(q: Tx | Deps['db'], id: string, partnerId: string, lock = false): Promise<DraftRow> {
   const d = await maybeOne<DraftRow>(q, `SELECT * FROM sales_drafts WHERE id=$1 AND partner_id=$2 ${lock ? 'FOR UPDATE' : ''}`, [id, partnerId]);
   if (!d) throw notFound('DRAFT'); // other partners' drafts look non-existent (T28)
   return d;
 }
 
-const view = (d: DraftRow, extra: Record<string, unknown> = {}) => ({
+export const view = (d: DraftRow, extra: Record<string, unknown> = {}) => ({
   id: d.id, status: d.status, source: d.source, lines: d.lines, customer_name: d.customer_name, customer_phone: d.customer_phone, delivery_zone_id: d.delivery_zone_id,
   address: d.address, address_later: d.address_later, contact_time: d.contact_time, note: d.note, fill_status: d.fill_status, fill_expires_at: d.fill_expires_at, order_id: d.order_id,
   version: d.version, created_at: d.created_at, updated_at: d.updated_at, missing: missingFields(d), ...extra,
 });
 
 /** Convert a complete draft into one partner-assisted order (row lock + unique order_id ⇒ idempotent, T06). */
-async function convertDraft(tx: Tx, cfg: AppConfig, actor: Actor, d: DraftRow) {
+export async function convertDraft(tx: Tx, cfg: AppConfig, actor: Actor, d: DraftRow) {
   if (d.order_id) {
     const o = await one<{ number: string }>(tx, `SELECT number FROM orders WHERE id=$1`, [d.order_id]);
     return { order_id: d.order_id, number: o.number, status: 'awaiting_customer_confirmation', replayed: true };
@@ -95,6 +101,8 @@ async function convertDraft(tx: Tx, cfg: AppConfig, actor: Actor, d: DraftRow) {
   const phone = normalizeUzPhone(d.customer_phone!)!;
   const partner = await one<{ id: string; user_id: string; status: string }>(tx, `SELECT id, user_id, status FROM partners WHERE id=$1`, [d.partner_id]);
   if (partner.status !== 'active') throw new AppError(403, 'PARTNER_NOT_ACTIVE');
+  // A short hold (V2 §09) protects stock only until the order exists: release it in the same transaction.
+  await releaseDraftHold(tx, { draftId: d.id }, 'released');
   const priced = await priceLines(tx, { lines: d.lines, delivery_zone_id: d.delivery_zone_id! });
   const zone = await one<{ region_code: string }>(tx, `SELECT region_code FROM delivery_zones WHERE id=$1`, [d.delivery_zone_id]);
   const address = { region_code: zone.region_code, ...d.address };
@@ -103,6 +111,14 @@ async function convertDraft(tx: Tx, cfg: AppConfig, actor: Actor, d: DraftRow) {
   const r = await createAssistedOrder(tx, cfg, actor, partner, { quoteId: q.id, quoteHash: priced.hash, note });
   await tx.query(`UPDATE orders SET contact_time_note=$2 WHERE id=$1`, [r.order_id, d.contact_time]);
   await tx.query(`UPDATE sales_drafts SET status='converted', order_id=$2, raw_message=NULL, version=version+1, updated_at=now() WHERE id=$1`, [d.id, r.order_id]);
+  // Contact notebook (V2 §14): only this partner's own contact; phone typed by the customer is shown masked.
+  const productIds = (await tx.query(`SELECT DISTINCT product_id FROM skus WHERE id = ANY($1::uuid[])`, [d.lines.map((l) => l.sku_id)])).rows.map((x) => x.product_id);
+  await tx.query(`INSERT INTO partner_contacts (partner_id, phone, name, contact_time, entered_by_partner, last_order_id, last_draft_id, interested, last_activity_at)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8, now())
+      ON CONFLICT (partner_id, phone) DO UPDATE SET name=COALESCE(EXCLUDED.name, partner_contacts.name), contact_time=COALESCE(EXCLUDED.contact_time, partner_contacts.contact_time),
+        entered_by_partner = partner_contacts.entered_by_partner OR EXCLUDED.entered_by_partner, last_order_id=EXCLUDED.last_order_id, last_draft_id=EXCLUDED.last_draft_id,
+        interested = (SELECT COALESCE(jsonb_agg(DISTINCT v), '[]') FROM jsonb_array_elements(partner_contacts.interested || EXCLUDED.interested) v), last_activity_at=now()`,
+    [d.partner_id, phone, d.customer_name?.trim() ?? null, d.contact_time, d.source !== 'customer_link', r.order_id, d.id, JSON.stringify(productIds)]);
   return r;
 }
 
@@ -128,7 +144,7 @@ export function registerSalesDrafts(app: FastifyInstance, deps: Deps): void {
   route(app, deps, { method: 'GET', url: '/partner/drafts/:id', tags: T, summary: 'Draft with missing fields and a live server quote', params: zIdParam }, async ({ actor, db, params }) => {
     const p = await myPartner(db, actor, false);
     const d = await loadDraft(db, params.id, p.id);
-    return view(d, { quote: await safeQuote(db, d) });
+    return view(d, { quote: await safeQuote(db, d), hold: await liveHold(db, d.id) });
   });
 
   route(app, deps, { method: 'PATCH', url: '/partner/drafts/:id', tags: T, summary: 'Autosave (expected_version; stale tabs cannot overwrite newer data)', params: zIdParam, body: zDraft.extend({ expected_version: z.number().int() }) },
@@ -148,7 +164,7 @@ export function registerSalesDrafts(app: FastifyInstance, deps: Deps): void {
         return n;
       });
       // Quote after commit: a pricing failure (e.g. sold out) never undoes the autosave.
-      return view(saved, { quote: await safeQuote(db, saved) });
+      return view(saved, { quote: await safeQuote(db, saved), hold: await liveHold(db, saved.id) });
     });
 
   route(app, deps, { method: 'POST', url: '/partner/drafts/:id/submit', tags: T, summary: 'Create the order from a complete draft (idempotent; customer must confirm by SMS)', params: zIdParam }, async ({ actor, db, cfg, params }) => {
@@ -186,8 +202,11 @@ export function registerSalesDrafts(app: FastifyInstance, deps: Deps): void {
 
   route(app, deps, { method: 'DELETE', url: '/partner/drafts/:id', tags: T, summary: 'Cancel a draft (kept for history)', params: zIdParam }, async ({ actor, db, params }) => {
     const p = await myPartner(db, actor, false);
-    const r = await db.query(`UPDATE sales_drafts SET status='cancelled', fill_token_hash=NULL, raw_message=NULL, version=version+1, updated_at=now() WHERE id=$1 AND partner_id=$2 AND status IN ('draft','awaiting_customer') RETURNING id`, [params.id, p.id]);
-    if (!r.rowCount) throw notFound('DRAFT');
+    await withTx(db, async (tx) => {
+      const r = await tx.query(`UPDATE sales_drafts SET status='cancelled', fill_token_hash=NULL, raw_message=NULL, version=version+1, updated_at=now() WHERE id=$1 AND partner_id=$2 AND status IN ('draft','awaiting_customer') RETURNING id`, [params.id, p.id]);
+      if (!r.rowCount) throw notFound('DRAFT');
+      await releaseDraftHold(tx, { draftId: params.id }, 'released'); // a cancelled draft never keeps stock
+    });
     return { ok: true };
   });
 
@@ -231,6 +250,7 @@ export function registerSalesDrafts(app: FastifyInstance, deps: Deps): void {
         [d.id, body.name, phone, body.delivery_zone_id, JSON.stringify(body.address), body.contact_time ?? null]);
       const fresh = await one<DraftRow>(tx, `SELECT * FROM sales_drafts WHERE id=$1`, [d.id]);
       const r = await convertDraft(tx, cfg, { ...actor, kind: 'anonymous' }, fresh);
+      await notifyPartner(tx, d.partner_id, 'partner.customer_filled', { number: maskedNumber(r.number), source: 'to‘ldirish havolasi' }, `filled:${d.id}`);
       await audit(tx, null, 'draft.customer_filled', { type: 'sales_draft', id: d.id }, { after: { order_id: r.order_id } });
       // The customer receives the SMS code on their own phone; the response carries no code (dev echo only outside production).
       const dev = r as { dev_customer_link_token?: string; dev_customer_code?: string };

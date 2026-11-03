@@ -20,7 +20,7 @@ export default function Admin() {
         <h1>Boshqaruv paneli</h1>
         <button className="btn" onClick={() => { setTab('products'); setNewProduct((n) => n + 1); }}>+ Mahsulot qo‘shish</button>
       </div>
-      <div className="admin-tabs" role="tablist">{[['orders', '📦', 'Buyurtmalar'], ['products', '🛍️', 'Mahsulotlar'], ['partners', '🤝', 'Hamkorlar'], ['flow', '🏷️', 'Qabul qilingan tovarlar'], ['programs', '🏆', 'Konkurs va bonuslar'], ['summary', '📊', 'Hisobot'], ['payouts', '💳', 'To‘lovlar (payout)'], ['finance', '💰', 'Moliya'], ['promos', '🎟️', 'Promokodlar'], ['import', '📄', 'CSV import'], ['integrations', '⚙️', 'Integratsiyalar']].map(([k, i, l]) => <button key={k} role="tab" aria-selected={tab === k} className={`admin-tab ${tab === k ? 'on' : ''}`} onClick={() => setTab(k!)}><span aria-hidden>{i}</span>{l}</button>)}</div>
+      <div className="admin-tabs" role="tablist">{[['orders', '📦', 'Buyurtmalar'], ['products', '🛍️', 'Mahsulotlar'], ['partners', '🤝', 'Hamkorlar'], ['flow', '🏷️', 'Qabul qilingan tovarlar'], ['programs', '🏆', 'Konkurs va bonuslar'], ['summary', '📊', 'Hisobot'], ['payouts', '💳', 'To‘lovlar (payout)'], ['finance', '💰', 'Moliya'], ['promos', '🎟️', 'Promokodlar'], ['import', '📄', 'CSV import'], ['integrations', '⚙️', 'Integratsiyalar']].map(([k, i, l]) => <button key={k} role="tab" aria-selected={tab === k} className={`admin-tab ${tab === k ? 'on' : ''}`} onClick={() => setTab(k!)}><span aria-hidden>{i}</span>{l}</button>)}<a className="admin-tab" href="/admin/commission"><span aria-hidden>🧮</span>Komissiya matritsasi va kurs</a></div>
       {msg && <div className="notice" role="status">{msg}</div>}
       {tab === 'orders' && <Orders lang={lang} />}
       {tab === 'flow' && <Flow lang={lang} />}

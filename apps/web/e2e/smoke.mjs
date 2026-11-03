@@ -249,11 +249,23 @@ await step('E2E-14/V2-T01..T12', 'partner Order Studio: autosaved draft → orde
   await cp.close();
 });
 
+await step('E2E-15/ADS', 'partner analytics: dashboard cards, expense entry, link report', async () => {
+  await page.goto(BASE + '/partner/analytics');
+  await page.getByText('Komissiya daromadi').first().waitFor();
+  await page.getByText('Reklamadan keyingi natija').first().waitFor();
+  await page.goto(BASE + '/partner/expenses');
+  await page.getByLabel('Summa').fill('150000');
+  await page.getByRole('button', { name: 'Saqlash' }).click();
+  await page.getByText('Saqlandi ✓').waitFor();
+  await page.goto(BASE + '/partner/analytics');
+  await page.getByText('150 000').first().waitFor();
+});
+
 await step('E2E-11/T017-axe', 'axe-core WCAG 2.x A/AA scan: no serious/critical violations on key customer pages', async () => {
   const axeSrc = (await import('node:fs')).readFileSync(new URL('../node_modules/axe-core/axe.min.js', import.meta.url), 'utf8');
   const p3 = await ctx.newPage();
   const bad = [];
-  for (const path of ['/', '/p/simsiz-quloqchin-x1', '/cart', '/checkout', '/login', '/partner', '/partner/new', '/partner/wallet', '/partner/orders']) {
+  for (const path of ['/', '/p/simsiz-quloqchin-x1', '/cart', '/checkout', '/login', '/partner', '/partner/new', '/partner/wallet', '/partner/orders', '/partner/analytics', '/partner/expenses']) {
     await p3.goto(BASE + path);
     await p3.waitForTimeout(500);
     await p3.addScriptTag({ content: axeSrc });

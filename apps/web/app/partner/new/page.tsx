@@ -12,8 +12,8 @@ import { LinkBox } from '../shared';
  * type it in, paste the customer's message, or send the customer a link to fill in themselves.
  */
 type Line = { sku_id: string; qty: number; slug: string };
-type Form = { lines: Line[]; customer_name: string; customer_phone: string; delivery_zone_id: string; district: string; street: string; house: string; landmark: string; address_later: boolean; contact_time: string; note: string };
-const EMPTY: Form = { lines: [], customer_name: '', customer_phone: '', delivery_zone_id: '', district: '', street: '', house: '', landmark: '', address_later: false, contact_time: '', note: '' };
+type Form = { lines: Line[]; customer_name: string; customer_phone: string; delivery_zone_id: string; district: string; street: string; house: string; landmark: string; address_later: boolean; contact_time: string; note: string; placement_id: string };
+const EMPTY: Form = { lines: [], customer_name: '', customer_phone: '', delivery_zone_id: '', district: '', street: '', house: '', landmark: '', address_later: false, contact_time: '', note: '', placement_id: '' };
 const MISSING_LABEL: Record<string, string> = { product: 'Mahsulot', customer_name: 'Mijoz ismi', customer_phone: 'Telefon raqami', delivery_zone: 'Yetkazish hududi', address: 'Manzil' };
 const TIME_CHIPS = ['Hozir', 'Ertalab', 'Tushdan keyin', 'Kechqurun 18:00 dan keyin'];
 
@@ -22,7 +22,7 @@ function toBody(f: Form, extra: Record<string, unknown> = {}) {
     lines: f.lines.filter((l) => l.sku_id).map((l) => ({ sku_id: l.sku_id, qty: l.qty })),
     customer_name: f.customer_name || null, customer_phone: f.customer_phone || null, delivery_zone_id: f.delivery_zone_id || null,
     address: { district: f.district || undefined, street: f.street || undefined, house: f.house || undefined, landmark: f.landmark || undefined },
-    address_later: f.address_later, contact_time: f.contact_time || null, note: f.note || null, ...extra,
+    address_later: f.address_later, contact_time: f.contact_time || null, note: f.note || null, placement_id: f.placement_id || null, ...extra,
   };
 }
 function fromDraft(d: any): Form {
@@ -31,7 +31,7 @@ function fromDraft(d: any): Form {
     lines: (d.lines ?? []).map((l: any) => ({ sku_id: l.sku_id, qty: l.qty, slug: slugOf(l.sku_id) })),
     customer_name: d.customer_name ?? '', customer_phone: d.customer_phone ?? '', delivery_zone_id: d.delivery_zone_id ?? '',
     district: d.address?.district ?? '', street: d.address?.street ?? '', house: d.address?.house ?? '', landmark: d.address?.landmark ?? '',
-    address_later: !!d.address_later, contact_time: d.contact_time ?? '', note: d.note ?? '',
+    address_later: !!d.address_later, contact_time: d.contact_time ?? '', note: d.note ?? '', placement_id: d.placement_id ?? '',
   };
 }
 
@@ -41,6 +41,7 @@ export default function OrderStudio() {
   const [f, setF] = useState<Form>(EMPTY);
   const [draft, setDraft] = useState<any>(null);
   const [products, setProducts] = useState<any[]>([]);
+  const [placements, setPlacements] = useState<any[]>([]);
   const [zones, setZones] = useState<any[]>([]);
   const [save, setSave] = useState<'idle' | 'saving' | 'saved' | 'error' | 'conflict'>('idle');
   const [err, setErr] = useState<string | null>(null);
@@ -58,6 +59,7 @@ export default function OrderStudio() {
   useEffect(() => {
     api('/partner/products').then((r) => setProducts(r.items)).catch((e) => setErr(e.code));
     api('/delivery-zones').then((r) => setZones(r.items)).catch(() => {});
+    api('/partner/placements').then((r) => setPlacements(r.items)).catch(() => {});
     const q = new URLSearchParams(location.search);
     const id = q.get('draft');
     if (id) api(`/partner/drafts/${id}`).then((d) => { setDraft(d); setF(fromDraft(d)); if (d.fill_status === 'shared') setMode('link'); }).catch((e) => setErr(e.code));
@@ -220,6 +222,15 @@ export default function OrderStudio() {
                 <input id="cp" type="tel" inputMode="tel" value={f.customer_phone} onChange={(e) => update({ customer_phone: e.target.value })} placeholder="+998 90 123 45 67" autoComplete="off" />
                 <label>Qachon qo‘ng‘iroq qilish qulay?</label>
                 <div className="chips">{TIME_CHIPS.map((c) => <button type="button" key={c} className={`chip ${f.contact_time === c ? 'on' : ''}`} aria-pressed={f.contact_time === c} onClick={() => update({ contact_time: f.contact_time === c ? '' : c })}>{c}</button>)}</div>
+                {placements.length > 0 && (
+                  <>
+                    <label htmlFor="src">Mijoz qaysi reklamadan keldi?</label>
+                    <select id="src" value={f.placement_id} onChange={(e) => update({ placement_id: e.target.value })}>
+                      <option value="">Bilmayman / manba ajratilmagan</option>
+                      {placements.map((p) => <option key={p.id} value={p.id}>{p.link_name} · {p.name}</option>)}
+                    </select>
+                  </>
+                )}
                 <label htmlFor="ct" className="sr-only">Aloqa vaqti</label>
                 <input id="ct" value={f.contact_time} onChange={(e) => update({ contact_time: e.target.value })} placeholder="Yoki o‘zingiz yozing: masalan, 19:00 dan keyin" />
               </section>

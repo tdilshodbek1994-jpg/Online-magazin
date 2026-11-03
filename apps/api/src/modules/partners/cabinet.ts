@@ -168,7 +168,7 @@ export function registerPartnerCabinet(app: FastifyInstance, deps: Deps): void {
   route(app, deps, { method: 'DELETE', url: '/partner/streams/:id', tags: T, summary: 'Archive a stream (link stops attributing; history kept)', params: zIdParam },
     async ({ actor, db, params }) => {
       const p = await myPartner(db, actor, false);
-      const r = await db.query(`UPDATE referral_links SET status='disabled' WHERE id=$1 AND partner_id=$2 AND status='active' RETURNING id`, [params.id, p.id]);
+      const r = await db.query(`UPDATE referral_links SET status='disabled', archived_at=now() WHERE id=$1 AND partner_id=$2 AND status='active' RETURNING id`, [params.id, p.id]);
       if (!r.rowCount) throw notFound('STREAM');
       await audit(db, actor, 'partner.stream_archived', { type: 'referral_link', id: params.id }, {});
       return { ok: true };

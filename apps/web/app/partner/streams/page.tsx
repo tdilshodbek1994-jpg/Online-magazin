@@ -50,14 +50,18 @@ export default function PartnerStreams() {
                 <button type="button" className="icon-btn" aria-label="Oqimni arxivlash" title="Arxivlash" onClick={async () => {
                   if (!confirm('Oqim arxivlansinmi? Havola endi yangi buyurtmani sizga bog‘lamaydi (tarix saqlanadi).')) return;
                   try { await api(`/partner/streams/${s.id}`, { method: 'DELETE' }); load(); } catch (e: any) { setErr(e); }
-                }}>🗑</button>
+                }}>Arxivlash</button>
               </div>
               <LinkBox url={s.url} shareText={`${name}${s.price_minor ? ` — ${som(s.price_minor)}` : ''}`} />
               <div className="money-row">
-                <div className="m-ok"><span>Foyda</span><b>{som(s.earned_minor)}</b></div>
+                <div className="m-ok"><span>Komissiya daromadi</span><b>{som(s.earned_minor)}</b></div>
                 <div className="m-wait"><span>Kutilmoqda</span><b>{som(s.pending_minor)}</b></div>
               </div>
               <div className="muted small">👆 {s.clicks} bosish{conv !== null ? ` · konversiya ${conv}%` : ''}</div>
+              <div className="row" style={{ gap: 8, marginTop: 6 }}>
+                <Link className="btn secondary sm" href={`/partner/analytics/link/${s.id}`}>Hisob-kitob</Link>
+                <Link className="btn secondary sm" href={`/partner/expenses?link=${s.id}`}>Xarajat qo‘shish</Link>
+              </div>
               <BucketPills c={s.orders} />
               <div className="muted small">🕒 {new Date(s.created_at).toLocaleString('uz-UZ', { dateStyle: 'short', timeStyle: 'short' })}</div>
             </article>

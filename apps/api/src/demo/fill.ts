@@ -34,6 +34,8 @@ const weighted = <T extends string>(w: Record<T, number>): T => { const tot = Ob
 
 const db = createPool(cfg.databaseUrl, 10);
 await migrate(db, MIGRATIONS_DIR, () => {});
+// DEMO: quantity-matrix rules take effect (flag stays off in production unless the owner enables it).
+await db.query(`UPDATE feature_flags SET enabled=true WHERE key='commission.quantity_matrix'`);
 const app = await buildApp({ ...cfg, env: 'test' }, db); // 'test' only silences per-request logs; flows and rules are the same
 const q = async <R = any>(sql: string, p: unknown[] = []) => (await db.query(sql, p)).rows as R[];
 
@@ -154,10 +156,17 @@ for (let i = 0; i < N_PRODUCTS; i++) {
       await tx.query(`INSERT INTO stock_balances (sku_id, merchant_org_id, warehouse_id, on_hand_sellable) VALUES ($1,$2,$3,$4)`, [sku, org, wh, stock]);
       if (stock) await tx.query(`INSERT INTO inventory_movements (sku_id, merchant_org_id, warehouse_id, kind, bucket, qty_delta, ref_type, ref_id, reason) VALUES ($1,$2,$3,'receipt','on_hand_sellable',$4,'seed',$5,'demo fill')`, [sku, org, wh, stock, code]);
     }
-    // DEMO commission rules only — the owner sets real ones in the admin panel.
-    const fixed = rnd() < 0.25;
-    await tx.query(`INSERT INTO commission_rules (product_id, version, kind, rate_bps, fixed_minor, effective_from) VALUES ($1,1,$2,$3,$4, now() - interval '120 days')`,
-      [prod, fixed ? 'fixed_per_unit' : 'percent', fixed ? null : pickOne([500, 800, 1000, 1200, 1500, 2000, 2500]), fixed ? round1k(base * 0.12) * 100 : null]);
+    // DEMO commission rules only — the owner sets real ones in the admin panel. Every 4th product uses the
+    // quantity matrix from the spec (1 → 100%, 2 → 100%+25%, 3 → 100%+50%+25% of the base commission).
+    const ruleKind = i % 4 === 0 ? 'matrix' : rnd() < 0.25 ? 'fixed' : 'percent';
+    if (ruleKind === 'matrix') {
+      await tx.query(`INSERT INTO commission_rules (product_id, version, kind, fixed_minor, commission_group, quantity_matrix, effective_from, note) VALUES ($1,1,'quantity_matrix',$2,$3,$4, now() - interval '120 days', 'DEMO matritsa')`,
+        [prod, round1k(Math.max(10_000, base * 0.1)) * 100, `product:${prod}`, JSON.stringify({ '1': [10000], '2': [10000, 2500], '3': [10000, 5000, 2500] })]);
+    } else {
+      const fixed = ruleKind === 'fixed';
+      await tx.query(`INSERT INTO commission_rules (product_id, version, kind, rate_bps, fixed_minor, effective_from) VALUES ($1,1,$2,$3,$4, now() - interval '120 days')`,
+        [prod, fixed ? 'fixed_per_unit' : 'percent', fixed ? null : pickOne([500, 800, 1000, 1200, 1500, 2000, 2500]), fixed ? round1k(base * 0.12) * 100 : null]);
+    }
     if (IMAGES) {
       const key = `${tp.art}:${palKeys[i % palKeys.length]}`;
       let png = pngCache.get(key);
@@ -197,10 +206,23 @@ const skuPool = await q<{ sku_id: string; product_id: string; atp: number }>(`SE
   FROM skus s JOIN stock_balances sb ON sb.sku_id=s.id JOIN products p ON p.id=s.product_id WHERE p.status='published' AND sb.on_hand_sellable - sb.reserved - sb.safety_buffer >= 4`);
 const zone = (await q(`SELECT id, region_code FROM delivery_zones WHERE active ORDER BY region_code='TAS' DESC LIMIT 1`))[0];
 const streams = new Map<string, string>(); // partner|product → code
+const streamIds = new Map<string, string>(); // code → link id
+const placementCodes = new Map<string, string[]>(); // link code → [telegram code, instagram code]
 async function streamCode(p: { id: string; token: string }, productId: string) {
   const k = `${p.id}|${productId}`;
-  if (!streams.has(k)) streams.set(k, (await call('POST', '/partner/streams', { token: p.token, body: { product_id: productId, name: pickOne(['Telegram kanal', 'Instagram', 'Do‘stlar guruhi', 'TikTok', 'Asosiy oqim']) } })).json.code);
-  return streams.get(k)!;
+  if (!streams.has(k)) {
+    const r = (await call('POST', '/partner/streams', { token: p.token, body: { product_id: productId, name: pickOne(['Telegram kanal', 'Instagram', 'Do‘stlar guruhi', 'TikTok', 'Asosiy oqim']) } })).json;
+    streams.set(k, r.code); streamIds.set(r.code, r.id);
+    // The demo partner also runs separate Telegram-post and Instagram-target placements on the same link.
+    if (p.id === demoPartnerUser.id && rnd() < 0.7) {
+      const tg = (await call('POST', `/partner/links/${r.id}/placements`, { token: p.token, body: { channel: 'telegram_channel', name: 'Kanal posti' } })).json.code;
+      const ig = (await call('POST', `/partner/links/${r.id}/placements`, { token: p.token, body: { channel: 'instagram_target', name: 'Instagram target' } })).json.code;
+      placementCodes.set(r.code, [tg, ig]);
+    }
+  }
+  const code = streams.get(k)!;
+  const pls = placementCodes.get(code);
+  return pls && rnd() < 0.75 ? pickOne(pls) : code;
 }
 
 // Clicks without orders, so conversion numbers look real.
@@ -366,10 +388,30 @@ try {
   await call('POST', `/offer/${t2}/seen`);
   await call('POST', `/offer/${t2}/later`, { body: { remind: true, when: 'tomorrow', phone: fakePhone(), consent: true } });
   await offerTok([pickOne(prodPool), pickOne(prodPool)], 'Sovg‘a uchun yaxshi variantlar');
-  for (let i = 0; i < 6; i++) {
-    const day = new Date(Date.now() - int(0, 28) * 86400_000).toISOString().slice(0, 10);
-    await call('POST', '/partner/ad-spend', { token: P0.token, body: { spent_on: day, amount_minor: String(round1k(int(30_000, 250_000)) * 100), channel: pickOne(['Instagram', 'Telegram kanal', 'TikTok']) } });
+  // Ad expenses: Telegram channel posts and Instagram target, allocated to the demo partner's links; one multi-day
+  // campaign, one shop-paid, one planned budget (never counted as spend) and some unallocated spend.
+  const myLinks = [...streams.entries()].filter(([k]) => k.startsWith(`${P0.id}|`)).map(([, code]) => streamIds.get(code)!).filter(Boolean);
+  for (let i = 0; i < 14; i++) {
+    const back = int(0, 50);
+    const from = new Date(Date.now() - back * 86400_000).toISOString().slice(0, 10);
+    const to = new Date(Date.now() - Math.max(0, back - (i % 5 === 0 ? 6 : 0)) * 86400_000).toISOString().slice(0, 10);
+    const link = myLinks.length ? pickOne(myLinks) : null;
+    await call('POST', '/partner/ad-expenses', { token: P0.token, body: {
+      channel: pickOne(['telegram_channel', 'telegram_channel', 'instagram_target', 'telegram_ads']), amount: String(round1k(int(40_000, 300_000))), currency: 'UZS',
+      service_from: from, service_to: to, paid_at: from, placement_name: pickOne(['@kanal posti', 'Instagram target', 'Telegram Ads kampaniya']),
+      ...(link && i % 4 !== 3 ? { allocations: [{ root_link_id: link, share_bps: 10000 }] } : {}),
+    } });
   }
+  const today = new Date().toISOString().slice(0, 10);
+  await call('POST', '/partner/ad-expenses', { token: P0.token, body: { channel: 'instagram_target', amount: '500000', payer: 'shop', service_from: today, service_to: today, note: 'Do‘kon to‘lagan reklama (DEMO)' } });
+  await call('POST', '/partner/ad-expenses', { token: P0.token, body: { channel: 'telegram_ads', amount: '1000000', kind: 'planned', service_from: today, service_to: today, note: 'Keyingi hafta byudjeti (reja)' } });
+  // Official CBU rates if the server can reach cbu.uz; otherwise USD expenses stay FX_PENDING (never priced at 1).
+  try {
+    const r = await fetch(`https://cbu.uz/uz/arkhiv-kursov-valyut/json/USD/${today}/`, { signal: AbortSignal.timeout(8000) });
+    const j = r.ok ? (await r.json()) as { Rate: string; Nominal: string; Date: string }[] : [];
+    for (const x of j) { const [dd, mm, yy] = x.Date.split('.'); await q(`INSERT INTO fx_snapshots (currency, effective_date, rate, nominal, source) VALUES ('USD',$1,$2,$3,'cbu') ON CONFLICT DO NOTHING`, [`${yy}-${mm}-${dd}`, x.Rate, Number(x.Nominal) || 1]); }
+  } catch { /* offline: FX stays pending */ }
+  await call('POST', '/partner/ad-expenses', { token: P0.token, body: { channel: 'instagram_target', amount: '40', currency: 'USD', service_from: today, service_to: today, placement_name: 'Instagram target (USD)' } });
   const sold = await q<{ id: string }>(`SELECT p.id FROM products p WHERE p.slug LIKE 'demo-%' AND NOT EXISTS (SELECT 1 FROM skus s JOIN stock_atp a ON a.sku_id=s.id WHERE s.product_id=p.id AND a.atp > 0) LIMIT 8`);
   for (const pr of sold) for (let i = 0; i < int(1, 4); i++) await call('POST', '/waitlist', { body: { product_id: pr.id, phone: fakePhone(), consent: true } });
   // a few streams on sold-out products, so the "out of stock" warning and waitlist count show in the cabinet

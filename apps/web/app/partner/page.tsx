@@ -134,6 +134,7 @@ export default function PartnerDashboard() {
             <Link href="/partner/market" className="tile-link"><span>🛍️</span>Market — mahsulot tanlash</Link>
             <Link href="/partner/streams" className="tile-link"><span>🔗</span>Oqimlarim</Link>
             <Link href="/partner/new" className="tile-link"><span>📞</span>Mijoz uchun buyurtma</Link>
+            <Link href="/partner/analytics" className="tile-link"><span>📈</span>Reklama va daromad</Link>
             <Link href="/partner/offers" className="tile-link"><span>🧺</span>Taklif to‘plami (2–3 variant)</Link>
             <Link href="/partner/contacts" className="tile-link"><span>📒</span>Mijozlar daftari</Link>
             <Link href="/partner/wallet" className="tile-link"><span>💳</span>Hamyon: komissiya va to‘lovlar</Link>

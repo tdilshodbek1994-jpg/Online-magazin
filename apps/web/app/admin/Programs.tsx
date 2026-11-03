@@ -1,6 +1,7 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
 import { api, som } from '@/lib/api';
+import { errText } from '@/lib/errors';
 
 const toMinor = (v: string) => String(BigInt(v.replace(/\D/g, '') || '0') * 100n);
 const digits = (v: string) => v.replace(/\D/g, '');
@@ -17,9 +18,9 @@ export function AdminPrograms() {
   const [d, setD] = useState<any>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [sec, setSec] = useState('contests');
-  const load = useCallback(() => api('/admin/programs').then(setD).catch((e) => setMsg(e.code)), []);
+  const load = useCallback(() => api('/admin/programs').then(setD).catch((e) => setMsg(errText(e))), []);
   useEffect(() => { void load(); }, [load]);
-  const act = async (fn: () => Promise<any>, ok: string) => { setMsg(null); try { await fn(); setMsg(`✓ ${ok}`); await load(); return true; } catch (e: any) { setMsg(ERR[e.code] ?? `Xatolik: ${e.code}`); return false; } };
+  const act = async (fn: () => Promise<any>, ok: string) => { setMsg(null); try { await fn(); setMsg(`✓ ${ok}`); await load(); return true; } catch (e: any) { setMsg(ERR[e.code] ?? errText(e)); return false; } };
   if (!d) return <div className="loading" role="status"><span className="spinner" aria-hidden />Yuklanmoqda…</div>;
   return (
     <section style={{ marginTop: 12 }}>

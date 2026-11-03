@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import { api, som } from '@/lib/api';
 import { pick, useI18n } from '@/lib/i18n';
+import { errText } from '@/lib/errors';
 
 /** Partner enters an order for a customer; the customer confirms it themselves by SMS link before anything ships (§ partner_assisted). */
 export default function PartnerAssistedOrder() {
@@ -12,10 +13,10 @@ export default function PartnerAssistedOrder() {
   const [quote, setQuote] = useState<any>(null);
   const [msg, setMsg] = useState<string | null>(null);
   useEffect(() => {
-    api('/partner/products').then((p) => setProducts(p.items)).catch((e) => setMsg(e.code));
+    api('/partner/products').then((p) => setProducts(p.items)).catch((e) => setMsg(errText(e)));
     api('/delivery-zones').then((z) => setZones(z.items)).catch(() => {});
   }, []);
-  const act = async (fn: () => Promise<string>) => { setMsg(null); try { setMsg(await fn()); } catch (e: any) { setMsg(e.code ?? 'ERROR'); } };
+  const act = async (fn: () => Promise<string>) => { setMsg(null); try { setMsg(await fn()); } catch (e: any) { setMsg(errText(e)); } };
   return (
     <div className="card" style={{ maxWidth: 640 }}>
       <h1>Mijoz uchun buyurtma</h1>

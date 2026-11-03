@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { api, som } from '@/lib/api';
 import { pick, useI18n } from '@/lib/i18n';
 import { BucketPills, Chips, LinkBox, PERIODS } from '../shared';
+import { errText } from '@/lib/errors';
 
 export default function PartnerStreams() {
   const { lang } = useI18n();
@@ -28,7 +29,7 @@ export default function PartnerStreams() {
         <button className="search-btn" aria-label="Izlash">Izlash</button>
       </form>
       <Chips items={PERIODS} value={period} onChange={setPeriod} label="Davr" />
-      {err && <div className="notice" role="alert">{err.code}</div>}
+      {err && <div className="notice" role="alert">{errText(err)}</div>}
       {items === null && !err && <div className="loading" role="status"><span className="spinner" aria-hidden />Yuklanmoqda…</div>}
       {items && items.length === 0 && <div className="empty"><p>Hali oqim yo‘q.</p><Link className="btn" href="/partner/market">Marketdan mahsulot tanlash</Link></div>}
       <div className="slist">

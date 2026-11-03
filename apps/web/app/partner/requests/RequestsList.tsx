@@ -5,6 +5,7 @@ import { Suspense, useEffect, useState } from 'react';
 import { api, som } from '@/lib/api';
 import { pick, useI18n } from '@/lib/i18n';
 import { BUCKET_LABEL, BUCKET_ORDER, Chips, PERIODS } from '../shared';
+import { errText } from '@/lib/errors';
 
 function Requests({ embedded = false }: { embedded?: boolean }) {
   const { lang } = useI18n();
@@ -36,7 +37,7 @@ function Requests({ embedded = false }: { embedded?: boolean }) {
       </form>
       <Chips items={PERIODS} value={period} onChange={setPeriod} label="Davr" />
       <Chips items={[['all', `Barchasi (${c.total ?? 0})`], ...BUCKET_ORDER.map((b) => [b, `${BUCKET_LABEL[b]} (${c[b] ?? 0})`] as [string, string]), ['callback', `Qayta qo‘ng‘iroq (${c.callback ?? 0})`], ['duplicate', `Dublikat (${c.duplicate ?? 0})`]]} value={status} onChange={setStatus} label="Holat" />
-      {err && <div className="notice" role="alert">{err.code}</div>}
+      {err && <div className="notice" role="alert">{errText(err)}</div>}
       {!data && !err && <div className="loading" role="status"><span className="spinner" aria-hidden />Yuklanmoqda…</div>}
       {data && data.items.length === 0 && <div className="empty">Ma’lumot topilmadi</div>}
       <div className="slist">

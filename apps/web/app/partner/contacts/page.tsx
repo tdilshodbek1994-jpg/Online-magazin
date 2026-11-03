@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { pick, useI18n } from '@/lib/i18n';
 import { BUCKET_LABEL } from '../shared';
+import { errText } from '@/lib/errors';
 
 /**
  * Mijozlar daftari (V2 §14): only contacts from the partner's own drafts/orders. It does not make the customer
@@ -23,7 +24,7 @@ export default function Contacts() {
     setMsg(null);
     const reuse = c.last_order_id ? confirm('Mijoz manzili o‘zgarmaganini va uni qayta ishlatishga rozi ekanini tasdiqlaysizmi?\n\nOK — manzil qayta ishlatiladi\nBekor — manzilni yangidan kiritasiz') : false;
     try { const d = await api(`/partner/contacts/${c.id}/reorder`, { method: 'POST', body: { reuse_address: reuse } }); location.href = `/partner/new?draft=${d.id}`; }
-    catch (e: any) { setMsg(e.code === 'DO_NOT_CONTACT' ? 'Mijoz bog‘lanmaslikni so‘ragan' : e.code === 'NO_PREVIOUS_ORDER' ? 'Bu mijozda hali buyurtma yo‘q' : e.code ?? 'ERROR'); }
+    catch (e: any) { setMsg(e.code === 'DO_NOT_CONTACT' ? 'Mijoz bog‘lanmaslikni so‘ragan' : e.code === 'NO_PREVIOUS_ORDER' ? 'Bu mijozda hali buyurtma yo‘q' : errText(e)); }
   };
   return (
     <>

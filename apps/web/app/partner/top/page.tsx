@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { Chips } from '../shared';
+import { errText } from '@/lib/errors';
 
 export default function PartnerTop() {
   const [period, setPeriod] = useState('month');
@@ -13,7 +14,7 @@ export default function PartnerTop() {
     <>
       <h1>TOP hamkorlar</h1>
       <Chips items={[['today', 'Bugun'], ['week', 'Hafta'], ['month', 'Shu oy']]} value={period} onChange={setPeriod} label="Davr" />
-      {err && <div className="notice" role="alert">{err.code}</div>}
+      {err && <div className="notice" role="alert">{errText(err)}</div>}
       {data?.me && <div className="rank-card"><div className="rank-badge">#{data.me.rank}</div><div><b>Sizning o‘rningiz</b><div className="muted">{data.me.delivered} ta yetkazilgan</div></div></div>}
       {data && data.items.length === 0 && <div className="empty">Bu davrda hali natija yo‘q — birinchi bo‘ling!</div>}
       <ol className="top-list">

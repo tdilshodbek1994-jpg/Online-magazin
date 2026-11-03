@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Async } from '@/components/Header';
 import { api, som } from '@/lib/api';
 import { BUCKET_LABEL, Chips, PERIODS, TelegramConnect, usePartnerMe } from './shared';
+import { errText } from '@/lib/errors';
 
 function ApplyForm({ onDone }: { onDone: () => void }) {
   const [apply, setApply] = useState({ name: '', channels: '' });
@@ -16,7 +17,7 @@ function ApplyForm({ onDone }: { onDone: () => void }) {
       <label htmlFor="dn">Ko‘rsatiladigan ism</label><input id="dn" value={apply.name} onChange={(e) => setApply({ ...apply, name: e.target.value })} />
       <label htmlFor="ch">Kanallar (Telegram, Instagram…)</label><input id="ch" value={apply.channels} onChange={(e) => setApply({ ...apply, channels: e.target.value })} />
       <p className="muted">Ariza yuborish bilan <a href="/legal/partner">hamkorlik shartnomasi</a>ni qabul qilasiz. Admin tasdiqlagandan so‘ng faol bo‘ladi.</p>
-      <button className="btn" onClick={async () => { setMsg(null); try { await api('/partner/apply', { method: 'POST', body: { display_name: apply.name, channels: apply.channels, accept_agreement: true } }); onDone(); } catch (e: any) { setMsg(e.code ?? 'ERROR'); } }}>Ariza yuborish</button>
+      <button className="btn" onClick={async () => { setMsg(null); try { await api('/partner/apply', { method: 'POST', body: { display_name: apply.name, channels: apply.channels, accept_agreement: true } }); onDone(); } catch (e: any) { setMsg(errText(e)); } }}>Ariza yuborish</button>
     </div>
   );
 }
@@ -109,7 +110,7 @@ export default function PartnerDashboard() {
 
           <div className="rail-head" style={{ marginTop: 20 }}><h2>Natijalar</h2></div>
           <Chips items={PERIODS} value={period} onChange={setPeriod} label="Davr" />
-          {err && <div className="notice" role="alert">{err.code}</div>}
+          {err && <div className="notice" role="alert">{errText(err)}</div>}
           {d && (
             <>
               <div className="stat-grid">

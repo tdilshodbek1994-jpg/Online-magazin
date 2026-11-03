@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { api, setToken } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
+import { errText } from '@/lib/errors';
 
 export default function Login() {
   const { t } = useI18n();
@@ -12,7 +13,7 @@ export default function Login() {
   return (
     <div className="card" style={{ maxWidth: 420 }}>
       <h1>{t('login')}</h1>
-      {err && <div role="alert" className="notice">{err.code}{err.details?.retry_after_seconds ? ` (${err.details.retry_after_seconds}s)` : ''}</div>}
+      {err && <div role="alert" className="notice">{errText(err)}{err.details?.retry_after_seconds ? ` (${err.details.retry_after_seconds} soniyadan keyin)` : ''}</div>}
       <label htmlFor="ph">{t('phone')}</label>
       <input id="ph" type="tel" autoComplete="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+998 90 123 45 67" />
       <button className="btn" style={{ marginTop: 12 }} onClick={async () => { setErr(null); try { setCh(await api('/auth/otp/request', { method: 'POST', body: { phone } })); } catch (e) { setErr(e); } }}>{t('sendCode')}</button>

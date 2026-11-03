@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { CH_LABEL } from '../analytics/shared';
+import { errText } from '@/lib/errors';
 
 const today = () => new Date().toISOString().slice(0, 10);
 type Alloc = { target: string; mode: 'share' | 'amount'; value: string };
@@ -41,7 +42,7 @@ export default function Expenses() {
       const r = await api('/partner/ad-expenses', { method: 'POST', idem: crypto.randomUUID(), body: { ...f, amount: f.kind === 'zero_confirmed' ? '0' : f.amount, placement_name: f.placement_name || undefined, note: f.note || undefined, paid_at: f.paid_at || undefined, allocations } });
       setMsg(r.fx_status === 'pending' ? 'Saqlandi ✓ Bu kun uchun dollar kursi hali yo‘q — kurs kelgach hisobga qo‘shiladi.' : 'Saqlandi ✓');
       setF({ ...f, amount: '', note: '', placement_name: '' }); load();
-    } catch (e: any) { setMsg(e.code === 'ALLOCATION_EXCEEDS_EXPENSE' ? 'Taqsimot xarajatdan oshib ketdi' : e.code === 'SERVICE_PERIOD_INVALID' ? 'Xizmat davri noto‘g‘ri' : e.code ?? 'ERROR'); }
+    } catch (e: any) { setMsg(e.code === 'ALLOCATION_EXCEEDS_EXPENSE' ? 'Taqsimot xarajatdan oshib ketdi' : e.code === 'SERVICE_PERIOD_INVALID' ? 'Xizmat davri noto‘g‘ri' : errText(e)); }
   };
   return (
     <div className="an">
@@ -119,7 +120,7 @@ export default function Expenses() {
         <p className="small muted">Ustunlar: <code>date,amount,currency,channel,placement,note,external_id</code>. Bir xil external_id qayta yuklansa qo‘shilmaydi — faqat o‘zgargan summa yangilanadi.</p>
         <label htmlFor="csv" className="sr-only">CSV</label>
         <textarea id="csv" rows={4} value={csv} onChange={(e) => setCsv(e.target.value)} placeholder={'date,amount,currency,channel,placement,note,external_id\n2026-11-01,250000,UZS,telegram_channel,@kanal,,tg-1'} />
-        <button className="btn secondary sm" disabled={csv.trim().length < 10} onClick={async () => { try { const r = await api('/partner/ad-expenses/import', { method: 'POST', body: { csv } }); setMsg(`Import: ${r.created} yangi, ${r.updated} yangilandi, ${r.unchanged} o‘zgarmadi${r.errors.length ? `, ${r.errors.length} xato qator` : ''}`); load(); } catch (e: any) { setMsg(e.code); } }}>Import</button>
+        <button className="btn secondary sm" disabled={csv.trim().length < 10} onClick={async () => { try { const r = await api('/partner/ad-expenses/import', { method: 'POST', body: { csv } }); setMsg(`Import: ${r.created} yangi, ${r.updated} yangilandi, ${r.unchanged} o‘zgarmadi${r.errors.length ? `, ${r.errors.length} xato qator` : ''}`); load(); } catch (e: any) { setMsg(errText(e)); } }}>Import</button>
       </details>
 
       <h2>Kiritilganlar</h2>

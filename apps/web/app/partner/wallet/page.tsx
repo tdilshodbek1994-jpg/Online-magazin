@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { api, som } from '@/lib/api';
 import { pick, useI18n } from '@/lib/i18n';
+import { errText } from '@/lib/errors';
 
 /**
  * Hamyon — "Pulim qayerda?" in plain words. One big number (withdrawable) with one button, the card in one line,
@@ -55,7 +56,7 @@ export default function Wallet() {
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [disp, setDisp] = useState({ order_id: '', subject: '', body: '' });
   const load = useCallback(() => {
-    api('/partner/wallet').then(setW).catch((e) => setErr(e.code));
+    api('/partner/wallet').then(setW).catch((e) => setErr(errText(e)));
     api('/partner/me').then(setMe).catch(() => {});
     api('/partner/payouts').then((r) => setPayouts(r.items ?? [])).catch(() => {});
     api('/partner/ledger').then((r) => setLedger(r.items ?? [])).catch(() => {});

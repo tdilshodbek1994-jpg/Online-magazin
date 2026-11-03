@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { api, som } from '@/lib/api';
 import { pick, useI18n } from '@/lib/i18n';
+import { errText } from '@/lib/errors';
 
 /**
  * Admin: versioned quantity-matrix commission (spec §5). Percentages apply to the BASE partner commission, not the price:
@@ -42,18 +43,18 @@ export default function CommissionAdmin() {
           <div><label htmlFor="cb">Bazaviy komissiya (so‘m)</label><input id="cb" inputMode="numeric" value={base} onChange={(e) => setBase(e.target.value.replace(/\D/g, ''))} /></div>
           <div><label htmlFor="cg">Komissiya guruhi (ixtiyoriy)</label><input id="cg" value={group} onChange={(e) => setGroup(e.target.value)} placeholder="Variantlar bir guruhda" /></div>
         </div>
-        <table className="mx"><thead><tr><th>Miqdor</th><th>1-dona %</th><th>2-dona %</th><th>3-dona %</th><th>Jami</th></tr></thead>
+        <div className="table-wrap"><table className="mx"><thead><tr><th>Miqdor</th><th>1-dona %</th><th>2-dona %</th><th>3-dona %</th><th>Jami</th></tr></thead>
           <tbody>{(['1', '2', '3'] as const).map((k) => (
             <tr key={k}><th>{k} dona</th>{[0, 1, 2].map((i) => <td key={i}>{i < Number(k) ? <input aria-label={`${k} dona, ${i + 1}-dona %`} inputMode="decimal" value={m[k]![i] ?? ''} onChange={(e) => setM({ ...m, [k]: m[k]!.map((x, j) => (j === i ? e.target.value.replace(/[^\d.]/g, '') : x)) })} /> : '—'}</td>)}
               <td><b>{pv?.preview?.[Number(k) - 1]?.total_minor ? som(pv.preview[Number(k) - 1].total_minor) : '—'}</b></td></tr>
-          ))}<tr><th>4+ dona</th><td colSpan={3} className="small muted">Qoida yo‘q — ko‘rib chiqishga tushadi</td><td>—</td></tr></tbody></table>
+          ))}<tr><th>4+ dona</th><td colSpan={3} className="small muted">Qoida yo‘q — ko‘rib chiqishga tushadi</td><td>—</td></tr></tbody></table></div>
         <label htmlFor="cn">Izoh (majburiy)</label><input id="cn" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Masalan: noyabr aksiyasi" />
         <button className="btn mt8" disabled={!sel.length || note.trim().length < 3} onClick={async () => {
           setMsg(null);
           try { const r = await api('/admin/commission-rules/matrix', { method: 'POST', body: { product_ids: sel, base_minor: baseMinor(), matrix: matrix(), note: note.trim(), ...(group ? { commission_group: group } : {}) } }); setMsg(`Nashr qilindi: ${r.published.length} ta mahsulot, ${new Date(r.effective_from).toLocaleString('uz-UZ')} dan. Eski buyurtmalar o‘zgarmaydi.`); setSel([]); }
-          catch (e: any) { setMsg(e.code === 'STEP_UP_REQUIRED' ? 'MFA tasdig‘i kerak' : e.code ?? 'ERROR'); }
+          catch (e: any) { setMsg(e.code === 'STEP_UP_REQUIRED' ? 'MFA tasdig‘i kerak' : errText(e)); }
         }}>Nashr qilish</button>
-        <p className="small muted">Qoida faqat “commission.quantity_matrix” funksiyasi yoqilganda kuchga kiradi (Integratsiyalar bo‘limidagi bayroqlar).</p>
+        <p className="small muted">Qoida faqat “Miqdor bo‘yicha komissiya” funksiyasi yoqilganda kuchga kiradi (Integratsiyalar bo‘limidagi bayroqlar).</p>
       </section>
 
       <section className="card an-sec">
@@ -63,7 +64,7 @@ export default function CommissionAdmin() {
 
       <section className="card an-sec">
         <h2>Valyuta kursi</h2>
-        <p className="small muted">Rasmiy kurs Markaziy bankdan olinadi (amount_uzs = summa × Rate / Nominal). Kurs topilmasa xarajat “kurs kutilmoqda” holatida qoladi — 1 deb olinmaydi.</p>
+        <p className="small muted">Rasmiy kurs Markaziy bankdan olinadi (so‘mdagi summa = summa × kurs / nominal). Kurs topilmasa xarajat “kurs kutilmoqda” holatida qoladi — 1 deb olinmaydi.</p>
         <button className="btn secondary sm" onClick={async () => { try { const r = await api('/admin/fx/sync-cbu', { method: 'POST', body: {} }); setMsg(`CBU: ${r.rates} ta kurs, ${r.repriced} ta xarajat narxlandi`); } catch (e: any) { setMsg(e.code === 'FX_SOURCE_UNAVAILABLE' ? 'CBU manbasiga ulanib bo‘lmadi — qo‘lda kiriting' : e.code); } }}>CBU’dan bugungi kurslarni olish</button>
         <div className="addr-grid">
           <div><label htmlFor="fc">Valyuta</label><input id="fc" value={fx.currency} maxLength={3} onChange={(e) => setFx({ ...fx, currency: e.target.value.toUpperCase() })} /></div>

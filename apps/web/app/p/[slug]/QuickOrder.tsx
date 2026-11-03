@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { notifyCart } from '@/components/Header';
 import { api, som } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
+import { errText } from '@/lib/errors';
 
 const T = {
   'uz-Latn': { open: '⚡ Tez buyurtma — 1 daqiqada', title: 'Tez buyurtma', sub: 'Ism va telefon kifoya. Operator qo‘ng‘iroq qilib, manzilni aniqlaydi. To‘lov — mahsulotni qabul qilganda.', name: 'Ismingiz', phone: 'Telefon raqamingiz', region: 'Viloyat / hudud', terms: 'Oferta shartlariga roziman', send: 'Buyurtma berish', cancel: 'Bekor', ok: 'Buyurtmangiz qabul qilindi!', okSub: 'Operator tez orada qo‘ng‘iroq qilib, manzil va yetkazish vaqtini kelishadi.', total: 'Jami (yetkazish bilan)', number: 'Buyurtma raqami' },
@@ -46,7 +47,7 @@ export function QuickOrder({ skuId, qty, disabled, autoOpen = false, onClose }: 
       try {
         const r = await api('/checkout/quick-order', { method: 'POST', idem: idem.current, body: { sku_id: skuId, qty, name: f.name.trim(), phone: f.phone, delivery_zone_id: f.zone || undefined, accept_terms: true } });
         setDone(r); notifyCart();
-      } catch (x: any) { setErr(ERR[x.code] ?? (x.field_errors ? 'Maydonlarni tekshiring' : x.code ?? 'ERROR')); } finally { setBusy(false); }
+      } catch (x: any) { setErr(ERR[x.code] ?? errText(x)); } finally { setBusy(false); }
     }}>
       <b>{t.title}</b>
       <p className="muted small">{t.sub}</p>

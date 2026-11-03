@@ -136,6 +136,21 @@ export function Header() {
 export function Async({ loading, error, onRetry, children }: { loading: boolean; error: any; onRetry?: () => void; children: React.ReactNode }) {
   const { t } = useI18n();
   if (loading) return <div role="status" className="loading"><span className="spinner" aria-hidden />{t('loading')}</div>;
-  if (error) return <div role="alert" className="notice">{t('error')}: <code>{error.code ?? 'UNKNOWN'}</code> {onRetry && <button className="btn secondary" onClick={onRetry}>{t('retry')}</button>}</div>;
+  if (error) {
+    const msg = friendlyError(error);
+    return <div role="alert" className="notice err-box"><b>{msg.title}</b>{msg.hint && <span className="small">{msg.hint}</span>}<span className="err-actions">{msg.home && <Link className="btn secondary sm" href={msg.home}>{msg.homeLabel}</Link>}{msg.retry && onRetry && <button className="btn secondary sm" onClick={onRetry}>{t('retry')}</button>}</span>{error.code && <small className="muted err-code">Kod: {error.code}</small>}</div>;
+  }
   return <>{children}</>;
+}
+
+/** Plain-language text for API errors shown by <Async>: people see what happened and what to do; the code stays small for support. */
+export function friendlyError(e: any): { title: string; hint?: string; retry: boolean; home?: string; homeLabel?: string } {
+  const code = String(e?.code ?? '');
+  const status = Number(e?.status ?? 0);
+  if (code.endsWith('_NOT_FOUND') || status === 404) return { title: 'Topilmadi', hint: 'Bu sahifa o‘chirilgan, havola noto‘g‘ri yoki u sizning hisobingizga tegishli emas.', retry: false, home: '/', homeLabel: 'Bosh sahifa' };
+  if (status === 401 || code === 'UNAUTHENTICATED' || code === 'AUTH_REQUIRED') return { title: 'Avval tizimga kiring', retry: false, home: '/login', homeLabel: 'Kirish' };
+  if (status === 403 || code === 'FORBIDDEN' || code.startsWith('PERMISSION')) return { title: 'Bu bo‘limga ruxsatingiz yo‘q', hint: 'Boshqa hisob bilan kirgan bo‘lishingiz mumkin.', retry: false, home: '/', homeLabel: 'Bosh sahifa' };
+  if (status === 429 || code === 'RATE_LIMITED') return { title: 'Juda ko‘p urinish', hint: 'Bir daqiqa kutib, qayta urinib ko‘ring.', retry: true };
+  if (code === 'NETWORK' || code === 'NETWORK_ERROR' || code === 'TIMEOUT' || status === 0) return { title: 'Internet bilan aloqa yo‘q', hint: 'Internetni tekshirib, qayta urinib ko‘ring.', retry: true };
+  return { title: 'Xatolik yuz berdi', hint: 'Birozdan keyin qayta urinib ko‘ring.', retry: true };
 }

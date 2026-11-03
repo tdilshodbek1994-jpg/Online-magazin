@@ -5,6 +5,7 @@ import { pick, useI18n } from '@/lib/i18n';
 import Link from 'next/link';
 import { BucketPills, Chips, PERIODS } from '../shared';
 import { Insights } from './Insights';
+import { errText } from '@/lib/errors';
 
 export default function PartnerStats() {
   const { lang } = useI18n();
@@ -21,7 +22,7 @@ export default function PartnerStats() {
       <h2>Batafsil jadval</h2>
       <Chips items={[['stream', 'Oqim bo‘yicha'], ['day', 'Sana bo‘yicha']]} value={group} onChange={setGroup} label="Guruhlash" />
       <Chips items={PERIODS} value={period} onChange={setPeriod} label="Davr" />
-      {err && <div className="notice" role="alert">{err.code}</div>}
+      {err && <div className="notice" role="alert">{errText(err)}</div>}
       {data && (
         <div className="kpi-row">
           <div className="card kpi"><span className="muted">Bosishlar</span><b>{sum.clicks}</b></div>

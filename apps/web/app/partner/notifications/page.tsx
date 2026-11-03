@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { TelegramConnect } from '../shared';
+import { errText } from '@/lib/errors';
 
 const ICON: Record<string, string> = { 'partner.order_new': '🛒', 'partner.order_delivered': '✅', 'partner.order_cancelled': '❌', 'partner.commission_available': '💰', 'partner.payout_paid': '💳', 'partner.bonus': '🎁', 'partner.contest_prize': '🏆', 'partner.penalty': '⚠️' };
 
@@ -13,7 +14,7 @@ export default function PartnerNotifications() {
     <>
       <h1>Bildirishnomalar</h1>
       <TelegramConnect />
-      {err && <div className="notice" role="alert">{err.code}</div>}
+      {err && <div className="notice" role="alert">{errText(err)}</div>}
       {items && items.length === 0 && <div className="empty">Hozircha xabar yo‘q. Birinchi buyurtma kelganda shu yerda ko‘rinadi.</div>}
       <div className="slist">
         {items?.map((n) => (

@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { api, som } from '@/lib/api';
 import { pick, useI18n } from '@/lib/i18n';
 import { Chips } from '../shared';
+import { errText } from '@/lib/errors';
 
 /** "Raqam emas, qarorga yordam" (V2 §17): separated channels, honest rates with formula and n, net after ad spend, where sales stop. */
 export function Insights() {
@@ -12,7 +13,7 @@ export function Insights() {
   const [spend, setSpend] = useState<any[]>([]);
   const [form, setForm] = useState({ spent_on: new Date().toISOString().slice(0, 10), amount: '', channel: '' });
   const [err, setErr] = useState<string | null>(null);
-  const load = () => { api(`/partner/insights?days=${days}`).then(setD).catch((e) => setErr(e.code)); api('/partner/ad-spend').then((r) => setSpend(r.items)).catch(() => {}); };
+  const load = () => { api(`/partner/insights?days=${days}`).then(setD).catch((e) => setErr(errText(e))); api('/partner/ad-spend').then((r) => setSpend(r.items)).catch(() => {}); };
   useEffect(load, [days]); // eslint-disable-line react-hooks/exhaustive-deps
   const Rate = ({ label, r }: { label: string; r: any }) => (
     <div className="card kpi rate" title={r.formula}>

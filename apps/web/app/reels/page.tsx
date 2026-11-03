@@ -6,6 +6,7 @@ import { IconClose, IconHeart, IconShare, IconSound } from '@/components/Icons';
 import { api, som } from '@/lib/api';
 import { pick, useI18n } from '@/lib/i18n';
 import { QuickOrder } from '../p/[slug]/QuickOrder';
+import { errText } from '@/lib/errors';
 
 function BuySheet({ item, onClose }: { item: any; onClose: () => void }) {
   const { lang } = useI18n();
@@ -124,7 +125,7 @@ function Feed() {
   return (
     <div className="reels">
       <button className="reels-close" aria-label="Yopish" onClick={() => (history.length > 1 ? router.back() : router.push('/'))}><IconClose size={24} /></button>
-      {err && <div className="reels-empty"><p>Xatolik: {err.code}</p></div>}
+      {err && <div className="reels-empty"><p>{errText(err)}</p></div>}
       {!err && done && items.length === 0 && <div className="reels-empty"><p>Hali video yo‘q.</p><Link className="btn" href="/catalog">Katalogga o‘tish</Link></div>}
       <div className="reels-scroll" ref={box}>
         {items.map((it, i) => <div key={it.id} data-i={i} className="reel-slot"><Reel item={it} active={i === active} muted={muted} onToggleMute={() => setMuted((m) => !m)} onBuy={() => setBuy(it)} /></div>)}

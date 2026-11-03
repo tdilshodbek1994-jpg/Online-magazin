@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import { api, som } from '@/lib/api';
 import { pick } from '@/lib/i18n';
+import { errText } from '@/lib/errors';
 
 type Row = { sku_id?: string; offer_version?: number; label: string; sku_code: string; price: string; was: string; cost: string; stock: string; on_hand?: number; reserved?: number };
 type Photo = { file: File; url: string };
@@ -112,7 +113,7 @@ export function ProductEditor({ product, categories, lang, onClose, onSaved }: {
       onSaved();
       setTimeout(onClose, 900);
     } catch (e: any) {
-      setErr(ERR[e.code] ?? `Xatolik: ${e.code ?? 'ERROR'}`);
+      setErr(ERR[e.code] ?? errText(e));
     } finally { setBusy(false); }
   };
 

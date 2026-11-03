@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Async } from '@/components/Header';
 import { api, som } from '@/lib/api';
 import { pick, useI18n } from '@/lib/i18n';
+import { errText } from '@/lib/errors';
 
 const QUEUES: [string, string][] = [['new', 'Yangi'], ['awaiting_customer', 'Mijoz tasdig‘i'], ['callback', 'Qayta qo‘ng‘iroq'], ['awaiting_payment', 'To‘lov kutilmoqda'], ['ready_to_pick', 'Yig‘ishga tayyor'], ['in_delivery', 'Yetkazishda'], ['problem', 'Muammoli'], ['returns', 'Qaytarish'], ['closed', 'Yopilgan']];
 
@@ -24,10 +25,10 @@ export default function Ops() {
     } catch (e) { setSt({ loading: false, error: e }); }
   }, [queue]);
   useEffect(() => { void load(); }, [load]);
-  const open = async (id: string) => { try { setSel(await api(`/ops/orders/${id}`)); } catch (e: any) { setMsg(e.code); } };
+  const open = async (id: string) => { try { setSel(await api(`/ops/orders/${id}`)); } catch (e: any) { setMsg(errText(e)); } };
   // Deep link from the owner overview: /ops?order=<id> opens that order card.
   useEffect(() => { try { const id = new URLSearchParams(location.search).get('order'); if (id && /^[0-9a-f-]{36}$/.test(id)) void open(id); } catch {} }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  const act = async (fn: () => Promise<any>) => { setMsg(null); try { await fn(); setMsg('OK'); if (sel) await open(sel.id); await load(); } catch (e: any) { setMsg(e.code ?? 'ERROR'); } };
+  const act = async (fn: () => Promise<any>) => { setMsg(null); try { await fn(); setMsg('OK'); if (sel) await open(sel.id); await load(); } catch (e: any) { setMsg(errText(e)); } };
   return (
     <>
       <h1>Operator xonasi</h1>

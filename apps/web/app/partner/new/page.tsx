@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, som } from '@/lib/api';
 import { pick, useI18n } from '@/lib/i18n';
 import { LinkBox } from '../shared';
+import { errText } from '@/lib/errors';
 
 /**
  * Order Studio (V2 §04–§07): the partner enters a customer's order in one screen.
@@ -57,12 +58,12 @@ export default function OrderStudio() {
 
   // Initial load: ?draft=<id> continues a stopped order (V2 §08), ?product=<slug>&sku=<id> starts from the market card.
   useEffect(() => {
-    api('/partner/products').then((r) => setProducts(r.items)).catch((e) => setErr(e.code));
+    api('/partner/products').then((r) => setProducts(r.items)).catch((e) => setErr(errText(e)));
     api('/delivery-zones').then((r) => setZones(r.items)).catch(() => {});
     api('/partner/placements').then((r) => setPlacements(r.items)).catch(() => {});
     const q = new URLSearchParams(location.search);
     const id = q.get('draft');
-    if (id) api(`/partner/drafts/${id}`).then((d) => { setDraft(d); setF(fromDraft(d)); if (d.fill_status === 'shared') setMode('link'); }).catch((e) => setErr(e.code));
+    if (id) api(`/partner/drafts/${id}`).then((d) => { setDraft(d); setF(fromDraft(d)); if (d.fill_status === 'shared') setMode('link'); }).catch((e) => setErr(errText(e)));
     else if (q.get('product')) setF((x) => ({ ...x, lines: [{ slug: q.get('product')!, sku_id: q.get('sku') ?? '', qty: 1 }] }));
     else setF((x) => ({ ...x, lines: [{ slug: '', sku_id: '', qty: 1 }] }));
   }, []);
@@ -107,7 +108,7 @@ export default function OrderStudio() {
       if (!id) throw { code: 'DRAFT_NOT_SAVED' };
       setResult(await api(`/partner/drafts/${id}/submit`, { method: 'POST' }));
     } catch (e: any) {
-      setErr(e.code === 'DRAFT_INCOMPLETE' ? `Yetishmayapti: ${(e.details?.missing ?? []).map((m: string) => MISSING_LABEL[m] ?? m).join(', ')}` : e.code === 'SELF_ORDER_FORBIDDEN' ? 'O‘zingiz uchun buyurtma kiritib bo‘lmaydi.' : (e.code ?? 'ERROR'));
+      setErr(e.code === 'DRAFT_INCOMPLETE' ? `Yetishmayapti: ${(e.details?.missing ?? []).map((m: string) => MISSING_LABEL[m] ?? m).join(', ')}` : e.code === 'SELF_ORDER_FORBIDDEN' ? 'O‘zingiz uchun buyurtma kiritib bo‘lmaydi.' : errText(e));
     } finally { setBusy(false); }
   };
 
@@ -116,7 +117,7 @@ export default function OrderStudio() {
     try {
       if (dirty.current || !draftRef.current) { dirty.current = false; await persist(f); }
       setShare(await api(`/partner/drafts/${draftRef.current.id}/share`, { method: 'POST', body: { hours: 72 } }));
-    } catch (e: any) { setErr(e.code === 'DRAFT_INCOMPLETE' ? 'Avval mahsulotni tanlang.' : e.code ?? 'ERROR'); } finally { setBusy(false); }
+    } catch (e: any) { setErr(e.code === 'DRAFT_INCOMPLETE' ? 'Avval mahsulotni tanlang.' : errText(e)); } finally { setBusy(false); }
   };
 
   const runParse = async () => {
@@ -130,7 +131,7 @@ export default function OrderStudio() {
       if (r.contact_time) patch.contact_time = r.contact_time.value;
       if (r.address_later) patch.address_later = true;
       update(patch);
-    } catch (e: any) { setErr(e.code ?? 'ERROR'); } finally { setBusy(false); }
+    } catch (e: any) { setErr(errText(e)); } finally { setBusy(false); }
   };
 
   const quote = draft?.quote && !draft.quote.error ? draft.quote : null;
@@ -293,7 +294,7 @@ function HoldBox({ draft, onChange }: { draft: any; onChange: () => void }) {
   const mm = Math.floor(left / 60000), ss = Math.floor((left % 60000) / 1000);
   const act = async (fn: () => Promise<any>) => {
     setErr(null); setBusy(true);
-    try { await fn(); onChange(); } catch (e: any) { setErr(e.code === 'HOLD_LIMIT' ? `Bir vaqtda ${e.details?.max ?? ''} tadan ortiq bron qilib bo‘lmaydi` : e.code === 'OUT_OF_STOCK' ? 'Omborda yetarli emas' : e.code === 'POLICY_NOT_SET' ? 'Bron qoidasi hali admin tomonidan belgilanmagan' : e.code ?? 'ERROR'); } finally { setBusy(false); }
+    try { await fn(); onChange(); } catch (e: any) { setErr(e.code === 'HOLD_LIMIT' ? `Bir vaqtda ${e.details?.max ?? ''} tadan ortiq bron qilib bo‘lmaydi` : e.code === 'OUT_OF_STOCK' ? 'Omborda yetarli emas' : e.code === 'POLICY_NOT_SET' ? 'Bron qoidasi hali admin tomonidan belgilanmagan' : errText(e)); } finally { setBusy(false); }
   };
   if (draft.hold && left > 0) return (
     <div className="hold-box on" role="status">

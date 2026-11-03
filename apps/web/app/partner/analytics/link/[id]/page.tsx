@@ -4,6 +4,7 @@ import { use, useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { LinkBox } from '../../../shared';
 import { CH_LABEL, PERIODS, useMoney } from '../../shared';
+import { errText } from '@/lib/errors';
 
 /** "Hisob-kitob" for one link: totals, 1/2/3-unit split with formulas, the orders and expenses behind every number, placements. */
 export default function LinkAnalytics({ params }: { params: Promise<{ id: string }> }) {
@@ -22,7 +23,7 @@ export default function LinkAnalytics({ params }: { params: Promise<{ id: string
     api(`/partner/links/${id}/placements`).then((r) => setPls(r.items)).catch(() => {});
   }, [id, period, basis]);
   useEffect(load, [load]);
-  if (err) return <div className="notice" role="alert">{err === 'NOT_FOUND' || err === 'LINK_NOT_FOUND' ? 'Havola topilmadi' : err}</div>;
+  if (err) return <div className="notice" role="alert">{err === 'NOT_FOUND' || err === 'LINK_NOT_FOUND' ? 'Havola topilmadi' : errText({ code: err })}</div>;
   if (!d) return <div className="loading" role="status"><span className="spinner" aria-hidden />Yuklanmoqda…</div>;
   const t = d.totals;
   return (

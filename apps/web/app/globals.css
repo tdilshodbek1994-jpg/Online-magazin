@@ -1024,3 +1024,13 @@ a.m-link { display: grid; gap: 2px; }
 .wal input, .wal select, .wal button.btn { max-width: 100%; }
 .pmenu-pop a[aria-current="page"] { background: var(--surface-2); color: var(--brand, var(--text)); }
 .pmenu-pop a[aria-current="page"]::after { content: ' ✓'; }
+/* Phone-width safety: form controls and grid columns never push the page wider than the screen */
+select, input, textarea { max-width: 100%; }
+.studio-main, .line-ed { grid-template-columns: minmax(0, 1fr); }
+.studio-main > *, .line-ed > * { min-width: 0; }
+@media (max-width: 860px) { .studio-grid { grid-template-columns: minmax(0, 1fr); } }
+/* Error box: plain words first, code small */
+.err-box { display: grid; gap: 6px; }
+.err-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.err-actions:empty { display: none; }
+.err-code { font-size: 11px; }

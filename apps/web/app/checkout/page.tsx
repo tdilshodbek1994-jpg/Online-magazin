@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { api, som } from '@/lib/api';
 import { notifyCart } from '@/components/Header';
 import { pick, useI18n } from '@/lib/i18n';
+import { errText } from '@/lib/errors';
 
 export default function Checkout() {
   const { t, lang } = useI18n();
@@ -49,7 +50,7 @@ export default function Checkout() {
     <>
       <h1>{t('checkout')}</h1>
       <ul className="co-trust"><li>🔒 Ma’lumotlaringiz himoyalangan</li><li>💵 To‘lov olganda</li><li>↩️ Qaytarish mumkin</li></ul>
-      {err && <div role="alert" className="notice">{err.code === 'QUOTE_CHANGED' ? t('priceChanged') : `${t('error')}: ${err.code}`}</div>}
+      {err && <div role="alert" className="notice">{err.code === 'QUOTE_CHANGED' ? t('priceChanged') : err.field_errors && Object.keys(err.field_errors).length ? 'Quyidagi maydonlarni tekshiring.' : errText(err)}</div>}
       {cartLines.length > 0 && !quote && (
         <div className="co-preview">
           <div className="co-thumbs">{cartLines.slice(0, 4).map((l: any) => (l.image ? <img key={l.id} src={l.image} alt="" width={44} height={44} /> : <span key={l.id} className="ph" aria-hidden />))}</div>

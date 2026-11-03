@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { api, som } from '@/lib/api';
 import { pick, useI18n } from '@/lib/i18n';
 import { LinkBox } from '../shared';
+import { errText } from '@/lib/errors';
 
 const STATUS: Record<string, [string, string]> = {
   open: ['Yuborilgan', 'b-new'], thinking: ['Mijoz o‘ylab ko‘ryapti', 'b-accepted'], chosen: ['Mijoz tanladi', 'b-delivered'], closed: ['Yopilgan', 'b-cancelled'], expired: ['Muddati tugagan', 'b-cancelled'],
@@ -43,7 +44,7 @@ export default function Offers() {
         {err && <div className="field-error" role="alert">{err}</div>}
         <button className="btn mt8" disabled={sel.length < 2} onClick={async () => {
           setErr(null);
-          try { setMade(await api('/partner/offers', { method: 'POST', body: { product_ids: sel, note: note || undefined } })); setSel([]); setNote(''); void load(); } catch (e: any) { setErr(e.code === 'POLICY_NOT_SET' ? 'Havola muddati qoidasi admin tomonidan hali belgilanmagan' : e.code ?? 'ERROR'); }
+          try { setMade(await api('/partner/offers', { method: 'POST', body: { product_ids: sel, note: note || undefined } })); setSel([]); setNote(''); void load(); } catch (e: any) { setErr(e.code === 'POLICY_NOT_SET' ? 'Havola muddati qoidasi admin tomonidan hali belgilanmagan' : errText(e)); }
         }}>Havola yaratish</button>
         {made && <div className="mt8"><p className="notice ok">Havola tayyor — mijozga yuboring:</p><LinkBox url={made.url} shareText="Siz uchun bir nechta variant tanladim — solishtirib ko‘ring" /></div>}
       </section>

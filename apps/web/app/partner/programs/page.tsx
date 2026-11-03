@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { api, som } from '@/lib/api';
+import { errText } from '@/lib/errors';
 
 const MONTHS = ['yanvar', 'fevral', 'mart', 'aprel', 'may', 'iyun', 'iyul', 'avgust', 'sentabr', 'oktabr', 'noyabr', 'dekabr'];
 const fmtDate = (d: string) => { const x = new Date(new Date(d).getTime() + 5 * 3600000); return `${x.getUTCDate()}-${MONTHS[x.getUTCMonth()]}`; };
@@ -14,7 +15,7 @@ export default function PartnerPrograms() {
   const [msg, setMsg] = useState<string | null>(null);
   const load = () => api('/partner/programs').then(setD).catch(setErr);
   useEffect(() => { void load(); }, []);
-  if (err) return <div className="notice" role="alert">{err.code}</div>;
+  if (err) return <div className="notice" role="alert">{errText(err)}</div>;
   if (!d) return <div className="loading" role="status"><span className="spinner" aria-hidden />Yuklanmoqda…</div>;
   const active = d.contests.filter((c: any) => c.status === 'active');
   const past = d.contests.filter((c: any) => c.status !== 'active');

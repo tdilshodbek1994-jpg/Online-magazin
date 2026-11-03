@@ -5,6 +5,7 @@ import { CategoryIcon } from '@/components/Icons';
 import { api, som } from '@/lib/api';
 import { pick, useI18n } from '@/lib/i18n';
 import { Chips, copyText, duration, LinkBox } from '../shared';
+import { errText } from '@/lib/errors';
 
 const SORTS: [string, string][] = [['new', '🕒 Yangi'], ['top', '⭐ TOP'], ['payout', '💰 Ko‘p to‘lanadigan']];
 
@@ -56,7 +57,7 @@ function MarketCard({ p, onCreated }: { p: any; onCreated: () => void }) {
         ) : open ? (
           <form className="stream-form" onSubmit={async (e) => {
             e.preventDefault(); setBusy(true); setErr(null);
-            try { setCreated(await api('/partner/streams', { method: 'POST', body: { product_id: p.id, name: sname.trim() || 'Asosiy oqim' } })); onCreated(); } catch (x: any) { setErr(x.code ?? 'ERROR'); } finally { setBusy(false); }
+            try { setCreated(await api('/partner/streams', { method: 'POST', body: { product_id: p.id, name: sname.trim() || 'Asosiy oqim' } })); onCreated(); } catch (x: any) { setErr(errText(x)); } finally { setBusy(false); }
           }}>
             <label htmlFor={`sn-${p.id}`}>Oqim nomi (masalan: Telegram kanal)</label>
             <input id={`sn-${p.id}`} value={sname} maxLength={80} onChange={(e) => setSname(e.target.value)} placeholder="Asosiy oqim" />
@@ -107,7 +108,7 @@ export default function PartnerMarket() {
         <button type="button" className={`chip ${!cat ? 'on' : ''}`} onClick={() => setCat('')}>Barchasi</button>
         {cats.map((c) => <button type="button" key={c.id} className={`chip ${cat === c.slug ? 'on' : ''}`} onClick={() => setCat(c.slug)}><CategoryIcon slug={c.slug} size={18} /> {pick(c.name, lang)}</button>)}
       </div>
-      {err && <div className="notice" role="alert">{err.code}</div>}
+      {err && <div className="notice" role="alert">{errText(err)}</div>}
       {items === null && !err && <div className="loading" role="status"><span className="spinner" aria-hidden />Yuklanmoqda…</div>}
       {items && items.length === 0 && <div className="empty">Mahsulot topilmadi</div>}
       {items && <div className="mgrid">{items.map((p) => <MarketCard key={p.id} p={p} onCreated={() => {}} />)}</div>}

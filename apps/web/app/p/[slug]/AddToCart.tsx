@@ -8,6 +8,7 @@ import { api, som } from '@/lib/api';
 import { pick, useI18n } from '@/lib/i18n';
 import { Gallery } from './Gallery';
 import { QuickOrder } from './QuickOrder';
+import { errText } from '@/lib/errors';
 
 export function AddToCart({ product, minPrice }: { product: any; minPrice: string | null }) {
   const { t, lang } = useI18n();
@@ -33,7 +34,7 @@ export function AddToCart({ product, minPrice }: { product: any; minPrice: strin
       const existing = cart.lines?.find((l: any) => l.sku_id === skuId)?.qty ?? 0;
       await api('/cart/lines', { method: 'PUT', body: { sku_id: skuId, qty: existing + qty } });
       setMsg('ok'); notifyCart();
-    } catch (e: any) { setMsg(e.code ?? 'ERROR'); } finally { setBusy(false); }
+    } catch (e: any) { setMsg(errText(e)); } finally { setBusy(false); }
   };
   return (
     <>

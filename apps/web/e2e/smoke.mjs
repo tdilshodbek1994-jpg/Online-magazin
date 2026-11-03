@@ -162,7 +162,7 @@ await step('E2E-12/T019', 'network drops while placing order: clear error, retry
   const before = (await p4.request.get(BASE + '/api/v1/products?limit=1')).ok();
   await ctx.setOffline(true);
   await p4.getByRole('button', { name: /Buyurtmani tasdiqlash/ }).click();
-  await p4.getByRole('alert').filter({ hasText: 'NETWORK' }).waitFor();
+  await p4.getByRole('alert').filter({ hasText: 'Internet bilan aloqa' }).waitFor();
   assert(!(await p4.getByRole('button', { name: /Buyurtmani tasdiqlash/ }).isDisabled()), 'button stuck in loading');
   await ctx.setOffline(false);
   await p4.getByRole('button', { name: /Buyurtmani tasdiqlash/ }).click();

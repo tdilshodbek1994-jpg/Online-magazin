@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Async } from '@/components/Header';
 import { api, som } from '@/lib/api';
+import { errText } from '@/lib/errors';
 
 export default function Courier() {
   const [items, setItems] = useState<any[]>([]);
@@ -10,7 +11,7 @@ export default function Courier() {
   const [msg, setMsg] = useState<string | null>(null);
   const load = useCallback(async () => { try { setItems((await api('/courier/tasks')).items); setSt({ loading: false, error: null }); } catch (e) { setSt({ loading: false, error: e }); } }, []);
   useEffect(() => { void load(); }, [load]);
-  const act = async (fn: () => Promise<any>) => { setMsg(null); try { await fn(); setMsg('OK'); await load(); } catch (e: any) { setMsg(e.code); } };
+  const act = async (fn: () => Promise<any>) => { setMsg(null); try { await fn(); setMsg('OK'); await load(); } catch (e: any) { setMsg(errText(e)); } };
   return (
     <>
       <h1>Kuryer vazifalari</h1>

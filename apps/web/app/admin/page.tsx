@@ -5,6 +5,7 @@ import { api, getToken, som } from '@/lib/api';
 import { pick, useI18n } from '@/lib/i18n';
 import { ProductEditor } from './ProductEditor';
 import { AdminPrograms } from './Programs';
+import { errText } from '@/lib/errors';
 
 const today = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tashkent' }).format(new Date());
 
@@ -13,7 +14,7 @@ export default function Admin() {
   const [tab, setTab] = useState('orders');
   const [newProduct, setNewProduct] = useState(0);
   const [msg, setMsg] = useState<string | null>(null);
-  const act = async (fn: () => Promise<any>, after?: () => void) => { setMsg(null); try { await fn(); setMsg('OK'); after?.(); } catch (e: any) { setMsg(e.code ?? 'ERROR'); } };
+  const act = async (fn: () => Promise<any>, after?: () => void) => { setMsg(null); try { await fn(); setMsg('OK'); after?.(); } catch (e: any) { setMsg(errText(e)); } };
   return (
     <>
       <div className="spread admin-head">
@@ -309,7 +310,7 @@ function Partners({ act }: { act: any }) {
 function Sellers({ productId, period }: { productId: string; period: string }) {
   const [rows, setRows] = useState<any[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
-  if (rows === null) return <button type="button" className="btn secondary sm" onClick={() => api(`/admin/products/${productId}/sellers?period=${period}`).then((r) => setRows(r.items)).catch((e) => setErr(e.code))}>🤝 Kim sotyapti?{err ? ` (${err})` : ''}</button>;
+  if (rows === null) return <button type="button" className="btn secondary sm" onClick={() => api(`/admin/products/${productId}/sellers?period=${period}`).then((r) => setRows(r.items)).catch((e) => setErr(errText(e)))}>🤝 Kim sotyapti?{err ? ` (${err})` : ''}</button>;
   if (rows.length === 0) return <p className="muted small">Bu mahsulotni hali hech bir hamkor sotmagan.</p>;
   return (
     <div className="seller-list">
@@ -385,9 +386,9 @@ function Integrations() {
     <section className="card" style={{ marginTop: 12 }}>
       {msg && <div className="notice" role="status">{msg}</div>}
       {ai && <div className="row" style={{ marginBottom: 12 }}><strong>AI yordamchi:</strong> {ai.enabled ? 'yoqilgan' : 'o‘chiq'}
-        <button className="btn secondary" onClick={async () => { const r = prompt('Sabab'); if (!r) return; try { await api('/admin/feature-flags/ai.enabled', { method: 'POST', body: { enabled: !ai.enabled, reason: r } }); setMsg('OK'); flags.load(); } catch (e: any) { setMsg(e.code); } }}>{ai.enabled ? 'O‘chirish (kill switch)' : 'Yoqish'}</button></div>}
+        <button className="btn secondary" onClick={async () => { const r = prompt('Sabab'); if (!r) return; try { await api('/admin/feature-flags/ai.enabled', { method: 'POST', body: { enabled: !ai.enabled, reason: r } }); setMsg('OK'); flags.load(); } catch (e: any) { setMsg(errText(e)); } }}>{ai.enabled ? 'O‘chirish (kill switch)' : 'Yoqish'}</button></div>}
       <Async loading={st.loading} error={st.error} onRetry={load}>
-        <table><tbody>{data?.items.map((i: any) => <tr key={i.key}><td>{i.key}</td><td><span className="badge test">{i.mode}</span></td><td>{i.live_verified ? 'live ✓' : 'live tekshirilmagan'}</td><td className="muted">{i.note}</td></tr>)}</tbody></table>
+        <div className="table-wrap"><table><tbody>{data?.items.map((i: any) => <tr key={i.key}><td>{i.key}</td><td><span className="badge test">{i.mode}</span></td><td>{i.live_verified ? 'live ✓' : 'live tekshirilmagan'}</td><td className="muted">{i.note}</td></tr>)}</tbody></table></div>
       </Async>
     </section>
   );
@@ -406,13 +407,13 @@ function Import() {
       <textarea id="csv" rows={8} value={csv} onChange={(e) => { setCsv(e.target.value); setPv(null); }} />
       <input type="file" accept=".csv,text/csv" onChange={(e) => { const f = e.target.files?.[0]; if (f) f.text().then((t) => { setCsv(t); setPv(null); }); }} />
       <div className="row" style={{ marginTop: 8 }}>
-        <button className="btn secondary" onClick={async () => { setErr(null); setRes(null); try { setPv(await api('/admin/imports/products/preview', { method: 'POST', body: { csv } })); } catch (e: any) { setErr(e.code); } }}>Tekshirish</button>
-        {pv && pv.valid_rows > 0 && <button className="btn" onClick={async () => { try { setRes(await api(`/admin/imports/${pv.batch_id}/commit`, { method: 'POST' })); } catch (e: any) { setErr(e.code); } }}>Tasdiqlash ({pv.valid_rows} qator)</button>}
+        <button className="btn secondary" onClick={async () => { setErr(null); setRes(null); try { setPv(await api('/admin/imports/products/preview', { method: 'POST', body: { csv } })); } catch (e: any) { setErr(errText(e)); } }}>Tekshirish</button>
+        {pv && pv.valid_rows > 0 && <button className="btn" onClick={async () => { try { setRes(await api(`/admin/imports/${pv.batch_id}/commit`, { method: 'POST' })); } catch (e: any) { setErr(errText(e)); } }}>Tasdiqlash ({pv.valid_rows} qator)</button>}
       </div>
       {pv && (
         <div style={{ marginTop: 8 }}>
           <p>Jami {pv.total_rows} · to‘g‘ri {pv.valid_rows} · xato {pv.rejected_rows} · o‘zgarishlar: {Object.entries(pv.changes).map(([k, v]) => `${k}: ${v}`).join(', ') || '—'} · qabul qilinadigan qoldiq: {pv.stock_units_to_receive}</p>
-          {pv.errors.length > 0 && <table><thead><tr><th>Qator</th><th>Maydon</th><th>Xato</th></tr></thead><tbody>{pv.errors.map((e: any, i: number) => <tr key={i}><td>{e.line}</td><td>{e.field}</td><td>{e.code}</td></tr>)}</tbody></table>}
+          {pv.errors.length > 0 && <div className="table-wrap"><table><thead><tr><th>Qator</th><th>Maydon</th><th>Xato</th></tr></thead><tbody>{pv.errors.map((e: any, i: number) => <tr key={i}><td>{e.line}</td><td>{e.field}</td><td>{e.code}</td></tr>)}</tbody></table></div>}
         </div>
       )}
       {res && <div className="notice ok" role="status">Yozildi: {res.committed_rows} qator {res.replayed ? '(avval yozilgan)' : ''}</div>}
@@ -435,8 +436,8 @@ function Promos({ act }: { act: any }) {
         <button className="btn" onClick={() => act(() => api('/admin/promotions', { method: 'POST', body: { code: f.code, name: { 'uz-Latn': f.code }, kind: 'cart_percent', value_bps: Number(f.percent) * 100, starts_at: `${f.from}:00+05:00`, ends_at: `${f.to}:00+05:00`, ...(f.max ? { max_redemptions: Number(f.max) } : {}) } }), load)}>Yaratish</button>
       </div>
       <Async loading={st.loading} error={st.error} onRetry={load}>
-        <table><tbody>{data?.items.map((p: any) => <tr key={p.id}><td><code>{p.code}</code></td><td>{p.kind} {p.value_bps ? p.value_bps / 100 + '%' : som(p.value_minor)}</td><td>{new Date(p.starts_at).toLocaleString('uz-UZ', { timeZone: 'Asia/Tashkent' })} → {new Date(p.ends_at).toLocaleString('uz-UZ', { timeZone: 'Asia/Tashkent' })}</td><td>{p.redemptions_reserved}/{p.max_redemptions ?? '∞'}</td><td>{p.status}</td>
-          <td>{p.status === 'active' && <button className="btn secondary" onClick={() => act(() => api(`/admin/promotions/${p.id}/pause`, { method: 'POST' }), load)}>To‘xtatish</button>}</td></tr>)}</tbody></table>
+        <div className="table-wrap"><table><tbody>{data?.items.map((p: any) => <tr key={p.id}><td><code>{p.code}</code></td><td>{p.kind} {p.value_bps ? p.value_bps / 100 + '%' : som(p.value_minor)}</td><td>{new Date(p.starts_at).toLocaleString('uz-UZ', { timeZone: 'Asia/Tashkent' })} → {new Date(p.ends_at).toLocaleString('uz-UZ', { timeZone: 'Asia/Tashkent' })}</td><td>{p.redemptions_reserved}/{p.max_redemptions ?? '∞'}</td><td>{p.status}</td>
+          <td>{p.status === 'active' && <button className="btn secondary" onClick={() => act(() => api(`/admin/promotions/${p.id}/pause`, { method: 'POST' }), load)}>To‘xtatish</button>}</td></tr>)}</tbody></table></div>
       </Async>
     </section>
   );
@@ -445,7 +446,7 @@ function Promos({ act }: { act: any }) {
 function ProductMedia({ productId }: { productId: string }) {
   const [items, setItems] = useState<any[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
-  const load = () => api(`/admin/products/${productId}/media`).then((r) => setItems(r.items)).catch((e) => setErr(e.code));
+  const load = () => api(`/admin/products/${productId}/media`).then((r) => setItems(r.items)).catch((e) => setErr(errText(e)));
   if (items === null) return <button className="btn secondary" onClick={load}>Rasmlar</button>;
   return (
     <div className="media-admin">
@@ -453,7 +454,7 @@ function ProductMedia({ productId }: { productId: string }) {
       {items.map((m) => (
         <div key={m.id} className="media-thumb">
           <img src={m.url} alt="" width={64} height={64} />
-          <button className="btn danger sm" aria-label="Rasmni o‘chirish" onClick={async () => { if (!confirm('Rasm do‘kondan olib tashlansinmi?')) return; try { await api(`/admin/media/${m.id}`, { method: 'DELETE' }); await load(); } catch (e: any) { setErr(e.code); } }}>×</button>
+          <button className="btn danger sm" aria-label="Rasmni o‘chirish" onClick={async () => { if (!confirm('Rasm do‘kondan olib tashlansinmi?')) return; try { await api(`/admin/media/${m.id}`, { method: 'DELETE' }); await load(); } catch (e: any) { setErr(errText(e)); } }}>×</button>
         </div>
       ))}
       {err && <span className="field-error">{err}</span>}
@@ -465,7 +466,7 @@ function ProductVideos({ productId }: { productId: string }) {
   const [items, setItems] = useState<any[] | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const load = () => api(`/admin/products/${productId}/videos`).then((r) => setItems(r.items)).catch((e) => setMsg(e.code));
+  const load = () => api(`/admin/products/${productId}/videos`).then((r) => setItems(r.items)).catch((e) => setMsg(errText(e)));
   const upload = async (f: File) => {
     if (f.size > 40 * 1024 * 1024) { setMsg('Video 40 MB dan katta. Qisqaroq (15–60 soniya) video yuklang.'); return; }
     const caption = prompt('Video izohi (ixtiyoriy)') ?? '';
@@ -477,7 +478,7 @@ function ProductVideos({ productId }: { productId: string }) {
       const j = await r.json().catch(() => ({}));
       if (!r.ok) throw j;
       setMsg('Video yuklandi ✓'); await load();
-    } catch (e: any) { setMsg(e.code === 'VIDEO_TYPE_NOT_ALLOWED' ? 'Faqat MP4 video (telefon kamerasi videosi) qabul qilinadi.' : e.code ?? 'ERROR'); } finally { setBusy(false); }
+    } catch (e: any) { setMsg(e.code === 'VIDEO_TYPE_NOT_ALLOWED' ? 'Faqat MP4 video (telefon kamerasi videosi) qabul qilinadi.' : errText(e)); } finally { setBusy(false); }
   };
   if (items === null) return <button className="btn secondary" onClick={load}>Videolar</button>;
   return (
@@ -486,7 +487,7 @@ function ProductVideos({ productId }: { productId: string }) {
       {items.map((v) => (
         <div key={v.id} className="media-thumb">
           <video src={v.url} poster={v.poster ?? undefined} width={64} height={96} muted playsInline preload="metadata" style={{ width: 64, height: 96, objectFit: 'cover', borderRadius: 10, display: 'block' }} />
-          <button className="btn danger sm" aria-label="Videoni o‘chirish" onClick={async () => { if (!confirm('Video olib tashlansinmi?')) return; try { await api(`/admin/videos/${v.id}`, { method: 'DELETE' }); await load(); } catch (e: any) { setMsg(e.code); } }}>×</button>
+          <button className="btn danger sm" aria-label="Videoni o‘chirish" onClick={async () => { if (!confirm('Video olib tashlansinmi?')) return; try { await api(`/admin/videos/${v.id}`, { method: 'DELETE' }); await load(); } catch (e: any) { setMsg(errText(e)); } }}>×</button>
           <span className="muted small">❤ {v.likes} · 👁 {v.views}</span>
         </div>
       ))}

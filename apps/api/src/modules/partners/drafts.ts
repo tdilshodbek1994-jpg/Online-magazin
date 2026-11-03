@@ -67,6 +67,11 @@ async function quoteDraft(q: Tx | Deps['db'], d: Pick<DraftRow, 'lines' | 'deliv
   return { ...pricedToJson(priced), zone_assumed: !d.delivery_zone_id, commission_estimate_minor: commission.toString(), commission_lines: rules };
 }
 
+/** A quote failure (e.g. variant sold out) must not block autosave: the draft is saved and the reason is shown. */
+async function safeQuote(q: Tx | Deps['db'], d: Pick<DraftRow, 'lines' | 'delivery_zone_id'>) {
+  try { return await quoteDraft(q, d); } catch (e) { return { error: (e as { code?: string }).code ?? 'QUOTE_FAILED' }; }
+}
+
 async function loadDraft(q: Tx | Deps['db'], id: string, partnerId: string, lock = false): Promise<DraftRow> {
   const d = await maybeOne<DraftRow>(q, `SELECT * FROM sales_drafts WHERE id=$1 AND partner_id=$2 ${lock ? 'FOR UPDATE' : ''}`, [id, partnerId]);
   if (!d) throw notFound('DRAFT'); // other partners' drafts look non-existent (T28)
@@ -117,20 +122,19 @@ export function registerSalesDrafts(app: FastifyInstance, deps: Deps): void {
     const d = await one<DraftRow>(db, `INSERT INTO sales_drafts (partner_id, created_by, source, lines, customer_name, customer_phone, delivery_zone_id, address, address_later, contact_time, note, raw_message)
         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
       [p.id, actor.userId, body.source ?? 'manual', JSON.stringify(body.lines ?? []), body.customer_name ?? null, body.customer_phone ?? null, body.delivery_zone_id ?? null, JSON.stringify(body.address ?? {}), body.address_later ?? false, body.contact_time ?? null, body.note ?? null, body.raw_message ?? null]);
-    return view(d);
+    return view(d, { quote: await safeQuote(db, d) });
   });
 
   route(app, deps, { method: 'GET', url: '/partner/drafts/:id', tags: T, summary: 'Draft with missing fields and a live server quote', params: zIdParam }, async ({ actor, db, params }) => {
     const p = await myPartner(db, actor, false);
     const d = await loadDraft(db, params.id, p.id);
-    const quote = await quoteDraft(db, d).catch((e: { code?: string }) => ({ error: e.code ?? 'QUOTE_FAILED' }));
-    return view(d, { quote });
+    return view(d, { quote: await safeQuote(db, d) });
   });
 
   route(app, deps, { method: 'PATCH', url: '/partner/drafts/:id', tags: T, summary: 'Autosave (expected_version; stale tabs cannot overwrite newer data)', params: zIdParam, body: zDraft.extend({ expected_version: z.number().int() }) },
     async ({ actor, db, params, body }) => {
       const p = await myPartner(db, actor);
-      return withTx(db, async (tx) => {
+      const saved = await withTx(db, async (tx) => {
         const d = await loadDraft(tx, params.id, p.id, true);
         if (!['draft', 'awaiting_customer'].includes(d.status)) throw conflict('DRAFT_CLOSED');
         if (d.version !== body.expected_version) throw conflict('VERSION_CONFLICT', { current_version: d.version });
@@ -141,8 +145,10 @@ export function registerSalesDrafts(app: FastifyInstance, deps: Deps): void {
           [d.id, body.lines ? JSON.stringify(body.lines) : null, body.customer_name !== undefined, body.customer_name ?? null, body.customer_phone !== undefined, body.customer_phone ?? null,
            body.delivery_zone_id !== undefined, body.delivery_zone_id ?? null, body.address ? JSON.stringify(body.address) : null, body.address_later ?? null,
            body.contact_time !== undefined, body.contact_time ?? null, body.note !== undefined, body.note ?? null]);
-        return view(n);
+        return n;
       });
+      // Quote after commit: a pricing failure (e.g. sold out) never undoes the autosave.
+      return view(saved, { quote: await safeQuote(db, saved) });
     });
 
   route(app, deps, { method: 'POST', url: '/partner/drafts/:id/submit', tags: T, summary: 'Create the order from a complete draft (idempotent; customer must confirm by SMS)', params: zIdParam }, async ({ actor, db, cfg, params }) => {

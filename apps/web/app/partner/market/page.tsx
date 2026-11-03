@@ -69,6 +69,7 @@ function MarketCard({ p, onCreated }: { p: any; onCreated: () => void }) {
         ) : (
           <button type="button" className="btn big" disabled={p.stock === 0 || !p.payout_minor} onClick={() => setOpen(true)}>Oqim yaratish</button>
         )}
+        {p.stock > 0 && <Link href={`/partner/new?product=${encodeURIComponent(p.slug)}`} className="btn secondary full mt8">📞 Mijoz uchun buyurtma</Link>}
       </div>
     </article>
   );

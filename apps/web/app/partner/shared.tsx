@@ -4,7 +4,10 @@ import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { api, som } from '@/lib/api';
 
-export const PARTNER_TABS: [string, string][] = [['/partner', 'Dashboard'], ['/partner/market', 'Market'], ['/partner/streams', 'Oqim'], ['/partner/stats', 'Statistika'], ['/partner/payouts', "To'lov"]];
+export const PARTNER_TABS: [string, string, string[]][] = [
+  ['/partner', 'Bosh sahifa', []], ['/partner/orders', 'Buyurtmalar', ['/partner/requests']], ['/partner/new', '+ Buyurtma', ['/partner/order']],
+  ['/partner/market', 'Mahsulotlar', ['/partner/streams']], ['/partner/wallet', 'Hamyon', ['/partner/payouts']], ['/partner/stats', 'Statistika', []],
+];
 
 export const PERIODS: [string, string][] = [['today', 'Bugun'], ['yesterday', 'Kecha'], ['week', 'Hafta'], ['month', 'Shu oy'], ['half_year', 'Yarim yil'], ['all', 'Hammasi']];
 
@@ -27,8 +30,8 @@ export function PartnerTabs() {
   const path = usePathname() ?? '';
   return (
     <nav className="ptabs" aria-label="Hamkor bo'limlari">
-      {PARTNER_TABS.map(([href, label]) => {
-        const on = href === '/partner' ? path === '/partner' : path.startsWith(href);
+      {PARTNER_TABS.map(([href, label, also]) => {
+        const on = href === '/partner' ? path === '/partner' : [href, ...also].some((h) => path === h || path.startsWith(h + '/'));
         return <Link key={href} href={href} className={on ? 'on' : ''} aria-current={on ? 'page' : undefined}>{label}</Link>;
       })}
     </nav>

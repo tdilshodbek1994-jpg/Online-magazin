@@ -42,6 +42,40 @@ export function Header() {
   if (perms.includes('catalog.write') || perms.includes('reports.read') || perms.includes('payouts.prepare')) staff.push(['/admin', t('admin')]);
   if (roles.includes('courier')) staff.push(['/courier', 'Kuryer']);
   if (roles.includes('owner') || roles.includes('finance')) staff.push(['/account/security', 'MFA']);
+  const logout = async () => { await api('/auth/logout', { method: 'POST' }).catch(() => {}); setToken(null); location.href = '/'; };
+  if (path?.startsWith('/partner')) {
+    // V2 §02: the partner cabinet is a work tool — no store search, staff bar or cart; one compact profile menu.
+    return (
+      <header className="top ptop">
+        <div className="wrap ptop-row">
+          <Link href="/partner" className="brand" aria-label="Hamkor kabineti">
+            <span className="logo-mark"><IconBag size={20} /></span>
+            <span>Uz<b>Shop</b> <small className="ptop-sub">Hamkor</small></span>
+          </Link>
+          <Link href="/partner/new" className="btn sm ptop-new">+ Buyurtma</Link>
+          <details className="pmenu">
+            <summary aria-label="Profil menyusi"><IconUser /></summary>
+            <div className="pmenu-pop">
+              <Link href="/partner/orders">Buyurtmalar</Link>
+              <Link href="/partner/streams">Oqimlarim</Link>
+              <Link href="/partner/stats">Statistika</Link>
+              <Link href="/partner/programs">Konkurs va bonuslar</Link>
+              <Link href="/partner/notifications">Bildirishnomalar</Link>
+              <Link href="/partner/about">Dastur haqida</Link>
+              {staff.filter(([h]) => h !== '/partner').map(([href, label]) => <Link key={href} href={href}>{label}</Link>)}
+              <Link href="/">Do‘konga o‘tish</Link>
+              <label className="sr-only" htmlFor="plang">Til</label>
+              <select id="plang" className="lang" value={lang} onChange={(e) => setLang(e.target.value as any)}>
+                <option value="uz-Latn">O‘zbek (lotin)</option>
+                <option value="uz-Cyrl">Ўзбек (кирилл)</option>
+              </select>
+              {logged && <button className="link-btn" onClick={logout}>{t('logout')}</button>}
+            </div>
+          </details>
+        </div>
+      </header>
+    );
+  }
   return (
     <header className="top">
       <div className="wrap head-grid">
@@ -75,7 +109,7 @@ export function Header() {
           <div className="wrap staff-row">
             {staff.length > 0 && <span className="muted staff-title">{t('staff')}:</span>}
             {staff.map(([href, label]) => <Link key={href} href={href} className={path?.startsWith(href) ? 'on' : ''}>{label}</Link>)}
-            <button className="link-btn" onClick={async () => { await api('/auth/logout', { method: 'POST' }).catch(() => {}); setToken(null); location.href = '/'; }}>{t('logout')}</button>
+            <button className="link-btn" onClick={logout}>{t('logout')}</button>
           </div>
         </div>
       )}

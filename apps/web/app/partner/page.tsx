@@ -28,12 +28,14 @@ export default function PartnerDashboard() {
   const [err, setErr] = useState<any>(null);
   const [day, setDay] = useState<any>(null);
   const [support, setSupport] = useState<string | null>(null);
+  const [att, setAtt] = useState<any>(null);
   useEffect(() => { api('/partner/leaderboard?period=today').then((r) => setDay(r.items[0] ?? null)).catch(() => {}); api('/features').then((f) => setSupport(f.support_telegram ?? null)).catch(() => {}); }, [me]);
   useEffect(() => {
     if (!me || me.status === 'pending' || me.status === 'rejected') return;
     setErr(null);
     api(`/partner/dashboard?period=${period}`).then(setD).catch(setErr);
   }, [me, period]);
+  useEffect(() => { if (me?.status === 'active') api('/partner/attention').then(setAtt).catch(() => {}); }, [me]);
 
   if (me === null) return <ApplyForm onDone={reload} />;
   return (
@@ -51,6 +53,8 @@ export default function PartnerDashboard() {
             </div>
           </section>
 
+          <Link href="/partner/new" className="cta-order"><span aria-hidden>＋</span><div><b>Mijoz uchun buyurtma</b><small>Telefon, manzil — 1 daqiqada. Mijoz SMS bilan tasdiqlaydi.</small></div></Link>
+
           <section className="balance-card">
             <div className="bc-main"><span>Hisobingizda</span><b>{som(me.balances.available_minor)}</b></div>
             <div className="bc-row">
@@ -58,8 +62,35 @@ export default function PartnerDashboard() {
               <div><span>Kutilmoqda</span><b>{som(me.balances.pending_minor)}</b></div>
               <div><span>Yechish mumkin</span><b>{som(me.balances.available_minor)}</b></div>
             </div>
-            <Link href="/partner/payouts" className="btn bc-btn">Pul yechish</Link>
+            <Link href="/partner/wallet" className="btn bc-btn">Hamyon va pul yechish</Link>
           </section>
+
+          {att && (att.action.length > 0 || att.waiting.length > 0) ? (
+            <section className="attention" aria-labelledby="att-h">
+              <h2 id="att-h">Hozir nima qilishim kerak?</h2>
+              {att.action.length > 0 && (
+                <div className="att-group act">
+                  <h3>Sizdan amal kerak · {att.action.length}</h3>
+                  {att.action.slice(0, 6).map((x: any, i: number) => <Link key={i} href={x.href ?? '/partner'} className="att-item"><b>{x.title}</b>{x.detail && <small>{x.detail}</small>}</Link>)}
+                </div>
+              )}
+              {att.waiting.length > 0 && (
+                <div className="att-group wait">
+                  <h3>Magazin / mijoz javobini kutyapmiz · {att.waiting.length}</h3>
+                  {att.waiting.slice(0, 6).map((x: any, i: number) => <Link key={i} href={x.href ?? '/partner'} className="att-item"><b>{x.title}</b>{x.detail && <small>{x.detail}</small>}</Link>)}
+                </div>
+              )}
+            </section>
+          ) : att && BigInt(me.balances.estimated_minor) + BigInt(me.balances.pending_minor) + BigInt(me.balances.available_minor) + BigInt(me.balances.paid_minor) === 0n ? (
+            <section className="card start-path">
+              <h2>Boshlash uchun 3 qadam</h2>
+              <ol>
+                <li><Link href="/partner/market">Mahsulot tanlang</Link> — narx, sizning komissiyangiz va zaxira ko‘rinadi.</li>
+                <li>Post yoki havolani Telegram/Instagram’ga joylang yoki <Link href="/partner/new">mijoz buyurtmasini o‘zingiz kiriting</Link>.</li>
+                <li>Buyurtma yetkazilgach komissiya <Link href="/partner/wallet">Hamyon</Link>da «Yechish mumkin» bo‘ladi.</li>
+              </ol>
+            </section>
+          ) : att ? <p className="notice ok">Hozircha shoshilinch ish yo‘q ✓</p> : null}
 
           <TelegramConnect />
 
@@ -98,11 +129,12 @@ export default function PartnerDashboard() {
           )}
 
           <div className="tile-grid">
-            <Link href="/partner/requests" className="tile-link"><span>📋</span>So‘rovlar (buyurtmalar)</Link>
+            <Link href="/partner/orders" className="tile-link"><span>📋</span>Buyurtmalar va qoralamalar</Link>
             <Link href="/partner/market" className="tile-link"><span>🛍️</span>Market — mahsulot tanlash</Link>
             <Link href="/partner/streams" className="tile-link"><span>🔗</span>Oqimlarim</Link>
-            <Link href="/partner/order" className="tile-link"><span>📞</span>Mijoz uchun buyurtma</Link>
-            <Link href="/partner/payouts" className="tile-link"><span>💳</span>Balans tarixi va to‘lovlar</Link>
+            <Link href="/partner/new" className="tile-link"><span>📞</span>Mijoz uchun buyurtma</Link>
+            <Link href="/partner/wallet" className="tile-link"><span>💳</span>Hamyon: komissiya va to‘lovlar</Link>
+            <Link href="/partner/stats" className="tile-link"><span>📊</span>Statistika</Link>
             <Link href="/partner/programs#konkurs" className="tile-link"><span>🏆</span>Konkurs</Link>
             <Link href="/partner/programs#bonus" className="tile-link"><span>🎁</span>Bonuslar</Link>
             <Link href="/partner/programs#jarima" className="tile-link"><span>⚠️</span>Jarimalar</Link>

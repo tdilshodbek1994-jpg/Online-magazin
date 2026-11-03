@@ -110,6 +110,7 @@ await step('E2E-7', 'partner logs in by OTP and sees own cabinet with code and b
 });
 
 await step('E2E-8/T009', 'logout clears session; partner cabinet no longer accessible', async () => {
+  if (await page.locator('.pmenu summary').isVisible().catch(() => false)) await page.locator('.pmenu summary').click(); // partner cabinet: logout lives in the profile menu
   await page.getByRole('button', { name: 'Chiqish' }).click();
   await page.waitForURL(BASE + '/');
   await page.goto(BASE + '/partner');
@@ -191,11 +192,68 @@ await step('E2E-13/AI', 'owner enables AI (kill switch) in admin; shopper asks t
   assert((await page.locator('section[aria-labelledby="ai-title"]').count()) === 0, 'AI box still visible after kill switch');
 });
 
+await step('E2E-14/V2-T01..T12', 'partner Order Studio: autosaved draft → order → sales passport → wallet; customer fill link → SMS step', async () => {
+  for (let i = 0; i < 4; i++) { try { await login('+998900000007'); break; } catch (e) { if (i === 3) throw e; await page.waitForTimeout(20000); } }
+  await page.goto(BASE + '/partner');
+  await page.getByText('Mijoz uchun buyurtma').first().waitFor();
+  const pickProduct = async () => {
+    await page.locator('.line-ed select').first().waitFor();
+    await page.waitForFunction(() => document.querySelectorAll('.line-ed select option').length > 1);
+    await page.locator('.line-ed select').first().selectOption({ index: 1 });
+    await page.waitForTimeout(800);
+    const chip = page.locator('.line-ed .chips .chip:not([disabled])').first();
+    if (await chip.count()) await chip.click();
+  };
+  await page.goto(BASE + '/partner/new');
+  await pickProduct();
+  await page.getByLabel('Ismi').fill('Test Mijoz');
+  await page.getByLabel('Telefon raqami').fill('+998 90 555 12 34');
+  await page.getByRole('button', { name: 'Kechqurun 18:00 dan keyin' }).click();
+  await page.getByLabel('Hudud').selectOption({ index: 1 });
+  await page.getByLabel('Tuman').fill('Yunusobod');
+  await page.getByLabel('Ko‘cha / mahalla').fill('Test ko‘chasi');
+  await page.getByLabel('Uy', { exact: true }).fill('12');
+  await page.getByText('Qoralama saqlandi ✓').waitFor();
+  assert((await page.url()).includes('draft='), 'draft id not in URL after autosave');
+  await page.getByText('Sizning komissiyangiz (taxminiy)').waitFor();
+  await page.getByRole('button', { name: 'Buyurtmani yuborish' }).click();
+  await page.getByText('Buyurtma yaratildi').waitFor();
+  await page.getByRole('link', { name: 'Sotuv pasporti' }).click();
+  await page.getByText('Kimniki va nega').waitFor();
+  await page.getByText('Buyurtmani o‘zingiz kiritdingiz').waitFor();
+  await page.getByText('Kechqurun 18:00 dan keyin').waitFor();
+  await page.goto(BASE + '/partner/wallet');
+  await page.getByText('Komissiya qayerda turibdi').waitFor();
+  // customer fill link
+  await page.goto(BASE + '/partner/new');
+  await page.getByRole('tab', { name: 'Mijoz o‘zi to‘ldirsin' }).click();
+  await pickProduct();
+  await page.getByText('Qoralama saqlandi ✓').waitFor();
+  await page.getByRole('button', { name: 'Havola yaratish' }).click();
+  const url = (await page.locator('code.link-url').first().textContent()).trim();
+  const tok = url.split('/f/')[1];
+  assert(tok && tok.length > 20, 'no fill token in link');
+  const cp = await ctx.newPage();
+  await cp.goto(BASE + '/f/' + tok);
+  await cp.getByText('Buyurtmangizni rasmiylashtiring').waitFor();
+  await cp.getByLabel('Ismingiz').fill('Mijoz Ikki');
+  await cp.getByLabel('Telefon raqamingiz').fill('+998 90 555 43 21');
+  await cp.getByLabel('Tuman').fill('Chilonzor');
+  await cp.getByLabel('Ko‘cha / mahalla').fill('Bunyodkor');
+  await cp.getByLabel('Uy', { exact: true }).fill('5');
+  await cp.locator('.check-row input').check();
+  await cp.getByRole('button', { name: 'Davom etish' }).click();
+  await cp.getByText('Rahmat! Endi SMS kodni kiriting').waitFor();
+  await cp.goto(BASE + '/f/' + tok);
+  await cp.getByText('Havola faol emas').waitFor(); // single use
+  await cp.close();
+});
+
 await step('E2E-11/T017-axe', 'axe-core WCAG 2.x A/AA scan: no serious/critical violations on key customer pages', async () => {
   const axeSrc = (await import('node:fs')).readFileSync(new URL('../node_modules/axe-core/axe.min.js', import.meta.url), 'utf8');
   const p3 = await ctx.newPage();
   const bad = [];
-  for (const path of ['/', '/p/simsiz-quloqchin-x1', '/cart', '/checkout', '/login']) {
+  for (const path of ['/', '/p/simsiz-quloqchin-x1', '/cart', '/checkout', '/login', '/partner', '/partner/new', '/partner/wallet', '/partner/orders']) {
     await p3.goto(BASE + path);
     await p3.waitForTimeout(500);
     await p3.addScriptTag({ content: axeSrc });

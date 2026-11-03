@@ -2,10 +2,13 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useCartCount } from '@/components/Header';
-import { IconBag, IconCart, IconChart, IconGauge, IconGrid, IconHome, IconLink, IconPlay, IconStore, IconUser, IconWallet } from '@/components/Icons';
+import { IconBag, IconCart, IconGrid, IconHome, IconPlay, IconStore, IconUser, IconWallet } from '@/components/Icons';
 import { getToken } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
 import { useEffect, useState } from 'react';
+
+export const isStaffPath = (p: string) => /^\/(admin|ops|courier)(\/|$)/.test(p);
+export const isWorkPath = (p: string) => p.startsWith('/partner') || isStaffPath(p);
 
 /** Mobile bottom navigation (hidden on desktop by CSS). */
 export function BottomNav() {
@@ -15,19 +18,24 @@ export function BottomNav() {
   const [logged, setLogged] = useState(false);
   useEffect(() => { setLogged(!!getToken()); }, [path]);
   if (path.startsWith('/partner')) {
-    const pItems: [string, string, React.ReactNode][] = [
-      ['/partner', 'Dashboard', <IconGauge key="d" />], ['/partner/market', 'Market', <IconStore key="m" />], ['/partner/streams', 'Oqim', <IconLink key="o" />],
-      ['/partner/stats', 'Statistika', <IconChart key="s" />], ['/partner/payouts', "To'lov", <IconWallet key="t" />],
+    // V2 §02: five things a partner does daily; the big middle button starts a customer order.
+    const pItems: [string, string, React.ReactNode, boolean][] = [
+      ['/partner', 'Bosh sahifa', <IconHome key="d" />, path === '/partner'],
+      ['/partner/orders', 'Buyurtmalar', <IconBag key="o" />, path.startsWith('/partner/orders') || path.startsWith('/partner/requests')],
+      ['/partner/new', 'Buyurtma', <span key="n" className="bn-plus" aria-hidden>+</span>, path.startsWith('/partner/new') || path.startsWith('/partner/order')],
+      ['/partner/market', 'Mahsulotlar', <IconStore key="m" />, path.startsWith('/partner/market') || path.startsWith('/partner/streams')],
+      ['/partner/wallet', 'Hamyon', <IconWallet key="w" />, path.startsWith('/partner/wallet') || path.startsWith('/partner/payouts')],
     ];
     return (
       <nav className="bottom-nav five" aria-label="Hamkor menyusi">
-        {pItems.map(([href, label, icon]) => {
-          const on = href === '/partner' ? path === '/partner' : path.startsWith(href);
-          return <Link key={href} href={href} className={on ? 'on' : ''} aria-current={on ? 'page' : undefined}><span className="bn-icon">{icon}</span><span>{label}</span></Link>;
-        })}
+        {pItems.map(([href, label, icon, on]) => (
+          <Link key={href} href={href} className={`${on ? 'on' : ''} ${href === '/partner/new' ? 'bn-cta' : ''}`} aria-current={on ? 'page' : undefined}><span className="bn-icon">{icon}</span><span>{href === '/partner/new' ? '+ Buyurtma' : label}</span></Link>
+        ))}
       </nav>
     );
   }
+  // Staff work areas have their own navigation; the shop's bottom bar only gets in the way there.
+  if (isStaffPath(path)) return null;
   const items: [string, string, React.ReactNode, boolean][] = [
     ['/', t('home'), <IconHome key="h" />, path === '/'],
     ['/catalog', t('catalog'), <IconGrid key="g" />, path.startsWith('/catalog') || path.startsWith('/p/')],
@@ -49,6 +57,8 @@ export function BottomNav() {
 
 export function Footer() {
   const { t } = useI18n();
+  const path = usePathname() ?? '/';
+  if (isWorkPath(path)) return null;
   return (
     <footer className="site-foot">
       <div className="wrap foot-grid">

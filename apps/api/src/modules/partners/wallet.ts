@@ -34,6 +34,8 @@ export const REASON_LABEL: Record<string, string> = {
   superseded: 'Boshqa hamkorga o‘tkazildi',
 };
 
+const tashkent = (d: string | Date) => new Date(d).toLocaleString('uz-UZ', { timeZone: 'Asia/Tashkent', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+
 export function registerPartnerWallet(app: FastifyInstance, deps: Deps): void {
   const T = ['partner'];
 
@@ -65,11 +67,11 @@ export function registerPartnerWallet(app: FastifyInstance, deps: Deps): void {
       const href = `/partner/orders/${o.id}`;
       if (o.channel === 'partner_assisted' && o.confirmation_status === 'pending' && o.bucket === 'new') {
         const old = Date.now() - new Date(o.created_at).getTime() > 2 * 3600_000;
-        (old ? action : waiting).push({ kind: 'awaiting_customer_sms', title: old ? `${o.masked_number}: mijoz SMS kodni hali kiritmadi — eslatib qo‘ying` : `${o.masked_number}: mijoz SMS orqali tasdiqlashini kutyapmiz`, detail: o.conf_expires ? `Kod muddati: ${o.conf_expires}` : undefined, href, at: o.created_at, ref_id: o.id });
+        (old ? action : waiting).push({ kind: 'awaiting_customer_sms', title: old ? `${o.masked_number}: mijoz SMS kodni hali kiritmadi — eslatib qo‘ying` : `${o.masked_number}: mijoz SMS orqali tasdiqlashini kutyapmiz`, detail: o.conf_expires ? `Kod ${tashkent(o.conf_expires)} gacha amal qiladi` : undefined, href, at: o.created_at, ref_id: o.id });
       } else if (o.confirmation_status === 'expired' && o.bucket === 'cancelled') {
         action.push({ kind: 'confirmation_expired', title: `${o.masked_number}: mijoz tasdiqlamadi, muddat tugadi`, detail: 'Mijoz bilan gaplashib, yangi buyurtma kiriting', href, at: o.created_at, ref_id: o.id });
       } else if (o.bucket === 'new') {
-        waiting.push({ kind: o.callback_at ? 'callback' : o.quick ? 'quick_address' : 'operator_review', title: o.callback_at ? `${o.masked_number}: operator mijozga belgilangan vaqtda qo‘ng‘iroq qiladi` : o.quick ? `${o.masked_number}: operator mijozdan manzilni aniqlayapti` : `${o.masked_number}: operator tasdiqlashini kutyapmiz`, detail: o.callback_at ?? undefined, href, at: o.created_at, ref_id: o.id });
+        waiting.push({ kind: o.callback_at ? 'callback' : o.quick ? 'quick_address' : 'operator_review', title: o.callback_at ? `${o.masked_number}: operator mijozga belgilangan vaqtda qo‘ng‘iroq qiladi` : o.quick ? `${o.masked_number}: operator mijozdan manzilni aniqlayapti` : `${o.masked_number}: operator tasdiqlashini kutyapmiz`, detail: o.callback_at ? `Qo‘ng‘iroq vaqti: ${tashkent(o.callback_at)}` : undefined, href, at: o.created_at, ref_id: o.id });
       }
     }
 

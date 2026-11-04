@@ -10,6 +10,7 @@ import { type Deps, requireIdempotencyKey, route, zIdParam } from '../../platfor
 import type { Actor } from '../../platform/auth.js';
 import { resolveAttribution } from '../partners/attribution.js';
 import { type Attribution, createOrder, m, partnerDiscountForLink, priceLines, pricedToJson, storeQuote } from '../orders/service.js';
+import { currentAssignment } from '../landings/experiments.js';
 import { captureOrderContext, currentConsent, recordEvent, recordLead, subjectKey, uzs } from '../tracking/service.js';
 
 /** Browser identifiers the real customer's own page supplies (only kept when ad-measurement consent is granted). */
@@ -201,9 +202,12 @@ export function registerCheckout(app: FastifyInstance, deps: Deps): void {
           createdBy: actor.userId, confirmation: 'pending', attribution, acceptedTerms: body.accept_terms,
         });
         if (body.landing) {
+          // the revision must be the published one, or the A/B variant this visitor was actually shown
+          const asg = await currentAssignment(tx, body.landing.landing_id, actor);
           const lp = await maybeOne<{ digest: string }>(tx, `SELECT r.digest FROM landing_pages l JOIN landing_revisions r ON r.landing_id=l.id AND r.revision=$2
-              WHERE l.id=$1 AND l.status='published' AND l.published_revision=$2 AND (SELECT s.product_id FROM skus s WHERE s.id=$3) = ANY(l.product_ids)`, [body.landing.landing_id, body.landing.revision, body.sku_id]);
-          if (lp) await tx.query(`UPDATE orders SET landing_snapshot=$2 WHERE id=$1`, [order.id, JSON.stringify({ landing_id: body.landing.landing_id, revision: body.landing.revision, digest: lp.digest, quote_id: q.id })]);
+              WHERE l.id=$1 AND l.status='published' AND (l.published_revision=$2 OR $4::int = $2) AND (SELECT s.product_id FROM skus s WHERE s.id=$3) = ANY(l.product_ids)`, [body.landing.landing_id, body.landing.revision, body.sku_id, asg?.revision ?? null]);
+          if (lp) await tx.query(`UPDATE orders SET landing_snapshot=$2, experiment_snapshot=$3 WHERE id=$1`, [order.id, JSON.stringify({ landing_id: body.landing.landing_id, revision: body.landing.revision, digest: lp.digest, quote_id: q.id }),
+            asg && asg.revision === body.landing.revision ? JSON.stringify(asg) : null]);
         }
         const landingOk = body.landing ? (await maybeOne<{ ok: boolean }>(tx, `SELECT true AS ok FROM orders WHERE id=$1 AND landing_snapshot IS NOT NULL`, [order.id]))?.ok : false;
         await captureOrderContext(tx, actor, order.id, body.tracking, { onBehalf: false, landingId: landingOk ? body.landing!.landing_id : null });

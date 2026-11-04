@@ -40,6 +40,7 @@ import { registerTracking } from './modules/tracking/routes.js';
 import { registerLandingAnalytics } from './modules/landings/analytics.js';
 import { registerTarget } from './modules/target/routes.js';
 import { registerTargetSafety } from './modules/target/safety.js';
+import { registerExperiments } from './modules/landings/experiments.js';
 import { registerReturns } from './modules/returns/routes.js';
 import { registerPayments } from './modules/payments/routes.js';
 import { registerSupport } from './modules/support/routes.js';
@@ -177,6 +178,7 @@ export async function buildApp(cfg: AppConfig, db: Db): Promise<FastifyInstance>
       registerLandingAnalytics(api, deps);
       registerTarget(api, deps);
       registerTargetSafety(api, deps);
+      registerExperiments(api, deps);
       registerVideos(api, deps);
       registerReturns(api, deps);
       registerPayments(api, deps);

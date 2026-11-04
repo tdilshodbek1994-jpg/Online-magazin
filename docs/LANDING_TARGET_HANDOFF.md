@@ -5,6 +5,7 @@
 - Analytics (P1A): `apps/api/src/modules/landings/analytics.ts` (shop spend + landing report, `funnel`, `clickConversion`), partner report tweaks in `analytics/report.ts`; web `apps/web/app/admin/LandingStats.tsx`.
 - Target (P1B): `apps/api/src/modules/target/{adapter,routes}.ts` (routes under `/admin/meta/*` and `/admin/ad-campaigns/*` — `/admin/campaigns` is the existing SMS/marketing module); web `apps/web/app/admin/TargetAdmin.tsx`, `apps/web/app/admin/meta/callback/page.tsx`.
 - Safety (P2A): `apps/api/src/modules/target/safety.ts` (rules, envelope, kill switch, recommendation; `runAdSafety` in `worker.ts`).
-- Next single task: P2B — A/B experiments on landing revisions (assignment, exposure, sample-ratio check, no auto-winner without the owner), then custom domain verification (DNS TXT challenge only — no DNS changes by us) behind separate flags.
+- A/B (P2B part 1): `apps/api/src/modules/landings/experiments.ts`; web `apps/web/app/admin/ExperimentsCard.tsx`.
+- Next single task: P2B part 2 — custom domains: ownership by DNS TXT challenge only (we never change DNS), pending until proven, one host = one tenant, TLS and Meta verification as separate statuses, allowlisted Meta token format, host allowlist routing, no admin session on partner hosts, signed short-lived flow token for checkout handoff, redirect-loop guard, disconnect shows dependent campaigns.
 - To go live with CAPI later: owner Meta OAuth (encrypted token in vault, `credentials_ref`), pin `api_version`, implement `TrackingTransport` for Graph API, add Pixel loader with CSP allowlist; the outbox, dedup and consent rules stay unchanged.
 - Owner gates still open: D09 window, D10 Purchase policy, D14 budgets, D18 A/B rules, D19 Meta permissions, D20 legal/cookie/billing.

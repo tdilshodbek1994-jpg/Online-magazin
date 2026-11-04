@@ -7,6 +7,7 @@ import { AppError, badRequest, conflict, notFound } from '../../platform/errors.
 import { type Deps, route, zIdParam } from '../../platform/http.js';
 import { myPartner } from '../partners/routes.js';
 import { defaultDefinition, digestOf, zDefinition } from './schema.js';
+import { assignVariant } from './experiments.js';
 
 /**
  * UZSHOP PRO — Landing Builder (P0B). Admin: create from a template, edit = new immutable revision (optimistic lock),
@@ -31,14 +32,18 @@ export async function catalogFacts(q: Queryable, productIds: string[]) {
 export function registerLandings(app: FastifyInstance, deps: Deps): void {
   // ---------------- Public ----------------
   route(app, deps, { method: 'GET', url: '/landings/:slug', tags: ['public'], summary: 'Published landing: published revision + live catalog facts', params: z.object({ slug: z.string().max(64) }) },
-    async ({ db, params, reply }) => {
+    async ({ actor, db, params, reply }) => {
       const l = await maybeOne<any>(db, `SELECT * FROM landing_pages WHERE slug=$1`, [params.slug]);
       if (!l || l.status !== 'published' || !l.published_revision) throw notFound('LANDING'); // drafts are never public (LT-011)
-      const r = await one<any>(db, `SELECT definition, digest FROM landing_revisions WHERE landing_id=$1 AND revision=$2`, [l.id, l.published_revision]);
+      const exp = await assignVariant(db, l.id, actor); // A/B: one sticky variant per visitor
+      const rev = exp?.revision ?? l.published_revision;
+      const r = await one<any>(db, `SELECT definition, digest FROM landing_revisions WHERE landing_id=$1 AND revision=$2`, [l.id, rev]);
       const products = (await catalogFacts(db, l.product_ids)).filter((p: any) => p.status === 'published');
-      reply.header('cache-control', 'public, max-age=30');
+      // A personal assignment must never be served from a shared cache to another visitor (LT-094).
+      reply.header('cache-control', exp ? 'private, no-store' : 'public, max-age=30');
+      if (exp) reply.header('vary', 'x-guest-token, x-session-token');
       const anyStock = products.some((p: any) => (p.skus ?? []).some((s: any) => s.available > 0));
-      return { id: l.id, slug: l.slug, title: l.title, template: l.template, revision: l.published_revision, digest: r.digest, definition: r.definition, products,
+      return { id: l.id, slug: l.slug, title: l.title, template: l.template, revision: rev, digest: r.digest, definition: r.definition, products, experiment: exp ? { id: exp.experiment_id, variant: exp.variant } : null,
         availability: anyStock ? 'in_stock' : 'unavailable' }; // trafficback: the page says "not available", no hidden swap (LT-029)
     });
 

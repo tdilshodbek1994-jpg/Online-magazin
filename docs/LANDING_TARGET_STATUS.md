@@ -72,14 +72,26 @@ Branch `claude/online-marketplace-platform-sdtv52` · not merged to main · not 
 | Admin «🛡️ Xavfsizlik» panel in Target tab (rules, envelope, kill switch, receipts) | done |
 | Real provider monitoring at scale, alert recipients (Telegram), live activation test with real money | **blocked**: owner Meta app + a separately approved amount/asset/time scope |
 
+## P2B (part 1) — A/B experiments + quality regression — done
+| Item | State |
+|---|---|
+| Migration `0035_landing_experiments.sql`: experiments (one running per landing, A = published revision, B = another revision, split), sticky assignments per subject key (no PII), `orders.experiment_snapshot`; demo evidence policy `experiments.min_evidence` | done |
+| Public `/landings/:slug` serves the visitor's variant; personal responses `private, no-store` (+ `Vary`); `/tracking/config` `private, no-store` | done |
+| Quick order accepts the published revision or the visitor's own variant only; snapshot stores experiment/variant/revision | done |
+| Results: exposures/orders/rate per variant, pooled Σ/Σ total, verdict `insufficient_data` / `enough_data_owner_decides`; no auto-winner, no auto-publish | done |
+| Admin «🧪 A/B sinov» card in the landing editor | done |
+| 320px + 200% text: footer/landing no longer force horizontal scroll (manual Playwright check: scrollWidth 320 = viewport, CTA visible, focused field visible) | done |
+| Domains (LT-031…040) | next (part 2) |
+
 ## Tests
 - `apps/api/test/zf-landings.test.ts` (own DB `om_test_landing`): LT-001, 002, 004, 005, 008, 010, 011, 012, 013, 014, 015, 016, 020, 021, 022, 023, 026, 027, 028, 029, 030.
 - P0B not yet mapped: LT-003 (parallel stock — covered by existing reservation tests, not re-run for landings), LT-006 (expired quote — existing checkout test), LT-007 (multi-product single order — storefront cart; landing multi UI not built), LT-009 (offline form — client), LT-017 (AI draft, P1B), LT-018 (reduced motion — CSS, needs browser check), LT-019 (promotion timer from backend — no timer block yet), LT-024/025 (on-behalf verification exists; tracking separation is P0C).
 - `apps/api/test/zg-tracking.test.ts` (own DB `om_test_tracking`): LT-041, 042, 043, 044, 045, 046, 047, 048, 049, 050, 051, 052, 053, 054, 055, 056, 057, 058, 059, 060 + readiness/health test (15 tests).
 - `apps/api/test/zh-landing-analytics.test.ts` (own DB `om_test_landing_analytics`): LT-081 (orders vs units on a landing), 082 (funnel 100/70/56 → 70/80/56), 083 (20 visits, 2 link + 2 on-behalf orders → 10%), 084, 085, 086, 087, 088 (100 000 UZS split 60/40, no ledger/journal change, partner ad stays null), 090. LT-081 matrix amount (56 orders/76 units/1 830 000) and LT-089 (cohort vs financial month) are covered by the existing `n-ad-analytics.test.ts` T07 and T32.
 - `apps/api/test/zi-target.test.ts` (own DB `om_test_target`, fake adapter): LT-061…LT-070, LT-071…LT-080 + honest blocked state without app/connection + copy/audience guard (18 tests).
+- `apps/api/test/zj-landing-p2b.test.ts` (own DB `om_test_landing_p2b`): LT-091, 092, 094, 095 (no server-side media URL fetch exists; internal URLs refused by the block schema), 096, 097, 098, 099, 100 (8 tests). LT-093 = manual browser check above.
 - LT-048 note: local outbox dedup is tested; provider-side dedup can only be verified with a real dataset (not run).
-- Full run 2026-11-04 (after P2A): `cd apps/api && pnpm vitest run` → 34 files, 262 tests passed, exit 0. (After P1B: 254; after P1A: 244.) (After P0C: 32 files, 238.) Web build OK; manual browser check: consent banner appears only after the owner connects a dataset, PageView recorded after consent. Web E2E not re-run for P0C (banner hidden by default).
+- Full run 2026-11-04 (after P2B part 1): `cd apps/api && pnpm vitest run` → 35 files, 270 tests passed, exit 0. (After P2A: 262; P1B: 254; P1A: 244.) (After P0C: 32 files, 238.) Web build OK; manual browser check: consent banner appears only after the owner connects a dataset, PageView recorded after consent. Web E2E not re-run for P0C (banner hidden by default).
 
 ## Not started
 P2B (custom domains/TLS, A/B, catalog ads, lead forms, partner ad accounts) — each behind its own flag.

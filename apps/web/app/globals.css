@@ -1617,3 +1617,6 @@ img.t3-ava { object-fit: cover; display: block; }
 .cc-panel > *, .ln-block > * { min-width: 0; }
 .tr-grid .tile { min-width: 0; overflow-wrap: anywhere; }
 .cc > * { min-width: 0; } .ln-preview { box-sizing: border-box; }
+/* LT-093: 320px + 200% text — nothing forces horizontal scroll */
+.foot-grid > *, .lp > * { min-width: 0; overflow-wrap: anywhere; }
+@media (max-width: 360px) { .foot-grid { grid-template-columns: 1fr; } }

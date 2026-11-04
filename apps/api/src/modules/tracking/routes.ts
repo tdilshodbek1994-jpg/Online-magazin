@@ -16,7 +16,8 @@ const T = ['tracking'];
  * no client-supplied values, datasets or order totals). Admin: health diagnostics; owner: single dataset settings.
  */
 export function registerTracking(app: FastifyInstance, deps: Deps): void {
-  route(app, deps, { method: 'GET', url: '/tracking/config', tags: T, summary: 'Tracking config for this visitor (pixel only when ready AND consented)' }, async ({ actor, db }) => {
+  route(app, deps, { method: 'GET', url: '/tracking/config', tags: T, summary: 'Tracking config for this visitor (pixel only when ready AND consented)' }, async ({ actor, db, reply }) => {
+    reply.header('cache-control', 'private, no-store'); // personal consent state is never cached for others (LT-094)
     const s = await trackingSettings(db);
     const c = await currentConsent(db, subjectKey(actor));
     const ready = s.enabled && !!s.dataset_id;

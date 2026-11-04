@@ -27,6 +27,13 @@ const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, ig
 const page = await ctx.newPage();
 if (process.env.E2E_DEBUG) page.on('response', (r) => { if (r.url().includes('/api/v1/') && r.status() >= 400) console.log('  resp', r.status(), r.request().method(), r.url().replace(BASE, '')); });
 
+// Staff and partner screens keep "Chiqish" inside the profile menu; open it first when it is there.
+async function logout() {
+  const menu = page.getByLabel('Profil menyusi');
+  if (await menu.count() && await menu.first().isVisible()) await menu.first().click();
+  await page.getByRole('button', { name: 'Chiqish' }).click();
+}
+
 await step('E2E-1/T005s', 'home loads and cyrillic search finds latin product', async () => {
   await page.goto(BASE + '/');
   await page.getByPlaceholder(/Mahsulot/).fill('қулоқчин');
@@ -110,8 +117,7 @@ await step('E2E-7', 'partner logs in by OTP and sees own cabinet with code and b
 });
 
 await step('E2E-8/T009', 'logout clears session; partner cabinet no longer accessible', async () => {
-  if (await page.locator('.pmenu summary').isVisible().catch(() => false)) await page.locator('.pmenu summary').click(); // partner cabinet: logout lives in the profile menu
-  await page.getByRole('button', { name: 'Chiqish' }).click();
+  await logout();
   await page.waitForURL(BASE + '/');
   await page.goto(BASE + '/partner');
   await page.getByText(/UNAUTHENTICATED|Hamkor bo/).first().waitFor();
@@ -125,7 +131,7 @@ await step('E2E-9', 'operator sees the new guest order in the "Yangi" queue', as
 });
 
 await step('E2E-10/T020', 'owner enrolls TOTP in UI; sensitive admin action asks step-up and succeeds', async () => {
-  await page.getByRole('button', { name: 'Chiqish' }).click();
+  await logout();
   await page.waitForURL(BASE + '/');
   await login('+998900000001');
   await page.goto(BASE + '/account/security');

@@ -17,6 +17,7 @@ export function renderText(template: string, p: Record<string, unknown>): string
     case 'partner.payout_paid': return `💳 To‘lov amalga oshirildi: ${som(p.amount_minor)}\nKarta: ${p.destination ?? '—'}`;
     case 'partner.bonus': return `🎁 Bonus: +${som(p.amount_minor)}\n${p.reason ?? ''}\nHisobingizga (yechish mumkin) qo‘shildi.`;
     case 'partner.contest_prize': return `🏆 Tabriklaymiz! ${p.reason ?? 'Konkurs sovrini'}\n+${som(p.amount_minor)} hisobingizga qo‘shildi.`;
+    case 'partner.operator_message': return `💬 Operator xabari — buyurtma ${p.number ?? ''}\n${p.text ?? ''}`;
     case 'partner.penalty': return `⚠️ Jarima: −${som(p.amount_minor)}\nSabab: ${p.reason ?? '—'}\nSavol bo‘lsa, qo‘llab-quvvatlashga yozing.`;
     case 'partner.customer_filled': return `📝 Mijoz ma’lumotlarini o‘zi to‘ldirdi (${p.source ?? 'havola'})\nBuyurtma ${p.number ?? ''} yaratildi — endi mijoz SMS kod bilan tasdiqlaydi.`;
     case 'waitlist.back_in_stock': return `UzShop: «${p.product ?? 'mahsulot'}» yana sotuvda. Buyurtma: ${p.path ?? ''}`;

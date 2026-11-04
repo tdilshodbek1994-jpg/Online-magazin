@@ -24,7 +24,8 @@ export default function OpsBoard() {
   const items: any[] = d.items;
   const now = Date.now();
   const groups: [string, string, (t: any) => boolean][] = [
-    ['attention', 'Diqqat talab', (t) => t.state === 'blocked' || !t.assignee_id || (t.due_at && new Date(t.due_at).getTime() < now && ['queued', 'assigned'].includes(t.state))],
+    ['attention', 'Diqqat talab', (t) => t.sla === 'critical' || t.state === 'blocked' || !t.assignee_id || (t.due_at && new Date(t.due_at).getTime() < now && ['queued', 'assigned'].includes(t.state))],
+    ['critical', 'Jiddiy kechikkan', (t) => t.sla === 'critical'],
     ['blocked', 'To‘xtagan', (t) => t.state === 'blocked'],
     ['unowned', 'Egasiz', (t) => !t.assignee_id],
     ['overdue', 'Kechikkan', (t) => t.due_at && new Date(t.due_at).getTime() < now && ['queued', 'assigned', 'in_progress'].includes(t.state)],
@@ -62,6 +63,7 @@ export default function OpsBoard() {
             <article key={t.id} className="scard board-task">
               <div className="spread"><b>{t.number}</b><span className={`pill ${t.state === 'blocked' ? 'b-returned' : t.state === 'scheduled' ? 'b-accepted' : 'b-new'}`}>{STATE_UZ[t.state] ?? t.state}</span></div>
               <div className="small">{t.five.what}</div>
+              {t.sla === 'critical' && <div className="sla-pill sla-crit">🔥 Muddat 2 soatdan ko‘p o‘tgan</div>}{t.sla === 'late' && <div className="sla-pill sla-late">⚠️ Muddat o‘tgan</div>}
               {t.blocked_by && <div className="small warn-t">⛔ {t.blocked_by}</div>}
               <div className="small"><b>Keyingi qadam:</b> {t.next_action}</div>
               <div className="small muted">👤 {t.assignee_name ?? 'egasiz'} · ⏱ {age(t.age_seconds)}{t.attempts ? ` · ${t.attempts} urinish` : ''}{t.not_before ? ` · 📞 ${new Date(t.not_before).toLocaleString('uz-UZ', { timeZone: 'Asia/Tashkent', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}` : ''}</div>

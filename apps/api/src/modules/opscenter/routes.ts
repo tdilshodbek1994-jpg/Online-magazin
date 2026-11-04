@@ -20,6 +20,8 @@ const MAX_ATTEMPTS = 5;          // unanswered calls before the task needs a sup
 const OPEN = `('resolved','closed')`;
 // Contact hours in Asia/Tashkent (UTC+5, no DST): no calls outside them (spec §12, T16). Policy register: owner may change.
 export const CONTACT_FROM_H = 9, CONTACT_TO_H = 21;
+// SLA warning thresholds (policy register: owner may change).
+export const SLA_SOON_MIN = 10, SLA_CRITICAL_H = 2;
 const tashHour = (d: Date) => (d.getUTCHours() + 5) % 24 + d.getUTCMinutes() / 60;
 export const inContactHours = (d: Date) => { const h = tashHour(d); return h >= CONTACT_FROM_H && h < CONTACT_TO_H; };
 /** Moves a time that falls into quiet hours to the next 09:00 Tashkent. */
@@ -53,6 +55,12 @@ export async function syncTasks(db: any): Promise<void> {
       FROM orders o WHERE o.id=t.order_id AND t.type='confirm' AND t.state NOT IN ${OPEN} AND o.commercial_status <> 'awaiting_confirmation'
     RETURNING t.id`);
   for (const r of closed.rows) await db.query(`INSERT INTO ops_task_events (task_id, kind, to_state, data) VALUES ($1,'auto_closed','closed','{"why":"order_moved_on"}')`, [r.id]);
+  const esc = await db.query(`
+    UPDATE ops_tasks t SET priority=t.priority+1, updated_at=now() -- no version bump: must not break the operator's open card
+     WHERE t.state IN ('queued','assigned','in_progress') AND t.due_at < now() - interval '${SLA_CRITICAL_H} hours'
+       AND NOT EXISTS (SELECT 1 FROM ops_task_events e WHERE e.task_id=t.id AND e.kind='sla_escalated')
+    RETURNING t.id`);
+  for (const r of esc.rows) await db.query(`INSERT INTO ops_task_events (task_id, kind, data) VALUES ($1,'sla_escalated','{"to":"supervisor"}')`, [r.id]);
 }
 
 export async function event(tx: any, taskId: string, actor: string | null, kind: string, from: string | null, to: string | null, data: Record<string, unknown> = {}) {
@@ -67,7 +75,12 @@ export const TASK_COLS = `t.id, t.order_id, t.type, t.state, t.priority, t.reaso
   t.source, t.attempts, t.version, t.created_at, t.updated_at, o.number, o.channel, o.payable_minor::text, o.contact_snapshot->>'name' AS customer_name,
   o.address_snapshot->>'district' AS district, u.display_name AS assignee_name,
   (SELECT string_agg((ol.product_snapshot->'name'->>'uz-Latn') || ' × ' || (ol.qty - ol.canceled_qty), ', ') FROM order_lines ol WHERE ol.order_id=o.id AND ol.qty > ol.canceled_qty) AS items_text,
-  EXTRACT(EPOCH FROM now()-t.created_at)::int AS age_seconds`;
+  EXTRACT(EPOCH FROM now()-t.created_at)::int AS age_seconds,
+  -- SLA (spec §15): only active states run the clock; waiting/scheduled are paused (real elapsed time stays in age).
+  CASE WHEN t.state IN ('queued','assigned','in_progress') AND t.due_at IS NOT NULL THEN
+    CASE WHEN now() > t.due_at + interval '${SLA_CRITICAL_H} hours' THEN 'critical' WHEN now() > t.due_at THEN 'late'
+         WHEN now() > t.due_at - interval '${SLA_SOON_MIN} minutes' THEN 'soon' ELSE 'ok' END
+  ELSE 'paused' END AS sla`;
 
 /** Claimable = queued, or a scheduled callback whose time came, or an expired lease (owner went silent). */
 const CLAIMABLE = `(t.state='queued' AND (t.not_before IS NULL OR t.not_before <= now()))
@@ -113,7 +126,8 @@ export function registerOperatorCentre(app: FastifyInstance, deps: Deps): void {
         COUNT(*) FILTER (WHERE t.state='scheduled' AND t.not_before <= now())::int AS callbacks_due,
         COUNT(*) FILTER (WHERE t.due_at < now() AND t.state IN ('queued','assigned','in_progress'))::int AS overdue,
         COUNT(*) FILTER (WHERE t.state='blocked')::int AS blocked,
-        COUNT(*) FILTER (WHERE t.assignee_id IS NULL)::int AS unowned
+        COUNT(*) FILTER (WHERE t.assignee_id IS NULL)::int AS unowned,
+        COUNT(*) FILTER (WHERE t.state IN ('queued','assigned','in_progress') AND t.due_at < now() - interval '${SLA_CRITICAL_H} hours')::int AS critical
       FROM ops_tasks t WHERE t.state NOT IN ${OPEN}`);
     return { shift, limits: { max_active: MAX_ACTIVE, lease_minutes: LEASE_MIN, max_attempts: MAX_ATTEMPTS }, counts: c, mine: mine.map((t) => ({ ...t, five: fiveAnswers(t) })) };
   });

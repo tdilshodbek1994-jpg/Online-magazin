@@ -11,8 +11,9 @@ import { pick, useI18n } from '@/lib/i18n';
  */
 const SHIFT: [string, string][] = [['working', '🟢 Ishdaman'], ['break', '☕ Tanaffus'], ['busy', '⏳ Band'], ['off', '⏹ Smena tugadi']];
 const STATE_UZ: Record<string, string> = { queued: 'Navbatda', assigned: 'Menda', in_progress: 'Ishlanmoqda', scheduled: 'Qayta qo‘ng‘iroq', waiting_customer: 'Mijozni kutyapmiz', waiting_internal: 'Ichki muammo', blocked: 'To‘xtagan', resolved: 'Hal qilindi', closed: 'Yopildi' };
-const EVENT_UZ: Record<string, string> = { claimed: 'Ishni oldi', reclaimed_after_lease: 'Ishni qayta oldi (oldingi egasi javob bermadi)', released: 'Navbatga qaytardi', contact: 'Aloqa natijasi', auto_closed: 'Avtomatik yopildi' };
+const EVENT_UZ: Record<string, string> = { sla_escalated: 'Muddat jiddiy o‘tdi — rahbarga ko‘tarildi', handoff_requested: 'Topshirish so‘raldi', handoff_accepted: 'Topshirish qabul qilindi', handoff_declined: 'Topshirish rad etildi', handoff_expired: 'Topshirish muddati o‘tdi', handoff_cancelled: 'Topshirish bekor qilindi', supervisor_transfer: 'Rahbar o‘tkazdi', partner_request: 'Hamkor so‘rovi', partner_answered: 'Hamkorga javob berildi', claimed: 'Ishni oldi', reclaimed_after_lease: 'Ishni qayta oldi (oldingi egasi javob bermadi)', released: 'Navbatga qaytardi', contact: 'Aloqa natijasi', auto_closed: 'Avtomatik yopildi' };
 const OUT_UZ: Record<string, string> = { no_answer: 'Javob bermadi', busy: 'Band', wrong_number: 'Noto‘g‘ri raqam', callback_requested: 'Keyin qo‘ng‘iroq qilishni so‘radi', info_given: 'Ma’lumot berildi', confirmed: 'Tasdiqladi', rejected: 'Rad etdi', problem: 'Muammo' };
+const SLA_UZ: Record<string, [string, string]> = { soon: ['⏰ Muddat yaqin', 'sla-soon'], late: ['⚠️ Kechikdi', 'sla-late'], critical: ['🔥 Jiddiy kechikdi', 'sla-crit'] };
 const tash = (v: string) => new Date(v).toLocaleString('uz-UZ', { timeZone: 'Asia/Tashkent', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
 
 export function WorkDesk({ onChanged }: { onChanged?: () => void }) {
@@ -57,7 +58,7 @@ export function WorkDesk({ onChanged }: { onChanged?: () => void }) {
       <div className="desk-stats">
         <span><b>{d.mine.length}</b> menda</span>
         {c.callbacks_due > 0 && <span className="warn"><b>{c.callbacks_due}</b> qo‘ng‘iroq vaqti keldi</span>}
-        {c.overdue > 0 && <span className="bad"><b>{c.overdue}</b> kechikkan</span>}
+        {c.overdue > 0 && <span className="bad"><b>{c.overdue}</b> kechikkan{c.critical > 0 ? ` (${c.critical} tasi 2 soatdan ko‘p)` : ''}</span>}
         <span><b>{c.available}</b> navbatda</span>
         {c.blocked > 0 && <span><b>{c.blocked}</b> to‘xtagan</span>}
       </div>
@@ -94,6 +95,7 @@ export function WorkDesk({ onChanged }: { onChanged?: () => void }) {
             <button key={t.id} type="button" className={`desk-item ${task?.id === t.id ? 'sel' : ''}`} onClick={() => openTask(t.id)}>
               <span className="spread"><b>{t.number}</b><span className={`pill ${t.state === 'scheduled' ? 'b-accepted' : t.state === 'blocked' ? 'b-returned' : 'b-new'}`}>{STATE_UZ[t.state] ?? t.state}{t.not_before ? ` · ${tash(t.not_before)}` : ''}</span></span>
               <span className="small">{t.customer_name ?? '—'} · {t.items_text}</span>
+              {SLA_UZ[t.sla] && <span className={`sla-pill ${SLA_UZ[t.sla][1]}`}>{SLA_UZ[t.sla][0]}</span>}
               <span className="small desk-next">➜ {t.next_action}</span>
             </button>
           ))}
@@ -134,6 +136,7 @@ function TaskCard({ task, order, lang, busy, onClose, onAct }: { task: any; orde
           </div>
         )}
         <TaskPartnerRequests taskId={task.id} />
+        <Composer taskId={task.id} />
         {!task.mine && task.state !== 'resolved' && task.state !== 'closed' && <button className="btn full" disabled={busy} onClick={() => onAct('claim', {}, false)}>Bu ishni olish</button>}
         {canWrite && (
           <div className="task-actions">
@@ -225,5 +228,34 @@ function TaskPartnerRequests({ taskId }: { taskId: string }) {
       ))}
       {msg && <div className="small" role="status">{msg}</div>}
     </div>
+  );
+}
+
+const AUD: [string, string, string][] = [['internal', '🔒 Ichki izoh', 'Faqat xodimlar ko‘radi'], ['partner', '🤝 Hamkorga', 'Hamkor kabinetida va Telegram’da ko‘radi'], ['customer', '👤 Mijozga', 'Mijoz buyurtma sahifasida ko‘radi']];
+const DELIV: Record<string, string> = { stored: 'kabinetda ko‘rinadi', queued: 'yuborish navbatida', sent: 'yuborildi', failed: 'yuborilmadi', unknown: 'natija noma’lum' };
+/** Three-audience composer: the audience is always named before sending; internal notes never leave the team. */
+function Composer({ taskId }: { taskId: string }) {
+  const [aud, setAud] = useState('internal');
+  const [text, setText] = useState('');
+  const [items, setItems] = useState<any[]>([]);
+  const [msg, setMsg] = useState<string | null>(null);
+  const load = useCallback(() => { api(`/ops/center/tasks/${taskId}/messages`).then((r) => setItems(r.items)).catch(() => {}); }, [taskId]);
+  useEffect(load, [load]);
+  const cur = AUD.find((a) => a[0] === aud)!;
+  return (
+    <details className="task-more composer">
+      <summary>Xabar / izoh yozish {items.length ? `(${items.length})` : ''}</summary>
+      <div className="seg aud-seg" role="radiogroup" aria-label="Kimga">
+        {AUD.map(([k, l]) => <button key={k} type="button" role="radio" aria-checked={aud === k} className={aud === k ? 'on' : ''} onClick={() => setAud(k)}>{l}</button>)}
+      </div>
+      <p className={`aud-note aud-${aud}`}>Kimga: <b>{cur[1]}</b> — {cur[2]}</p>
+      <textarea rows={2} maxLength={1000} value={text} onChange={(e) => setText(e.target.value)} aria-label={`Matn: ${cur[1]}`} />
+      <button className="btn secondary full" disabled={text.trim().length < 2} onClick={async () => {
+        setMsg(null);
+        try { const r = await api(`/ops/center/tasks/${taskId}/messages`, { method: 'POST', body: { audience: aud, body: text } }); setText(''); setMsg(r.delivery_state === 'no_partner' ? 'Bu buyurtmada hamkor yo‘q.' : `✓ Saqlandi (${DELIV[r.delivery_state] ?? r.delivery_state})`); load(); } catch (e: any) { setMsg(errText(e)); }
+      }}>{aud === 'internal' ? 'Izohni saqlash' : 'Yuborish'}</button>
+      {msg && <div className="small" role="status">{msg}</div>}
+      {items.length > 0 && <ul className="msg-list">{items.map((m) => <li key={m.id} className={`aud-${m.audience}`}><span className="small"><b>{AUD.find((a) => a[0] === m.audience)?.[1]}</b> · {m.author} · {tash(m.created_at)}{m.audience !== 'internal' ? ` · ${DELIV[m.delivery_state] ?? m.delivery_state}` : ''}</span><span>{m.body}</span></li>)}</ul>}
+    </details>
   );
 }

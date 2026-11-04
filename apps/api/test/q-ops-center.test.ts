@@ -106,3 +106,29 @@ describe('Operator Centre P0', () => {
     expect((await api(t, 'GET', '/ops/center/board', { token: s.operator.token })).status).toBe(403);
   });
 });
+
+describe('Operator Centre SLA', () => {
+  it('marks soon/late/critical, pauses on scheduled, escalates a critical task once without breaking the open card', async () => {
+    const prod = await mkProduct(t, { prices: [30_000], stock: [5] });
+    const r = await placeOrder(t, { guest: randomUUID() + randomUUID(), phone: nextPhone() }, [{ sku_id: prod.skuIds[0]!, qty: 1 }]);
+    await api(t, 'GET', '/ops/center', { token: s.operator.token });
+    const task = (await t.db.query(`SELECT id, version FROM ops_tasks WHERE order_id=$1`, [r.json.order_id])).rows[0];
+    const slaOf = async () => (await api(t, 'GET', `/ops/center/tasks/${task.id}`, { token: s.operator.token })).json.sla;
+    await t.db.query(`UPDATE ops_tasks SET due_at = now() + interval '5 minutes' WHERE id=$1`, [task.id]);
+    expect(await slaOf()).toBe('soon');
+    await t.db.query(`UPDATE ops_tasks SET due_at = now() - interval '5 minutes' WHERE id=$1`, [task.id]);
+    expect(await slaOf()).toBe('late');
+    await shift(s.operator.token, 'working');
+    const c = await api(t, 'POST', `/ops/center/tasks/${task.id}/claim`, { token: s.operator.token, body: {} });
+    await t.db.query(`UPDATE ops_tasks SET due_at = now() - interval '3 hours' WHERE id=$1`, [task.id]);
+    expect(await slaOf()).toBe('critical');
+    await api(t, 'GET', '/ops/center', { token: s.operator.token });
+    await api(t, 'GET', '/ops/center', { token: s.operator.token });
+    const ev = (await t.db.query(`SELECT COUNT(*)::int AS n FROM ops_task_events WHERE task_id=$1 AND kind='sla_escalated'`, [task.id])).rows[0].n;
+    expect(ev).toBe(1);
+    // The operator's open card still saves (escalation does not bump the version).
+    const w = await api(t, 'POST', `/ops/center/tasks/${task.id}/contact`, { token: s.operator.token, body: { expected_version: c.json.task.version, outcome: 'no_answer' } });
+    expect(w.status).toBe(200);
+    expect(await slaOf()).toBe('paused');
+  });
+});

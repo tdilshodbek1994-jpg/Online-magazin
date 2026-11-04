@@ -88,6 +88,35 @@ export function Header() {
       </header>
     );
   }
+  if (/^\/(admin|ops|courier)(\/|$)/.test(path ?? '')) {
+    // Spec §05: staff screens are work tools — no shop search, banner or cart; one compact bar with the staff sections.
+    return (
+      <header className="top ptop stop">
+        <div className="wrap ptop-row">
+          <Link href={staff[0]?.[0] ?? '/'} className="brand" aria-label="Xodimlar paneli">
+            <span className="logo-mark"><IconBag size={20} /></span>
+            <span>Uz<b>Shop</b> <small className="ptop-sub">Xodim</small></span>
+          </Link>
+          <nav className="stop-nav" aria-label="Xodim bo‘limlari">
+            {staff.filter(([h]) => h !== '/partner' && h !== '/account/security').map(([href, label]) => <Link key={href} href={href} className={path?.startsWith(href) ? 'on' : ''} aria-current={path?.startsWith(href) ? 'page' : undefined}>{label}</Link>)}
+          </nav>
+          <details className="pmenu" ref={menu}>
+            <summary aria-label="Profil menyusi"><IconUser /></summary>
+            <div className="pmenu-pop" onClick={(e) => { if ((e.target as HTMLElement).closest('a')) closeMenu(); }}>
+              {staff.map(([href, label]) => <Link key={href} href={href}>{label}</Link>)}
+              <Link href="/">Do‘konga o‘tish</Link>
+              <label className="sr-only" htmlFor="slang">Til</label>
+              <select id="slang" className="lang" value={lang} onChange={(e) => setLang(e.target.value as any)}>
+                <option value="uz-Latn">O‘zbek (lotin)</option>
+                <option value="uz-Cyrl">Ўзбек (кирилл)</option>
+              </select>
+              {logged && <button className="link-btn" onClick={logout}>{t('logout')}</button>}
+            </div>
+          </details>
+        </div>
+      </header>
+    );
+  }
   return (
     <header className="top">
       <div className="wrap head-grid">

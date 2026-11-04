@@ -6,6 +6,7 @@ import { conflict, notFound, unprocessable } from '../../platform/errors.js';
 import { type Deps, route, zIdParam } from '../../platform/http.js';
 import { myPartner } from '../partners/routes.js';
 import { event } from './routes.js';
+import { partnerMessages } from './messages.js';
 
 /**
  * Partner → operator requests (spec §08): "change the call time", "I'll complete the address", "variant change",
@@ -39,7 +40,7 @@ export function registerPartnerRequests(app: FastifyInstance, deps: Deps): void 
     const p = await myPartner(db, actor, false);
     const o = await maybeOne(db, `SELECT 1 FROM orders WHERE id=$1 AND attributed_partner_id=$2`, [params.id, p.id]);
     if (!o) throw notFound('ORDER');
-    return { items: await many(db, `SELECT id, kind, body, preferred_at, status, answer, created_at, answered_at FROM partner_order_requests WHERE order_id=$1 AND partner_id=$2 ORDER BY created_at DESC`, [params.id, p.id]) };
+    return { items: await many(db, `SELECT id, kind, body, preferred_at, status, answer, created_at, answered_at FROM partner_order_requests WHERE order_id=$1 AND partner_id=$2 ORDER BY created_at DESC`, [params.id, p.id]), messages: await partnerMessages(db, params.id) };
   });
 
   route(app, deps, { method: 'GET', url: '/ops/center/tasks/:id/partner-requests', tags: T, summary: 'Operator: partner requests of the task order', params: zIdParam }, async ({ actor, db, params }) => {

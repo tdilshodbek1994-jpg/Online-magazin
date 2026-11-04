@@ -51,9 +51,16 @@ Vertical slice UI → API → DB → tests:
 * All requests of one order join one open `partner_request` task (no duplicate cases). Operator answers in the task card; the partner sees only that answer, no staff identity. When every request is answered the task resolves; a requested call time updates the order's callback.
 * Test `s-partner-requests.test.ts`.
 
+## 2d. Done in P1 (part 3)
+
+* **Staff layout**: `/ops`, `/admin`, `/courier` use a compact staff bar (sections, profile menu) — no shop search, banner or cart (§05).
+* **SLA levels** on every active task: ok / soon (≤10 min) / late / critical (>2 h past due); waiting and scheduled tasks are paused (real age kept). A critical task is escalated once (priority +1, `sla_escalated` event, visible on the board under "Jiddiy kechikkan") without bumping the version, so an open card still saves.
+* **Three-audience messages** (`migrations/0018_order_messages.sql`, `modules/opscenter/messages.ts`): composer names the audience (🔒 internal / 🤝 partner / 👤 customer) before sending; internal notes stay in `order_notes`; partner messages show on the sales passport (+ Telegram outbox), customer messages on the customer's order page (in-app notice for logged-in customers, no SMS from here). Delivery states: stored / queued / sent / failed / unknown — never "read" (T25).
+* Tests: SLA in `q-ops-center.test.ts`, `t-order-messages.test.ts`.
+
 ## 3. Not done yet (honest list)
 
-P1 (remaining): skill/language routing and capacity round-robin, SLA clocks with business calendar and pause reasons, customer-safe vs internal message composer, notification outbox per audience, staff layout for `/ops` without shop header.
+P1 (remaining): skill/language routing and capacity round-robin, business calendar (holidays) for SLA, quiet-hours digest for notifications.
 P2: supervisor dashboard UI (API exists), incident grouping, QA sampling, duplicate review, bulk-safe actions, KB/templates, load and restore tests.
 P3: real telephony adapter, Telegram Business, AI assistant (read-only, human approval).
 
@@ -68,5 +75,6 @@ P3: real telephony adapter, Telegram Business, AI assistant (read-only, human ap
 | Confirm task due | order created + 30 min | demo default, not shown to customers |
 | Contact hours | 09:00–21:00 Tashkent | demo default, owner to approve |
 | Handoff expiry | 30 min | demo default |
+| SLA warning / critical | 10 min before due / 2 h after due | demo default |
 | Opt-out / attempt spacing per customer | not enforced yet | **owner decision needed** |
 | 4+ units quantity tier | not invented; manual review | **owner decision needed** |

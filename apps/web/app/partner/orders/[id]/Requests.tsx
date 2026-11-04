@@ -10,12 +10,13 @@ const fmt = (v: string) => new Date(v).toLocaleString('uz-UZ', { timeZone: 'Asia
 
 export function PartnerRequests({ orderId }: { orderId: string }) {
   const [items, setItems] = useState<any[]>([]);
+  const [msgs, setMsgs] = useState<any[]>([]);
   const [kind, setKind] = useState('message');
   const [body, setBody] = useState('');
   const [when, setWhen] = useState('');
   const [msg, setMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const load = useCallback(() => { api(`/partner/orders/${orderId}/requests`).then((r) => setItems(r.items)).catch(() => {}); }, [orderId]);
+  const load = useCallback(() => { api(`/partner/orders/${orderId}/requests`).then((r) => { setItems(r.items); setMsgs(r.messages ?? []); }).catch(() => {}); }, [orderId]);
   useEffect(load, [load]);
   const send = async () => {
     setBusy(true); setMsg(null);
@@ -28,6 +29,7 @@ export function PartnerRequests({ orderId }: { orderId: string }) {
     <section className="card preq" aria-labelledby="preq-h">
       <h2 id="preq-h">Operatorga yozish</h2>
       <p className="muted small">Yuborilgan buyurtmani o‘zingiz o‘zgartira olmaysiz — so‘rov yozing, operator bajaradi.</p>
+      {msgs.length > 0 && <ul className="preq-list">{msgs.map((m, i) => <li key={i}><b className="small">💬 Operator xabari</b><div className="small">{m.body}</div><div className="muted small">{fmt(m.created_at)}</div></li>)}</ul>}
       <label htmlFor="preq-kind">Nima kerak?</label>
       <select id="preq-kind" value={kind} onChange={(e) => setKind(e.target.value)}>{KINDS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>
       {kind === 'callback_time' && (<><label htmlFor="preq-when">Mijozga qachon qo‘ng‘iroq qilinsin? (Toshkent vaqti)</label><input id="preq-when" type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)} /></>)}

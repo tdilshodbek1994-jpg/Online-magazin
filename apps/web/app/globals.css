@@ -1223,3 +1223,25 @@ a.admin-tab { text-decoration: none; color: inherit; }
 .mini-tile.t7 span { background: color-mix(in srgb, #ef4444 20%, transparent); }
 .mini-tile.t8 span { background: color-mix(in srgb, #eab308 25%, transparent); }
 .bc-orange { background: linear-gradient(135deg, #881337, #e11d48 60%, #fb7185); }
+/* Staff bar (ops/admin/courier) */
+.stop .ptop-row { gap: 10px; }
+.stop-nav { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; flex: 1; min-width: 0; }
+.stop-nav::-webkit-scrollbar { display: none; }
+.stop-nav a { padding: 8px 12px; border-radius: 999px; text-decoration: none; color: var(--text); font-weight: 700; font-size: 14px; white-space: nowrap; min-height: 40px; display: inline-flex; align-items: center; }
+.stop-nav a.on { background: color-mix(in srgb, var(--primary) 18%, transparent); color: var(--primary-600); }
+.sla-pill { justify-self: start; display: inline-flex; padding: 3px 8px; border-radius: 999px; font-size: 12px; font-weight: 800; }
+.sla-soon { background: color-mix(in srgb, #f59e0b 22%, var(--surface)); }
+.sla-late { background: color-mix(in srgb, #ef4444 18%, var(--surface)); }
+.sla-crit { background: color-mix(in srgb, #ef4444 35%, var(--surface)); }
+/* Three-audience composer */
+.composer { display: grid; gap: 8px; }
+.aud-seg { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 0; }
+.aud-seg button { white-space: normal; font-size: 13px; padding: 6px 4px; min-height: 40px; }
+.aud-note { margin: 0; padding: 6px 10px; border-radius: 10px; font-size: 13px; }
+.aud-internal { background: color-mix(in srgb, #64748b 18%, var(--surface)); }
+.aud-partner { background: color-mix(in srgb, #3b82f6 16%, var(--surface)); }
+.aud-customer { background: color-mix(in srgb, #10b981 16%, var(--surface)); }
+.msg-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
+.msg-list li { display: grid; gap: 2px; padding: 8px 10px; border-radius: 10px; }
+.ord-msgs { display: grid; gap: 6px; margin-top: 10px; }
+.ord-msg { display: grid; gap: 2px; padding: 8px 10px; border-radius: 10px; background: var(--surface-2); }

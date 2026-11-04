@@ -5,6 +5,7 @@ import { hashToken } from '../../platform/auth.js';
 import { many, maybeOne, one, type Tx, withTx } from '../../platform/db.js';
 import { AppError, badRequest, conflict, notFound, unauthorized } from '../../platform/errors.js';
 import { idempotent } from '../../platform/idempotency.js';
+import { customerMessages } from '../opscenter/messages.js';
 import { type Deps, requireIdempotencyKey, route, zIdParam } from '../../platform/http.js';
 import type { Actor } from '../../platform/auth.js';
 import { resolveAttribution } from '../partners/attribution.js';
@@ -183,7 +184,7 @@ export function registerCheckout(app: FastifyInstance, deps: Deps): void {
     if (!o) throw notFound('ORDER'); // never reveals existence of foreign orders (T005)
     const lines = await many(db, `SELECT id, product_snapshot, qty, canceled_qty, returned_qty, unit_price_minor::text, line_net_minor::text FROM order_lines WHERE order_id=$1`, [params.id]);
     const timeline = await many(db, `SELECT dimension, to_status, created_at FROM order_status_events WHERE order_id=$1 ORDER BY id`, [params.id]);
-    return { ...o, lines, timeline };
+    return { ...o, lines, timeline, messages: await customerMessages(db, params.id) };
   });
 
   void conflict;

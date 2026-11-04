@@ -89,3 +89,4 @@ P3: real telephony adapter, Telegram Business, AI assistant (read-only, human ap
 | SLA warning / critical | 10 min before due / 2 h after due | demo default |
 | Opt-out / attempt spacing per customer | not enforced yet | **owner decision needed** |
 | 4+ units quantity tier | not invented; manual review | **owner decision needed** |
+| Partner customer discount (discount link) | paid from the partner's commission; max = commission per unit at link creation (and < price); commission never below 0 | demo default, owner to approve |

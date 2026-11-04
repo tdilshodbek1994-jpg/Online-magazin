@@ -1480,3 +1480,13 @@ button.pill-btn.sel { outline: 2px solid var(--primary); }
 .pd-warn { padding: 10px 12px; border-radius: 12px; background: #fff4e5; border: 1px solid #f5c27a; color: #6b3600; font-size: 14px; }
 .pd-price { display: grid; gap: 2px; padding: 10px 12px; border-radius: 12px; background: #fff4e5; color: #6b3600; }
 .pd-price b { color: #b42318; }
+/* Contest Center */
+.cc { display: grid; gap: 10px; }
+button.cc-card, a.cc-card { display: grid; gap: 4px; text-align: left; font: inherit; color: inherit; text-decoration: none; cursor: pointer; }
+.cc-card.sel { outline: 2px solid var(--primary); }
+.cc-rules ul { margin: 6px 0; padding-left: 18px; display: grid; gap: 4px; }
+.cc-join { display: grid; gap: 8px; }
+.cc-me { background: var(--primary-50); border-radius: 8px; padding-left: 6px; padding-right: 6px; }
+.cc-form, .cc-panel { display: grid; gap: 8px; }
+.cc-prize { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.cc-prize input:not([style]) { flex: 1; min-width: 120px; }

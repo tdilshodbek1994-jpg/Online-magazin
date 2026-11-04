@@ -24,10 +24,12 @@ Branch: `claude/online-marketplace-platform-sdtv52` · Not merged to `main`, not
 | Prizes: place prizes, stock-safe awards, money → wallet, item fulfilment statuses, expiry | done (C10, C16, C17) |
 | Leaderboard (aliases unless consent, my place, as-of, offset cursor), "me" with counted orders (masked) + funnel | done (C01, C08) |
 | Dry-run simulation, CSV export (formula-injection safe), audit for every action | done |
-| Partner/admin web screens | **not done yet** (next) |
+| Admin web: tab «Konkurs markazi» (create draft + prizes, status buttons with owner checks, dry-run, recompute, cancel, appeals queue, awards, CSV) | done |
+| Partner web: `/partner/contests` (groups, my prizes) and `/partner/contests/[id]` (rules, revisions, prizes, join with name consent, my provisional/final result + counted orders, leaderboard with as-of and warning, appeal form) | done |
 
 ## Tests
 - `apps/api/test/zb-contest-center.test.ts` — own database `om_test_contest` (spec: new tests on a separate DB).
+- Web E2E smoke: 15/15 passed after the screens were added (2026-11-04).
 - Last full run: `cd apps/api && pnpm vitest run` → **27 files, 190 tests passed, exit 0** (2026-11-04).
 - Covered: C01, C02, C03, C04, C05, C06, C07, C08, C09, C10, C11, C12, C16, C17, C18, C19.
 - Not covered yet: C13–C15 (ad analytics wording/allocation inside contests — existing ad analytics tests cover allocation; contest ROI metric not built), C20 (TAQVIM is a different repo — untouched).

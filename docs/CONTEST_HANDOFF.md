@@ -14,8 +14,8 @@
 - Ties beyond prize stock are returned as `needs_decision` — the owner awards explicitly (`/admin/cc/prizes/:id/award`).
 
 ## Next tasks (in order)
-1. Web: admin editor (create/edit with reason, prizes, dry-run table, status buttons, appeals queue, awards) under `/admin` tab "Konkurs markazi".
-2. Web: partner "Konkurs markazi" (list, detail+rules, join with consent toggles, leaderboard with as-of + warning, my result with counted orders, appeal form, my prizes).
+1. (done) Web admin tab `apps/web/app/admin/ContestCenter.tsx`; partner pages `apps/web/app/partner/contests/`.
+2. Admin UI still missing: editing a live contest with a reason (API exists: PUT with `reason`), item-prize fulfilment buttons (API: PATCH /admin/cc/awards/:id), manual correction form.
 3. P1: notifications (start, deadline, provisional, winner) via existing Telegram outbox with opt-in; fraud flags (self-referral, duplicates) into a review queue; contest ROI metric with "data incomplete" when ad spend is unknown (C13–C15); weighted formulas.
 4. Two-step approval for large prizes (finance + owner); budget planned/committed/actual report.
 

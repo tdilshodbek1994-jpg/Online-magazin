@@ -1341,3 +1341,32 @@ a.admin-tab { text-decoration: none; color: inherit; }
 .cat-current { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 4px 0 2px; }
 .catalog2 .filter-bar { margin-top: 8px; }
 .catmenu-item.sub { padding-left: 28px; font-weight: 500; min-height: 42px; } .catmenu-item.sub .cm-ico { width: 30px; height: 30px; }
+
+/* ===== Palette 2.0 — bright and harmonious (user: "ranglar mutanosib emas, bo‘g‘iq") =====
+   One brand family: vivid green (brand) + sunny yellow (action) on clean white, with soft pastel tints for
+   secondary blocks. Text contrast on coloured buttons kept ≥ 4.5:1. */
+:root {
+  --bg: #ffffff; --surface: #ffffff; --surface-2: #f4f7f5; --border: #e6ebe8; --muted: #5a6470;
+  --primary: #00804a; --primary-600: #007a46; --primary-50: #e6f7ee;
+  --hdr-1: #00804a; --hdr-2: #00a85f; --tile: #f3f6f4; --signal: #ffd60a;
+  --shadow: 0 1px 2px rgba(16,24,40,.04), 0 6px 18px rgba(16,24,40,.06);
+}
+body { background: var(--bg); }
+header.top:not(.ptop) { background: linear-gradient(100deg, #00894f 0%, #00a35c 60%, #13b46b 100%); box-shadow: 0 4px 14px rgba(0,137,79,.25); }
+header.top:not(.ptop) .lang { background: rgba(255,255,255,.95); color: #0f2a1d; border-color: transparent; }
+/* Hero slides: bright, each its own mood, all in the same saturated family */
+.hero2-slide.s-sale { background: radial-gradient(circle at 88% 18%, rgba(255,214,10,.55) 0, transparent 42%), linear-gradient(115deg, #e11d48 0%, #f43f5e 45%, #fb7a1e 100%); }
+.hero2-slide.s-new { background: radial-gradient(circle at 88% 25%, rgba(255,255,255,.28) 0, transparent 40%), linear-gradient(115deg, #2b4ee6 0%, #4f46e5 50%, #8b3df0 100%); }
+.hero2-slide.s-cod { background: radial-gradient(circle at 88% 25%, rgba(255,214,10,.45) 0, transparent 40%), linear-gradient(115deg, #00894f 0%, #00a35c 55%, #19c27a 100%); }
+/* Trust row: each tile its own soft tint + matching icon colour */
+.trust li { box-shadow: none; border: 0; }
+.trust li:nth-child(1) { background: #e8f8ef; } .trust li:nth-child(1) svg { color: #008a4e; }
+.trust li:nth-child(2) { background: #e9f1ff; } .trust li:nth-child(2) svg { color: #2b5be6; }
+.trust li:nth-child(3) { background: #fff1e6; } .trust li:nth-child(3) svg { color: #e2600a; }
+.trust li:nth-child(4) { background: #f2ecff; } .trust li:nth-child(4) svg { color: #7a3ff0; }
+/* Cards: white on white need a gentle lift */
+.pcard, .quad, .cart-line2 { box-shadow: 0 1px 2px rgba(16,24,40,.05), 0 4px 14px rgba(16,24,40,.06); border: 1px solid #eef1ef; }
+.cat-tile { background: var(--tile); }
+.schip.on { background: var(--primary); color: #fff; border-color: var(--primary); }
+.pd-hero { background: linear-gradient(115deg, #00804a 0%, #00965a 55%, #0a8f86 100%); }
+.balance-card { background: linear-gradient(135deg, #2d3fd6 0%, #4b3bd9 55%, #6d33d6 100%); }

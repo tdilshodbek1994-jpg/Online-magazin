@@ -11,6 +11,7 @@ import { UzcoinAdmin } from './UzcoinAdmin';
 import { LandingsAdmin } from './LandingsAdmin';
 import { TargetAdmin } from './TargetAdmin';
 import { LevelsAdmin } from './LevelsAdmin';
+import { FinanceAdmin } from './FinanceAdmin';
 import { ProductEditor } from './ProductEditor';
 import { AdminPrograms } from './Programs';
 import { errText, stText } from '@/lib/errors';
@@ -49,7 +50,7 @@ export default function Admin() {
       {tab === 'promos' && <Promos act={act} />}
       {tab === 'partners' && <Partners act={act} />}
       {tab === 'payouts' && <Payouts act={act} />}
-      {tab === 'finance' && <Finance act={act} />}
+      {tab === 'finance' && <FinanceAdmin />}
       {tab === 'staff' && <Staff />}
       {tab === 'stock' && <StockAlerts />}
       {tab === 'integrations' && <Integrations />}
@@ -327,29 +328,6 @@ function Payouts({ act }: { act: any }) {
         </tbody></table></div>
       </Async>
       <button className="btn secondary" onClick={() => act(() => api('/admin/commissions/release', { method: 'POST', body: {} }), load)}>Kutish muddati o‘tgan komissiyalarni ochish</button>
-    </section>
-  );
-}
-
-function Finance({ act }: { act: any }) {
-  const rem = useLoad<any>('/finance/remittances');
-  const ex = useLoad<any>('/finance/exceptions');
-  return (
-    <section className="card" style={{ marginTop: 12 }}>
-      <h2>COD topshiriqlari</h2>
-      <Async loading={rem.st.loading} error={rem.st.error} onRetry={rem.load}>
-        <div className="table-wrap"><table><tbody>{rem.data?.items.map((r: any) => (
-          <tr key={r.id}><td>{r.courier_name}</td><td>kutilgan {som(r.expected_minor)} · e’lon {som(r.declared_minor)}</td><td>{stText(r.status)}</td>
-            <td>{r.status === 'submitted' && <button className="btn" onClick={() => { const v = prompt('Kassaga tushgan summa (so‘m)'); if (v) act(() => api(`/finance/remittances/${r.id}/confirm`, { method: 'POST', body: { received_minor: String(BigInt(v.replace(/\D/g, '')) * 100n) } }), rem.load); }}>Qabul qilish</button>}</td></tr>
-        ))}</tbody></table></div>
-      </Async>
-      <h2>Moliyaviy istisnolar</h2>
-      <Async loading={ex.st.loading} error={ex.st.error} onRetry={ex.load}>
-        <div className="table-wrap"><table><tbody>{ex.data?.items.map((x: any) => (
-          <tr key={x.id}><td>{stText(x.kind)}</td><td>{x.ref_type}:{x.ref_id.slice(0, 8)}</td><td>{som(x.amount_minor)}</td><td>{stText(x.status)}</td>
-            <td>{x.status === 'open' && <button className="btn secondary" onClick={() => { const r = prompt('Yechim (kamida 10 belgi, dalil bilan)'); if (r) act(() => api(`/finance/exceptions/${x.id}/resolve`, { method: 'POST', body: { resolution: r } }), ex.load); }}>Yopish</button>}</td></tr>
-        ))}</tbody></table></div>
-      </Async>
     </section>
   );
 }

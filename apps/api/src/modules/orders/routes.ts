@@ -284,7 +284,11 @@ export function registerOrders(app: FastifyInstance, deps: Deps): void {
 
   route(app, deps, { method: 'GET', url: '/finance/remittances', tags: ['finance'], summary: 'Remittances list' }, async ({ actor, db }) => {
     requirePerm(actor, 'cod.confirm');
-    return { items: await many(db, `SELECT r.*, u.display_name AS courier_name FROM cod_remittances r JOIN users u ON u.id=r.courier_user_id ORDER BY created_at DESC LIMIT 200`) };
+    return { items: await many(db, `SELECT r.*, u.display_name AS courier_name, cu.display_name AS confirmed_by_name,
+        (SELECT COUNT(*)::int FROM cod_collections c WHERE c.remittance_id=r.id) AS orders,
+        (SELECT array_agg(o.number ORDER BY o.number) FROM cod_collections c JOIN orders o ON o.id=c.order_id WHERE c.remittance_id=r.id) AS order_numbers
+      FROM cod_remittances r JOIN users u ON u.id=r.courier_user_id LEFT JOIN users cu ON cu.id=r.confirmed_by
+      ORDER BY (r.status='submitted') DESC, (r.status='discrepancy') DESC, r.created_at DESC LIMIT 200`) };
   });
 
   route(app, deps, { method: 'GET', url: '/finance/exceptions', tags: ['finance'], summary: 'Open finance exceptions' }, async ({ actor, db }) => {

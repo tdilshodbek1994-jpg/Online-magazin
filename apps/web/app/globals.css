@@ -1654,3 +1654,13 @@ img.t3-ava { object-fit: cover; display: block; }
   .stop .ptop-sub { display: none; }
   .stop-nav { mask-image: linear-gradient(90deg, #000 85%, transparent); -webkit-mask-image: linear-gradient(90deg, #000 85%, transparent); }
 }
+/* Finance: courier cash hand-ins */
+.fin-sum { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.fin-sum button { display: grid; gap: 1px; padding: 10px 6px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface); color: inherit; font: inherit; cursor: pointer; text-align: center; min-width: 0; }
+.fin-sum button.on { border-color: var(--primary); background: var(--primary-50); }
+.fin-sum button.warn b { color: var(--danger, #b42318); }
+.fin-sum b { font-size: 20px; }
+.fin-sum span { font-size: 12px; font-weight: 600; }
+.fin-sum small { font-size: 11px; color: var(--muted); overflow-wrap: anywhere; }
+.fin-list { display: grid; gap: 8px; }
+.fin-card { display: grid; gap: 6px; padding: 12px; }

@@ -1246,3 +1246,5 @@ a.admin-tab { text-decoration: none; color: inherit; }
 .ord-msgs { display: grid; gap: 6px; margin-top: 10px; }
 .ord-msg { display: grid; gap: 2px; padding: 8px 10px; border-radius: 10px; background: var(--surface-2); }
 .tpl-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+.dup-box { display: grid; gap: 6px; padding: 10px; border-radius: 12px; background: color-mix(in srgb, #f59e0b 14%, var(--surface)); }
+.dup-item { display: grid; gap: 4px; padding: 8px; border-radius: 10px; background: var(--surface); }

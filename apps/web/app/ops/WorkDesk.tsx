@@ -135,6 +135,7 @@ function TaskCard({ task, order, lang, busy, onClose, onAct }: { task: any; orde
             <div className="small muted">{[order.address_snapshot?.district, order.address_snapshot?.street, order.address_snapshot?.house].filter((x: any) => x && x !== '-').join(', ') || 'Manzil hali yo‘q'}</div>
           </div>
         )}
+        <DuplicatePanel taskId={task.id} canAct={task.mine} />
         <TaskPartnerRequests taskId={task.id} />
         <Composer taskId={task.id} />
         {!task.mine && task.state !== 'resolved' && task.state !== 'closed' && <button className="btn full" disabled={busy} onClick={() => onAct('claim', {}, false)}>Bu ishni olish</button>}
@@ -272,5 +273,42 @@ function Composer({ taskId }: { taskId: string }) {
       {msg && <div className="small" role="status">{msg}</div>}
       {items.length > 0 && <ul className="msg-list">{items.map((m) => <li key={m.id} className={`aud-${m.audience}`}><span className="small"><b>{AUD.find((a) => a[0] === m.audience)?.[1]}</b> · {m.author} · {tash(m.created_at)}{m.audience !== 'internal' ? ` · ${DELIV[m.delivery_state] ?? m.delivery_state}` : ''}</span><span>{m.body}</span></li>)}</ul>}
     </details>
+  );
+}
+
+/** Possible duplicates with evidence; the operator decides (nothing is merged or cancelled automatically). */
+function DuplicatePanel({ taskId, canAct }: { taskId: string; canAct: boolean }) {
+  const [d, setD] = useState<any>(null);
+  const [reason, setReason] = useState('');
+  const [msg, setMsg] = useState<string | null>(null);
+  const load = useCallback(() => { api(`/ops/center/tasks/${taskId}/duplicates`).then(setD).catch(() => {}); }, [taskId]);
+  useEffect(load, [load]);
+  if (!d || (!d.items.length && !d.order.review)) return null;
+  const decide = async (decision: string, keep?: string) => {
+    setMsg(null);
+    try { await api(`/ops/center/tasks/${taskId}/duplicate-decision`, { method: 'POST', body: { decision, keep_order_id: keep, reason } }); setMsg(decision === 'duplicate' ? '✓ Bu buyurtma takror deb bekor qilindi (asl buyurtma saqlandi)' : '✓ Takror emas deb belgilandi'); load(); }
+    catch (e: any) { setMsg(e.code === 'PAID_ORDER_REQUIRES_REFUND' ? 'To‘langan buyurtmani bu yerda bekor qilib bo‘lmaydi — qaytarish jarayoni orqali.' : errText(e)); }
+  };
+  return (
+    <div className="dup-box">
+      <b>⚠️ Takror bo‘lishi mumkin</b>
+      {d.order.review ? <p className="small">Qaror: {d.order.review === 'duplicate' ? 'takror — bekor qilingan' : 'takror emas'}</p> : <p className="muted small">Bir xil telefon — dalil emas, faqat signal. Bir raqamda oila a’zolari ham buyurtma berishi mumkin.</p>}
+      {d.items.map((o: any) => (
+        <div key={o.id} className="dup-item small">
+          <div className="spread"><b>{o.number}</b><span>{o.minutes_apart < 60 ? `${o.minutes_apart} daq farq` : `${Math.round(o.minutes_apart / 60)} soat farq`}</span></div>
+          <div>{o.customer_name ?? '—'} · {o.district ?? '—'} · {o.channel}</div>
+          {o.shared_items && <div>Bir xil mahsulot: {o.shared_items}</div>}
+          {canAct && !d.order.review && <button className="btn secondary sm" disabled={reason.trim().length < 3} onClick={() => { if (confirm(`Joriy buyurtma ${o.number} ning takrori deb bekor qilinsinmi?`)) void decide('duplicate', o.id); }}>Bu — {o.number} ning takrori</button>}
+        </div>
+      ))}
+      {canAct && !d.order.review && (
+        <>
+          <label className="small" htmlFor={`dup-r-${taskId}`}>Sabab (majburiy)</label>
+          <input id={`dup-r-${taskId}`} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Masalan: mijoz ikki marta bosgan / aka-uka alohida buyurtma" />
+          <button className="btn secondary sm" disabled={reason.trim().length < 3} onClick={() => decide('not_duplicate')}>Takror emas</button>
+        </>
+      )}
+      {msg && <div className="small" role="status">{msg}</div>}
+    </div>
   );
 }

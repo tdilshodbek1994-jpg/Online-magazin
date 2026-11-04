@@ -46,16 +46,30 @@ Branch `claude/online-marketplace-platform-sdtv52` · not merged to main · not 
 | Admin UI «📊 Tahlil va reklama xarajati» inside the landing editor (period, tiles, flows, spend rows, spend form with flow split, explicit zero) | done |
 | Live Meta Insights for the shop account | blocked: needs owner Meta OAuth (P1B/D19) |
 
+## P1B — done with a fake adapter; live Meta blocked (no app/credentials)
+| Item | State |
+|---|---|
+| Migration `0033_target_campaigns.sql`: `meta_connections` (OAuth state hash bound to the admin session, 10 min, single use; AES-GCM token; scopes; provider-verified assets), `campaign_drafts` (15 states), `campaign_approvals` (digest + scope + TTL), `provisioning_operations` (unique per draft/kind/digest, `client_ref`), `remote_objects`; flag `ads.live_spend=false`; demo policy `target.approval_ttl_hours=24` | done |
+| Adapter boundary `target/adapter.ts`: default = honest not-connected (authorize URL only with `META_APP_ID` + `META_GRAPH_VERSION`; everything else `NOT_CONNECTED`) | done |
+| Drafts from a published landing: copy only from approved facts (hero, benefits, catalog price); AI provider stays off (`generator='template'`); ad copy guard (medical/guarantee claims, links, phones); audience 18+, only geo/age/genders | done |
+| Preflight: landing revision, stock, connection + `ads_management`, verified ad account/Page/dataset, dataset = Pixel setting, account currency, budget, schedule, creative, payer shown | done |
+| Owner approval bound to digest of ad account, payer, currency, budget, schedule, audience, placements, creative revision, landing revision, destination, Page, dataset, objective, policy version; edit/TTL → stale | done |
+| Provision → remote objects PAUSED; double call = one op; timeout → `unknown`, retry reconciles by `client_ref` (no blind create) | done |
+| Activate only with `ads.live_spend` + still-valid approval, one op; status `delivery_pending` until provider effective status; sync maps PENDING_REVIEW → delivery_pending, DISAPPROVED → rejected (+reason); protective pause without approval (`pause_requested` if no answer) | done (flag off) |
+| Admin «🎯 Target» tab + `/admin/meta/callback` page | done |
+| Real Graph API adapter, app review, pinned version contract tests, exposure reserve across campaigns | **blocked**: owner Meta app/credentials (D19) |
+
 ## Tests
 - `apps/api/test/zf-landings.test.ts` (own DB `om_test_landing`): LT-001, 002, 004, 005, 008, 010, 011, 012, 013, 014, 015, 016, 020, 021, 022, 023, 026, 027, 028, 029, 030.
 - P0B not yet mapped: LT-003 (parallel stock — covered by existing reservation tests, not re-run for landings), LT-006 (expired quote — existing checkout test), LT-007 (multi-product single order — storefront cart; landing multi UI not built), LT-009 (offline form — client), LT-017 (AI draft, P1B), LT-018 (reduced motion — CSS, needs browser check), LT-019 (promotion timer from backend — no timer block yet), LT-024/025 (on-behalf verification exists; tracking separation is P0C).
 - `apps/api/test/zg-tracking.test.ts` (own DB `om_test_tracking`): LT-041, 042, 043, 044, 045, 046, 047, 048, 049, 050, 051, 052, 053, 054, 055, 056, 057, 058, 059, 060 + readiness/health test (15 tests).
 - `apps/api/test/zh-landing-analytics.test.ts` (own DB `om_test_landing_analytics`): LT-081 (orders vs units on a landing), 082 (funnel 100/70/56 → 70/80/56), 083 (20 visits, 2 link + 2 on-behalf orders → 10%), 084, 085, 086, 087, 088 (100 000 UZS split 60/40, no ledger/journal change, partner ad stays null), 090. LT-081 matrix amount (56 orders/76 units/1 830 000) and LT-089 (cohort vs financial month) are covered by the existing `n-ad-analytics.test.ts` T07 and T32.
+- `apps/api/test/zi-target.test.ts` (own DB `om_test_target`, fake adapter): LT-061…LT-070 + honest blocked state without app/connection + copy/audience guard (10 tests).
 - LT-048 note: local outbox dedup is tested; provider-side dedup can only be verified with a real dataset (not run).
-- Full run 2026-11-04 (after P1A): `cd apps/api && pnpm vitest run` → 33 files, 244 tests passed, exit 0. (After P0C: 32 files, 238.) Web build OK; manual browser check: consent banner appears only after the owner connects a dataset, PageView recorded after consent. Web E2E not re-run for P0C (banner hidden by default).
+- Full run 2026-11-04 (after P1B): `cd apps/api && pnpm vitest run` → 34 files, 254 tests passed, exit 0. (After P1A: 33/244.) (After P0C: 32 files, 238.) Web build OK; manual browser check: consent banner appears only after the owner connects a dataset, PageView recorded after consent. Web E2E not re-run for P0C (banner hidden by default).
 
 ## Not started
-P1B–P2B (AI drafts, Meta OAuth + PAUSED provisioning, live activation gate, custom domains, A/B).
+P2A (safety rules/auto-pause, master kill switch, monitoring, unknown-operation recovery worker) and P2B (custom domains/TLS, A/B, catalog ads, lead forms, partner ad accounts).
 
 ## Policy register (demo defaults, not approved business values)
 - `tracking.server_event_max_age_days` = 7 (draft, is_demo) — provider acceptance window must be re-checked for the pinned API version.

@@ -38,6 +38,7 @@ import { registerUzcoin } from './modules/uzcoin/routes.js';
 import { registerLandings } from './modules/landings/routes.js';
 import { registerTracking } from './modules/tracking/routes.js';
 import { registerLandingAnalytics } from './modules/landings/analytics.js';
+import { registerTarget } from './modules/target/routes.js';
 import { registerReturns } from './modules/returns/routes.js';
 import { registerPayments } from './modules/payments/routes.js';
 import { registerSupport } from './modules/support/routes.js';
@@ -173,6 +174,7 @@ export async function buildApp(cfg: AppConfig, db: Db): Promise<FastifyInstance>
       registerLandings(api, deps);
       registerTracking(api, deps);
       registerLandingAnalytics(api, deps);
+      registerTarget(api, deps);
       registerVideos(api, deps);
       registerReturns(api, deps);
       registerPayments(api, deps);

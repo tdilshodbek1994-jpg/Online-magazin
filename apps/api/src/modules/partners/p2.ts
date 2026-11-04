@@ -398,6 +398,7 @@ export async function runP2Scheduled(db: Db): Promise<void> {
       if (u.rowCount) await queueNotification(tx, { phone: w.phone, channel: 'sms', purpose: 'transactional', template: 'price_watch.dropped', locale: 'uz-Latn', params: { product: w.name, was: som(w.was), now: som(w.now_price), path: `/p/${w.slug}` }, dedupeKey: `price-watch:${w.id}:${w.now_price}` });
     });
   }
+  await runPartnerWeekly(db);
   const due = await db.query(`SELECT id, remind_phone FROM partner_offers WHERE status='thinking' AND remind_phone IS NOT NULL AND remind_at <= now() AND expires_at > now() LIMIT 200`);
   for (const f of due.rows) {
     await withTx(db, async (tx) => {
@@ -405,4 +406,31 @@ export async function runP2Scheduled(db: Db): Promise<void> {
       if (u.rowCount) await queueNotification(tx, { phone: f.remind_phone, channel: 'sms', purpose: 'transactional', template: 'offer.reminder', locale: 'uz-Latn', params: {}, dedupeKey: `offer-remind:${f.id}` });
     });
   }
+}
+
+/**
+ * Weekly Telegram digest for partners (Mondays after 09:00 Tashkent): last 7 days — orders, delivered, money that
+ * became withdrawable, best stream. Real numbers only; nothing sent for a quiet week; one per partner per week (dedupe).
+ */
+export async function runPartnerWeekly(db: Db, now = new Date()): Promise<number> {
+  const t = new Date(now.getTime() + 5 * 3600e3); // Tashkent wall clock
+  if (t.getUTCDay() !== 1 || t.getUTCHours() < 9) return 0;
+  const week = t.toISOString().slice(0, 10);
+  const rows = await db.query(`
+    SELECT p.id, p.user_id,
+           (SELECT COUNT(*)::int FROM orders o WHERE o.attributed_partner_id=p.id AND o.created_at > now() - interval '7 days') AS orders,
+           (SELECT COUNT(*)::int FROM orders o WHERE o.attributed_partner_id=p.id AND o.delivered_at > now() - interval '7 days') AS delivered,
+           (SELECT COALESCE(SUM(amount_minor),0)::text FROM partner_ledger l WHERE l.partner_id=p.id AND l.to_bucket='available' AND l.created_at > now() - interval '7 days') AS available_minor,
+           (SELECT l.name FROM orders o JOIN referral_links l ON l.id::text = o.attribution->>'link_id'
+             WHERE o.attributed_partner_id=p.id AND o.created_at > now() - interval '7 days' GROUP BY l.name ORDER BY COUNT(*) DESC LIMIT 1) AS top_stream
+      FROM partners p JOIN telegram_links tl ON tl.user_id=p.user_id
+     WHERE p.status='active'`);
+  let sent = 0;
+  for (const r of rows.rows) {
+    if (r.orders === 0 && r.delivered === 0 && r.available_minor === '0') continue; // quiet week: no message
+    await queueNotification(db, { userId: r.user_id, channel: 'telegram', purpose: 'transactional', template: 'partner.weekly', locale: 'uz-Latn',
+      params: { orders: r.orders, delivered: r.delivered, amount_minor: r.available_minor, stream: r.top_stream ?? '—' }, dedupeKey: `partner-weekly:${r.id}:${week}` });
+    sent++;
+  }
+  return sent;
 }

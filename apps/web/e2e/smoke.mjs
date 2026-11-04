@@ -136,8 +136,8 @@ await step('E2E-10/T020', 'owner enrolls TOTP in UI; sensitive admin action asks
   await login('+998900000001');
   await page.goto(BASE + '/account/security');
   await page.getByRole('button', { name: 'Autentifikatorni ulash' }).click();
-  const secret = (await page.locator('code').first().textContent()).trim();
-  await page.getByLabel('Ilovadagi kod').fill(totp(secret));
+  const secret = (await page.locator('.mfa-key code').first().textContent()).replace(/\s/g, '');
+  await page.getByLabel('Ilovadagi 6 xonali kod').fill(totp(secret));
   await page.getByRole('button', { name: 'Faollashtirish' }).click();
   await page.getByText(/Tiklash kodlari/).waitFor();
   await page.goto(BASE + '/admin');

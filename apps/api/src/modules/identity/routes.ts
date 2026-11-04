@@ -181,7 +181,7 @@ export function registerIdentity(app: FastifyInstance, deps: Deps): void {
     const secret = newSecret();
     await db.query(`INSERT INTO user_mfa (user_id, secret_enc) VALUES ($1,$2) ON CONFLICT (user_id) DO UPDATE SET secret_enc=EXCLUDED.secret_enc, created_at=now()`, [actor.userId, encrypt(secret, cfg.mfaKey)]);
     const u = await one<{ phone_e164: string }>(db, `SELECT phone_e164 FROM users WHERE id=$1`, [actor.userId]);
-    return { secret, otpauth_uri: `otpauth://totp/OnlineMagazin:${encodeURIComponent(u.phone_e164)}?secret=${secret}&issuer=OnlineMagazin&digits=6&period=30` };
+    return { secret, otpauth_uri: `otpauth://totp/UzShop:${encodeURIComponent(u.phone_e164)}?secret=${secret}&issuer=UzShop&digits=6&period=30` };
   });
 
   route(app, deps, { method: 'POST', url: '/auth/mfa/activate', tags: T, summary: 'Confirm TOTP code; returns 8 one-time recovery codes once', body: z.object({ code: z.string().regex(/^\d{6}$/) }) }, async ({ actor, db, cfg, body }) => {

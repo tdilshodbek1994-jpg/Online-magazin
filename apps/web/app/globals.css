@@ -1303,3 +1303,13 @@ a.admin-tab { text-decoration: none; color: inherit; }
 .stock-info { display: grid; gap: 2px; min-width: 0; }
 .stock-info b { overflow-wrap: anywhere; }
 @media (max-width: 420px) { .stock-row { grid-template-columns: 52px minmax(0, 1fr); } .stock-row .pill { grid-column: 2; justify-self: start; } }
+.mfa-steps { display: grid; gap: 8px; }
+.mfa-steps ol { padding-left: 20px; margin: 0; display: grid; gap: 10px; }
+.mfa-steps li { display: grid; gap: 6px; }
+.mfa-steps li .btn { justify-self: start; }
+.mfa-key { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.mfa-key code { font-size: 15px; letter-spacing: .04em; word-break: break-all; padding: 6px 8px; border-radius: 8px; background: var(--surface-2); }
+.mfa-steps li { display: block; }
+.mfa-steps li > .btn { display: inline-flex; margin: 8px 0 6px; }
+.mfa-steps li > span { display: block; margin-top: 4px; }
+.mfa-steps li > .mfa-key { display: flex; }

@@ -14,10 +14,11 @@ const WHY: Record<string, string> = {
   'asset_not_verified:ad_account': 'Reklama hisobi tasdiqlanmagan', 'asset_not_verified:page': 'Sahifa (Page) tasdiqlanmagan', 'asset_not_verified:dataset': 'Dataset tasdiqlanmagan',
   landing_not_published: 'Landing nashrda emas', landing_revision_changed: 'Landing yangi versiyaga o‘tgan', out_of_stock: 'Mahsulot tugagan', dataset_mismatch: 'Dataset Pixel sozlamasidan farq qiladi',
   currency_mismatch: 'Valyuta hisob valyutasiga mos emas', budget_missing: 'Budjet kiritilmagan', schedule_invalid: 'Muddat noto‘g‘ri', creative_missing: 'Reklama matni yo‘q', payer_missing: 'Kim to‘lashi ko‘rsatilmagan',
-  adapter_not_connected: 'Meta adapteri ulanmagan', provider_timeout: 'Meta javob bermadi', approval_missing: 'Tasdiq yo‘q', approval_expired: 'Tasdiq muddati o‘tgan', approval_stale: 'Tasdiqdan keyin o‘zgartirilgan — qayta tasdiq kerak',
+  adapter_not_connected: 'Meta adapteri ulanmagan', provider_timeout: 'Meta javob bermadi', approval_missing: 'Tasdiq yo‘q', owner_reapproval_required: 'Xavfsizlik to‘xtatgan — qayta yoqish uchun egasi qayta tasdiqlashi kerak', spend_envelope_required: 'Egasi tasdiqlagan umumiy budjet chegarasi yo‘q',
+  envelope_exceeded: 'Umumiy budjet chegarasidan oshadi', end_date_required: 'Kunlik budjet uchun tugash sanasi kerak', stock_out: 'Tovar tugadi', landing_unpublished: 'Landing nashrdan olindi', price_changed: 'Narx o‘zgardi', creative_price_mismatch: 'Matndagi narx katalogdan farq qiladi', approval_expired: 'Tasdiq muddati o‘tgan', approval_stale: 'Tasdiqdan keyin o‘zgartirilgan — qayta tasdiq kerak',
 };
 const CHECK: Record<string, string> = { landing_published: 'Landing nashrda', product_available: 'Mahsulot bor', meta_connection: 'Meta ulanishi va ruxsat', ad_account_verified: 'Reklama hisobi', page_verified: 'Sahifa (Page)',
-  dataset_verified: 'Dataset', dataset_matches_tracking: 'Dataset = Pixel sozlamasi', currency_matches_account: 'Valyuta', budget_set: 'Budjet', schedule_valid: 'Muddat', creative_present: 'Reklama matni', creative_policy: 'Matn qoidalari', payer_shown: 'To‘lovchi ko‘rsatilgan' };
+  dataset_verified: 'Dataset', dataset_matches_tracking: 'Dataset = Pixel sozlamasi', currency_matches_account: 'Valyuta', budget_set: 'Budjet', schedule_valid: 'Muddat', creative_present: 'Reklama matni', creative_price_matches_catalog: 'Matndagi narx = katalog', creative_policy: 'Matn qoidalari', payer_shown: 'To‘lovchi ko‘rsatilgan' };
 const why = (r: string | null | undefined) => (r ? r.split(',').map((x) => (x.startsWith('creative_policy') ? 'Matnda taqiqlangan da’vo/havola/telefon bor' : WHY[x] ?? x)).join(' · ') : '');
 const local = (iso: string | null) => (iso ? new Date(new Date(iso).getTime() + 5 * 3600_000).toISOString().slice(0, 16) : '');
 const toIso = (v: string) => (v ? new Date(`${v}:00+05:00`).toISOString() : null);
@@ -47,6 +48,7 @@ export function TargetAdmin() {
         <div className="card cc-panel">
           <div className="spread"><b>Meta ulanishi</b><span className="pill">{conn.status === 'connected' ? '✅ ulangan' : `⛔ ${why(conn.blocked_reason) || 'ulanmagan'}`}</span></div>
           <p className="small">Hisobot: {conn.capabilities.reporting ? 'bor' : 'yo‘q'} · Reklama boshqarish: {conn.capabilities.manage_ads ? 'bor' : 'yo‘q'} · Jonli sarf: {conn.capabilities.live_spend_flag ? 'YOQILGAN' : 'o‘chiq'}{conn.account_currency ? ` · Valyuta ${conn.account_currency}` : ''}</p>
+          {conn.emergency && <p className="notice small">⚠️ {conn.emergency}</p>}
           {!conn.app_configured && <p className="notice small">Meta ilovasi (App ID, API versiyasi) sozlanmagan. Egasi Meta Business’da ilova yaratib, server sozlamasiga kiritgandan keyin ulash mumkin bo‘ladi.</p>}
           <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
             <button className="btn sm" onClick={start}>Meta’ni ulash (egasi)</button>
@@ -66,6 +68,7 @@ export function TargetAdmin() {
       </details>
       <div className="slist">{list.map((c) => <button key={c.id} type="button" className={`scard cc-card ${sel === c.id ? 'sel' : ''}`} onClick={() => setSel(sel === c.id ? null : c.id)}><div className="spread"><b>{c.title}</b><span className="pill">{ST[c.status] ?? c.status}</span></div><div className="small muted">/l/{c.slug} · {c.budget_type === 'daily' ? 'kunlik' : 'umumiy'} {som(c.budget_minor)}{c.blocked_reason ? ` · ${why(c.blocked_reason)}` : ''}</div></button>)}</div>
       {sel && <CampaignEditor id={sel} onChanged={load} />}
+      <SafetyPanel />
     </section>
   );
 }
@@ -109,14 +112,38 @@ function CampaignEditor({ id, onChanged }: { id: string; onChanged: () => void }
       </div>
       <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
         {editable && <button className="btn secondary sm" onClick={async () => { const r = await act('preflight', undefined, '✓ Tekshirildi'); if (r) setPf(r); }}>Tekshirish (preflight)</button>}
-        {d.status === 'review' && <button className="btn sm" onClick={() => act('approve', { digest: d.digest }, '✓ Tasdiqlandi')}>Tasdiqlash: {som(d.budget_minor)} {d.budget_type === 'daily' ? 'kuniga' : 'jami'}, to‘lovchi {d.payer_label} (egasi)</button>}
+        {['review', 'paused'].includes(d.status) && !d.approval.valid && <button className="btn sm" onClick={() => act('approve', { digest: d.digest }, '✓ Tasdiqlandi')}>Tasdiqlash: {som(d.budget_minor)} {d.budget_type === 'daily' ? 'kuniga' : 'jami'}, to‘lovchi {d.payer_label} (egasi)</button>}
         {['owner_approved', 'unknown', 'blocked'].includes(d.status) && d.approval.valid && <button className="btn secondary sm" onClick={() => act('provision', undefined, '✓ Meta’da TO‘XTATILGAN holda yaratildi')}>Meta’da to‘xtatilgan holda yaratish (egasi)</button>}
-        {d.status === 'provisioned_paused' && <button className="btn secondary sm" onClick={() => act('activate', undefined, 'Ishga tushirish so‘raldi — Meta tekshiruvi kutilmoqda')}>Ishga tushirish (pul sarflanadi, egasi)</button>}
+        {['provisioned_paused', 'paused'].includes(d.status) && <button className="btn secondary sm" onClick={() => act('activate', undefined, 'Ishga tushirish so‘raldi — Meta tekshiruvi kutilmoqda')}>Ishga tushirish (pul sarflanadi, egasi)</button>}
         {d.remote.length > 0 && <button className="btn secondary sm" onClick={() => act('sync', undefined, '✓ Holat yangilandi')}>Holatni yangilash</button>}
         {d.remote.length > 0 && !['paused', 'provisioned_paused'].includes(d.status) && <button className="btn secondary sm danger-t" onClick={() => act('pause')}>To‘xtatish</button>}
       </div>
       <p className="small muted">Tasdiq: {d.approval.valid ? '✅ amalda' : why(d.approval.reason)} · Matn versiyasi v{d.creative_revision} · Landing v{d.landing_revision}</p>
       {pf && <ul className="small" style={{ margin: 0, paddingLeft: 18 }}>{pf.checks.map((c: any) => <li key={c.check}>{c.ok ? '✅' : '⛔'} {CHECK[c.check] ?? c.check}{c.ok ? '' : ` — ${why(c.reason)}`}</li>)}</ul>}
     </div>
+  );
+}
+
+const RULE: Record<string, string> = { stock_out: 'Tovar tugasa — to‘xtatish so‘rovi', landing_unpublished: 'Landing nashrdan olinsa — to‘xtatish so‘rovi', price_changed: 'Narx o‘zgarsa — to‘xtatish so‘rovi' };
+/** P2A: protective rules (pause only), spending envelope, master kill switch, automation receipts. */
+function SafetyPanel() {
+  const [x, setX] = useState<any>(null);
+  const [total, setTotal] = useState('');
+  const load = useCallback(() => { api('/admin/ad-safety').then(setX).catch(() => {}); }, []);
+  useEffect(load, [load]);
+  if (!x) return null;
+  const env = x.envelopes.find((e: any) => !e.closed_at);
+  const run = async (fn: () => Promise<any>, ok: string) => { try { await fn(); toast(ok); load(); } catch (e: any) { toast(e.code === 'OWNER_APPROVAL_REQUIRED' ? 'Faqat egasi.' : errText(e), 'err'); } };
+  return (
+    <details className="card pp-more" style={{ marginTop: 12 }}>
+      <summary>🛡️ Xavfsizlik: chegaralar va favqulodda to‘xtatish</summary>
+      <p className="small muted">Avtomatika faqat to‘xtatish so‘rovini yuboradi — hech qachon yoqmaydi va budjetni oshirmaydi. To‘xtatilgandan keyin qayta yoqish faqat egasining yangi tasdig‘i bilan.</p>
+      {x.rules.map((r: any) => <label key={r.kind} className="row small" style={{ gap: 8, alignItems: 'center' }}><input type="checkbox" checked={r.enabled} onChange={(e) => run(() => api(`/admin/ad-safety/rules/${r.kind}`, { method: 'PUT', body: { enabled: e.target.checked } }), '✓ Saqlandi')} />{RULE[r.kind] ?? r.kind}</label>)}
+      <p className="small">Umumiy budjet chegarasi: {env ? `${som(env.total_minor)} (band: ${som(env.reserved_minor)})` : 'yo‘q — ishga tushirib bo‘lmaydi'}</p>
+      <div className="row" style={{ gap: 8 }}><input aria-label="Chegara (so‘m)" inputMode="numeric" placeholder="Chegara, so‘m" value={total} onChange={(e) => setTotal(e.target.value.replace(/\D/g, '').slice(0, 13))} />
+        <button className="btn secondary sm" disabled={!total} onClick={() => run(() => api('/admin/ad-safety/envelopes', { method: 'POST', body: { currency: 'UZS', total_minor: String(BigInt(total) * 100n) } }), '✓ Chegara tasdiqlandi')}>Tasdiqlash (egasi)</button></div>
+      <button className="btn sm danger-t" style={{ marginTop: 8 }} onClick={() => { if (confirm('UzShop yaratgan barcha reklamalarga to‘xtatish so‘rovi yuborilsinmi?')) void run(() => api('/admin/ad-safety/kill-switch', { method: 'POST', body: { reason: 'admin favqulodda to‘xtatish' } }), 'To‘xtatish so‘rovlari yuborildi'); }}>⛔ Hammasini to‘xtatish (faqat UzShop kampaniyalari)</button>
+      {x.receipts.length > 0 && <table className="tr-table" style={{ marginTop: 8 }}><tbody>{x.receipts.map((r: any) => <tr key={r.id}><td>{new Date(r.created_at).toLocaleString('uz')}</td><td>{r.title ?? '—'}</td><td>{r.action === 'pause_requested' ? 'To‘xtatish so‘raldi' : r.action === 'pause_failed' ? 'Meta javob bermadi' : r.action === 'kill_switch' ? 'Favqulodda' : r.action}</td><td className="muted">{why(r.reason) || r.reason}</td></tr>)}</tbody></table>}
+    </details>
   );
 }

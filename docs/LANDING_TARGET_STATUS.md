@@ -59,17 +59,30 @@ Branch `claude/online-marketplace-platform-sdtv52` · not merged to main · not 
 | Admin «🎯 Target» tab + `/admin/meta/callback` page | done |
 | Real Graph API adapter, app review, pinned version contract tests, exposure reserve across campaigns | **blocked**: owner Meta app/credentials (D19) |
 
+## P2A — done with a fake adapter (live spend still off)
+| Item | State |
+|---|---|
+| Migration `0034_target_safety.sql`: `ad_safety_rules` (stock_out / landing_unpublished / price_changed, owner-approved), `ad_automation_receipts`, `ad_spend_envelopes` + `ad_envelope_reservations`, draft `synced_at`/`paused_at`/`safety_reason` | done |
+| Safety evaluator (worker + `POST /admin/ad-safety/run`): only pause requests for UZSHOP-managed running campaigns; status `pause_requested` until the provider confirms PAUSED; approval revoked → restart needs a fresh owner approval (`OWNER_REAPPROVAL_REQUIRED`) | done |
+| Master kill switch `POST /admin/ad-safety/kill-switch`: only campaigns with our remote ids; receipts + audit | done |
+| Spending envelope: activation reserves daily×days or lifetime under a row lock; concurrent activations can never exceed it (`ENVELOPE_EXCEEDED`, `SPEND_ENVELOPE_REQUIRED`, `END_DATE_REQUIRED`) | done |
+| Catalog prices are part of the approval digest (price change → stale); `price_changed` rule pauses running campaigns; ad copy price must match the catalog (`creative_price_mismatch`) | done |
+| Token revoke/disconnect: response + connection health show live managed campaigns and the manual Ads Manager emergency path (never claims ads stopped) | done |
+| Recommendation endpoint is advisory: stale/no sync → warning, no budget suggestion; nothing applies budgets automatically | done |
+| Admin «🛡️ Xavfsizlik» panel in Target tab (rules, envelope, kill switch, receipts) | done |
+| Real provider monitoring at scale, alert recipients (Telegram), live activation test with real money | **blocked**: owner Meta app + a separately approved amount/asset/time scope |
+
 ## Tests
 - `apps/api/test/zf-landings.test.ts` (own DB `om_test_landing`): LT-001, 002, 004, 005, 008, 010, 011, 012, 013, 014, 015, 016, 020, 021, 022, 023, 026, 027, 028, 029, 030.
 - P0B not yet mapped: LT-003 (parallel stock — covered by existing reservation tests, not re-run for landings), LT-006 (expired quote — existing checkout test), LT-007 (multi-product single order — storefront cart; landing multi UI not built), LT-009 (offline form — client), LT-017 (AI draft, P1B), LT-018 (reduced motion — CSS, needs browser check), LT-019 (promotion timer from backend — no timer block yet), LT-024/025 (on-behalf verification exists; tracking separation is P0C).
 - `apps/api/test/zg-tracking.test.ts` (own DB `om_test_tracking`): LT-041, 042, 043, 044, 045, 046, 047, 048, 049, 050, 051, 052, 053, 054, 055, 056, 057, 058, 059, 060 + readiness/health test (15 tests).
 - `apps/api/test/zh-landing-analytics.test.ts` (own DB `om_test_landing_analytics`): LT-081 (orders vs units on a landing), 082 (funnel 100/70/56 → 70/80/56), 083 (20 visits, 2 link + 2 on-behalf orders → 10%), 084, 085, 086, 087, 088 (100 000 UZS split 60/40, no ledger/journal change, partner ad stays null), 090. LT-081 matrix amount (56 orders/76 units/1 830 000) and LT-089 (cohort vs financial month) are covered by the existing `n-ad-analytics.test.ts` T07 and T32.
-- `apps/api/test/zi-target.test.ts` (own DB `om_test_target`, fake adapter): LT-061…LT-070 + honest blocked state without app/connection + copy/audience guard (10 tests).
+- `apps/api/test/zi-target.test.ts` (own DB `om_test_target`, fake adapter): LT-061…LT-070, LT-071…LT-080 + honest blocked state without app/connection + copy/audience guard (18 tests).
 - LT-048 note: local outbox dedup is tested; provider-side dedup can only be verified with a real dataset (not run).
-- Full run 2026-11-04 (after P1B): `cd apps/api && pnpm vitest run` → 34 files, 254 tests passed, exit 0. (After P1A: 33/244.) (After P0C: 32 files, 238.) Web build OK; manual browser check: consent banner appears only after the owner connects a dataset, PageView recorded after consent. Web E2E not re-run for P0C (banner hidden by default).
+- Full run 2026-11-04 (after P2A): `cd apps/api && pnpm vitest run` → 34 files, 262 tests passed, exit 0. (After P1B: 254; after P1A: 244.) (After P0C: 32 files, 238.) Web build OK; manual browser check: consent banner appears only after the owner connects a dataset, PageView recorded after consent. Web E2E not re-run for P0C (banner hidden by default).
 
 ## Not started
-P2A (safety rules/auto-pause, master kill switch, monitoring, unknown-operation recovery worker) and P2B (custom domains/TLS, A/B, catalog ads, lead forms, partner ad accounts).
+P2B (custom domains/TLS, A/B, catalog ads, lead forms, partner ad accounts) — each behind its own flag.
 
 ## Policy register (demo defaults, not approved business values)
 - `tracking.server_event_max_age_days` = 7 (draft, is_demo) — provider acceptance window must be re-checked for the pinned API version.

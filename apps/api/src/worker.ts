@@ -6,6 +6,8 @@ import { releaseDraftHold, releaseReservation } from './modules/inventory/servic
 import { runP2Scheduled } from './modules/partners/p2.js';
 import { renderText, sendTelegram } from './modules/notifications/telegram.js';
 import { dispatchTracking } from './modules/tracking/service.js';
+import { runAdSafety } from './modules/target/safety.js';
+import { loadConfig } from './config.js';
 
 /**
  * Durable worker (ADR-005). Jobs are claimed with FOR UPDATE SKIP LOCKED; scheduled tasks run under a
@@ -68,6 +70,7 @@ export async function runScheduledOnce(db: Db, now: Date = new Date()): Promise<
       await runP2Scheduled(db).catch(() => {});
       const released = await withTx(db, (tx) => releaseMatured(tx, now));
       await dispatchTracking(db, process.env.NODE_ENV === 'production' ? 'production' : 'development', undefined, now).catch(() => {});
+      await runAdSafety(db, loadConfig()).catch(() => {}); // protective pause requests only
       await db.query(`UPDATE outbox_events SET dispatched_at=now() WHERE dispatched_at IS NULL AND id IN (SELECT id FROM outbox_events WHERE dispatched_at IS NULL ORDER BY id LIMIT 1000)`);
       return { expired, released };
     } finally {

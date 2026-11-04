@@ -27,13 +27,13 @@ function ownerOnly(a: Actor) { requirePerm(a, 'catalog.write'); if (!isOwner(a))
 const stable = (v: unknown): string => Array.isArray(v) ? `[${v.map(stable).join(',')}]` : v && typeof v === 'object'
   ? `{${Object.keys(v as object).sort().map((k) => `${JSON.stringify(k)}:${stable((v as Record<string, unknown>)[k])}`).join(',')}}` : JSON.stringify(v ?? null);
 
-interface Draft {
+export interface Draft {
   id: string; landing_id: string; landing_revision: number; flow_id: string | null; title: string; objective: string; ad_account_id: string | null; page_id: string | null; dataset_id: string | null;
   payer_label: string | null; currency: string; budget_type: 'daily' | 'lifetime'; budget_minor: string; start_at: string | null; end_at: string | null; audience: Record<string, unknown>; placements: string[];
   creative: Record<string, string>; creative_revision: number; policy_version: string; status: string; version: number; blocked_reason: string | null;
 }
 const DRAFT_COLS = `id, landing_id, landing_revision, flow_id, title, objective, ad_account_id, page_id, dataset_id, payer_label, currency, budget_type, budget_minor::text, start_at, end_at, audience, placements, creative, creative_revision, policy_version, status, version, blocked_reason, configured_status, effective_status, review_feedback`;
-const getDraft = async (q: Queryable, id: string, lock = false) => {
+export const getDraft = async (q: Queryable, id: string, lock = false) => {
   const d = await maybeOne<Draft>(q, `SELECT ${DRAFT_COLS} FROM campaign_drafts WHERE id=$1 ${lock ? 'FOR UPDATE' : ''}`, [id]);
   if (!d) throw notFound('CAMPAIGN');
   return d;
@@ -51,18 +51,18 @@ export async function approvalScope(q: Queryable, cfg: AppConfig, d: Draft) {
     ad_account: d.ad_account_id, payer: d.payer_label, currency: d.currency, budget_type: d.budget_type, budget_minor: d.budget_minor,
     start_at: d.start_at ? new Date(d.start_at).toISOString() : null, end_at: d.end_at ? new Date(d.end_at).toISOString() : null,
     audience: d.audience, placements: d.placements, creative_revision: d.creative_revision, landing_id: d.landing_id, landing_revision: d.landing_revision,
-    destination: await destinationUrl(q, cfg, d), page: d.page_id, dataset: d.dataset_id, objective: d.objective, policy_version: d.policy_version,
+    destination: await destinationUrl(q, cfg, d), offer_prices: await offerPrices(q, d.landing_id), page: d.page_id, dataset: d.dataset_id, objective: d.objective, policy_version: d.policy_version,
   };
   return { scope, digest: sha(stable(scope)) };
 }
 
-async function connection(q: Queryable) {
+export async function connection(q: Queryable) {
   return maybeOne<{ id: string; status: string; token_ciphertext: string | null; token_expires_at: string | null; scopes: string[]; ad_account_id: string | null; account_currency: string | null; account_timezone: string | null; page_id: string | null; dataset_id: string | null; verified_assets: Record<string, string>; business_id: string | null; last_error: string | null }>(
     q, `SELECT * FROM meta_connections WHERE status IN ('connected','pending','expired','error') ORDER BY (status='connected') DESC, updated_at DESC LIMIT 1`);
 }
-const tokenOf = (cfg: AppConfig, c: { token_ciphertext: string | null }) => decrypt(c.token_ciphertext!, cfg.mfaKey);
+export const tokenOf = (cfg: AppConfig, c: { token_ciphertext: string | null }) => decrypt(c.token_ciphertext!, cfg.mfaKey);
 
-function connectionBlocker(c: Awaited<ReturnType<typeof connection>>, needManage: boolean): string | null {
+export function connectionBlocker(c: Awaited<ReturnType<typeof connection>>, needManage: boolean): string | null {
   if (!c || c.status !== 'connected' || !c.token_ciphertext) return 'meta_not_connected';
   if (c.token_expires_at && new Date(c.token_expires_at) < new Date()) return 'meta_token_expired';
   if (needManage && !c.scopes.includes('ads_management')) return 'permission_missing:ads_management';
@@ -98,17 +98,67 @@ export async function preflight(q: Queryable, cfg: AppConfig, d: Draft) {
   add('creative_present', texts.every((t) => t.trim().length > 1), 'creative_missing');
   const issues = creativeIssues(texts);
   add('creative_policy', issues.length === 0, issues.length ? `creative_policy:${issues.join('|')}` : undefined);
+  const prices = await offerPrices(q, d.landing_id);
+  const wrong = priceClaims(texts.join(' ')).filter((p) => !prices.includes(p));
+  add('creative_price_matches_catalog', wrong.length === 0, 'creative_price_mismatch');
   add('payer_shown', !!d.payer_label, 'payer_missing');
   return { ok: checks.every((x) => x.ok), checks };
 }
 
-async function validApproval(q: Queryable, cfg: AppConfig, d: Draft) {
+export async function validApproval(q: Queryable, cfg: AppConfig, d: Draft) {
   const a = await maybeOne<{ id: string; digest: string; expires_at: string }>(q, `SELECT id, digest, expires_at FROM campaign_approvals WHERE draft_id=$1 AND revoked_at IS NULL ORDER BY approved_at DESC LIMIT 1`, [d.id]);
   const { digest } = await approvalScope(q, cfg, d);
   if (!a) return { ok: false as const, reason: 'approval_missing', digest };
   if (new Date(a.expires_at) <= new Date()) return { ok: false as const, reason: 'approval_expired', digest };
   if (a.digest !== digest) return { ok: false as const, reason: 'approval_stale', digest };
   return { ok: true as const, digest, approvalId: a.id };
+}
+
+export async function remoteIdsOf(q: Queryable, draftId: string): Promise<RemoteIds | null> {
+  const r = await many<{ level: string; remote_id: string }>(q, `SELECT level, remote_id FROM remote_objects WHERE draft_id=$1`, [draftId]);
+  const m = Object.fromEntries(r.map((x) => [x.level, x.remote_id]));
+  return m.campaign ? { campaign_id: m.campaign, adset_id: m.adset!, creative_id: m.creative!, ad_id: m.ad! } : null;
+}
+
+/** Catalog prices of the landing's products right now (the approved promise is bound to them — LT-080). */
+export async function offerPrices(q: Queryable, landingId: string): Promise<string[]> {
+  const l = await one<{ product_ids: string[] }>(q, `SELECT product_ids FROM landing_pages WHERE id=$1`, [landingId]);
+  const facts = await catalogFacts(q, l.product_ids) as any[];
+  return facts.flatMap((p) => (p.skus ?? []).map((x: any) => String(x.price_minor))).sort();
+}
+/** Prices written in ad copy ("100 000 so‘m", "100000 UZS") must exist in the catalog (LT-072). */
+export function priceClaims(text: string): string[] {
+  const out: string[] = [];
+  for (const m of text.matchAll(/(\d[\d\s.,]{2,})\s*(so[‘'`ʻ]?m|сўм|сум|uzs)/gi)) out.push(String(BigInt(m[1]!.replace(/[\s.,]/g, '')) * 100n));
+  return out;
+}
+
+const LIVE = `('activation_requested','delivery_pending','delivering','pause_requested','unknown')`;
+/** LT-077: revoking the token does not stop remote ads — say so and show the manual emergency path. */
+async function liveInfo(q: Queryable, c: Awaited<ReturnType<typeof connection>>) {
+  const n = (await one<{ n: number }>(q, `SELECT COUNT(*)::int AS n FROM campaign_drafts WHERE status IN ${LIVE}`)).n;
+  const connected = !!c && connectionBlocker(c, true) === null;
+  return { managed_live_campaigns: n, emergency: n > 0 && !connected ? 'Meta ulanmagan, lekin reklamalar ishlayotgan bo‘lishi mumkin: Ads Manager’da qo‘lda to‘xtating yoki qayta ulang.' : null };
+}
+
+/** Exposure of a campaign for the spending envelope: lifetime budget, or daily × scheduled days (end date required). */
+export function exposureOf(d: Pick<Draft, 'budget_type' | 'budget_minor' | 'start_at' | 'end_at'>): bigint {
+  if (d.budget_type === 'lifetime') return BigInt(d.budget_minor);
+  if (!d.end_at || !d.start_at) throw new AppError(409, 'END_DATE_REQUIRED');
+  const days = BigInt(Math.ceil((Date.parse(d.end_at) - Date.parse(d.start_at)) / 86_400_000));
+  return BigInt(d.budget_minor) * (days > 0n ? days : 1n);
+}
+export async function reserveEnvelope(db: Queryable & { connect?: unknown }, d: Draft) {
+  const exposure = exposureOf(d);
+  await withTx(db as never, async (tx) => {
+    const env = await maybeOne<{ id: string; total_minor: string }>(tx, `SELECT id, total_minor::text FROM ad_spend_envelopes WHERE closed_at IS NULL AND currency=$1 ORDER BY approved_at DESC LIMIT 1 FOR UPDATE`, [d.currency]);
+    if (!env) throw new AppError(409, 'SPEND_ENVELOPE_REQUIRED');
+    const mine = await maybeOne<{ amount_minor: string }>(tx, `SELECT amount_minor::text FROM ad_envelope_reservations WHERE draft_id=$1 AND released_at IS NULL AND envelope_id=$2`, [d.id, env.id]);
+    if (mine && BigInt(mine.amount_minor) >= exposure) return;
+    const used = BigInt((await one<{ s: string }>(tx, `SELECT COALESCE(SUM(amount_minor),0)::text AS s FROM ad_envelope_reservations WHERE envelope_id=$1 AND released_at IS NULL AND draft_id<>$2`, [env.id, d.id])).s);
+    if (used + exposure > BigInt(env.total_minor)) throw new AppError(409, 'ENVELOPE_EXCEEDED');
+    await tx.query(`INSERT INTO ad_envelope_reservations (draft_id, envelope_id, amount_minor) VALUES ($1,$2,$3) ON CONFLICT (draft_id) DO UPDATE SET envelope_id=EXCLUDED.envelope_id, amount_minor=EXCLUDED.amount_minor, released_at=NULL, created_at=now()`, [d.id, env.id, exposure.toString()]);
+  });
 }
 
 const zCreative = z.object({ headline: z.string().trim().min(2).max(60), primary_text: z.string().trim().min(2).max(500), cta: z.enum(['SHOP_NOW', 'ORDER_NOW', 'LEARN_MORE']).default('ORDER_NOW') }).strict();
@@ -127,6 +177,7 @@ export function registerTarget(app: FastifyInstance, deps: Deps): void {
       verified_assets: c?.verified_assets ?? {}, token_expires_at: c?.token_expires_at ?? null, last_error: c?.last_error ?? null,
       capabilities: { reporting: !!c?.scopes.includes('ads_read'), manage_ads: !!c?.scopes.includes('ads_management'), live_spend_flag: !!flag?.enabled },
       app_configured: metaAdapter().authorizeUrl('x', 'x') !== null, adapter: metaAdapter().name,
+      ...(await liveInfo(db, c)),
     };
   });
 
@@ -184,7 +235,8 @@ export function registerTarget(app: FastifyInstance, deps: Deps): void {
     ownerOnly(actor);
     await db.query(`UPDATE meta_connections SET status='revoked', token_ciphertext=NULL, updated_at=now() WHERE status IN ('connected','pending','error','expired')`);
     await audit(db, actor, 'meta.disconnected', { type: 'meta_connection', id: '-' }, {});
-    return { ok: true, note: 'Token o‘chirildi. Meta’dagi reklamalar o‘chmaydi — kerak bo‘lsa avval to‘xtating.' };
+    const live = await liveInfo(db, null);
+    return { ok: true, note: 'Token o‘chirildi. Meta’dagi reklamalar o‘chmaydi — kerak bo‘lsa avval to‘xtating.', ...live };
   });
 
   // ---------------------------------------------------------------- drafts
@@ -277,13 +329,13 @@ export function registerTarget(app: FastifyInstance, deps: Deps): void {
     ownerOnly(actor);
     return withTx(db, async (tx) => {
       const d = await getDraft(tx, params.id, true);
-      if (d.status !== 'review') throw new AppError(409, 'PREFLIGHT_REQUIRED');
+      if (d.status !== 'review' && d.status !== 'paused') throw new AppError(409, 'PREFLIGHT_REQUIRED'); // paused → resume needs a fresh owner approval
       const { digest, scope } = await approvalScope(tx, cfg, d);
       if (digest !== body.digest) throw new AppError(409, 'APPROVAL_DIGEST_MISMATCH');
       const ttl = (await getPolicy<{ hours: number }>(tx, 'target.approval_ttl_hours', cfg.env))?.value.hours ?? 24;
       await tx.query(`UPDATE campaign_approvals SET revoked_at=now() WHERE draft_id=$1 AND revoked_at IS NULL`, [d.id]);
       await tx.query(`INSERT INTO campaign_approvals (draft_id, digest, scope, approved_by, expires_at) VALUES ($1,$2,$3,$4, now() + make_interval(hours => $5))`, [d.id, digest, JSON.stringify(scope), actor.userId, ttl]);
-      await tx.query(`UPDATE campaign_drafts SET status='owner_approved', updated_at=now() WHERE id=$1`, [d.id]);
+      if (d.status === 'review') await tx.query(`UPDATE campaign_drafts SET status='owner_approved', updated_at=now() WHERE id=$1`, [d.id]);
       await audit(tx, actor, 'campaign.approved', { type: 'campaign', id: d.id }, { after: { digest, budget_minor: d.budget_minor, currency: d.currency, payer: d.payer_label } });
       return { ok: true, digest, expires_in_hours: ttl };
     });
@@ -302,11 +354,7 @@ export function registerTarget(app: FastifyInstance, deps: Deps): void {
   }
   const finish = (opId: string, status: string, error: string | null = null) =>
     deps.db.query(`UPDATE provisioning_operations SET status=$2, error=$3, updated_at=now() WHERE id=$1`, [opId, status, error]);
-  const remoteIds = async (draftId: string): Promise<RemoteIds | null> => {
-    const r = await many<{ level: string; remote_id: string }>(deps.db, `SELECT level, remote_id FROM remote_objects WHERE draft_id=$1`, [draftId]);
-    const m = Object.fromEntries(r.map((x) => [x.level, x.remote_id]));
-    return m.campaign ? { campaign_id: m.campaign, adset_id: m.adset!, creative_id: m.creative!, ad_id: m.ad! } : null;
-  };
+  const remoteIds = (draftId: string) => remoteIdsOf(deps.db, draftId);
 
   route(app, deps, { method: 'POST', url: '/admin/ad-campaigns/:id/provision', tags: A, summary: 'Owner: create remote objects PAUSED (idempotent; unknown outcome → reconcile by client_ref)', params: zIdParam },
     async ({ actor, db, cfg, params }) => {
@@ -363,12 +411,13 @@ export function registerTarget(app: FastifyInstance, deps: Deps): void {
       if (!flag?.enabled) throw new AppError(409, 'LIVE_SPEND_DISABLED');
       const d = await getDraft(db, params.id);
       if (['activation_requested', 'delivery_pending', 'delivering'].includes(d.status)) return { status: d.status, replayed: true };
-      if (d.status !== 'provisioned_paused') throw new AppError(409, 'PROVISION_REQUIRED');
+      if (d.status !== 'provisioned_paused' && d.status !== 'paused') throw new AppError(409, 'PROVISION_REQUIRED');
       const ap = await validApproval(db, cfg, d);
-      if (!ap.ok) throw new AppError(409, ap.reason.toUpperCase());
+      if (!ap.ok) throw new AppError(409, d.status === 'paused' ? 'OWNER_REAPPROVAL_REQUIRED' : ap.reason.toUpperCase());
       const c = await connection(db);
       const cb = connectionBlocker(c, true);
       if (cb) throw new AppError(409, cb.toUpperCase());
+      await reserveEnvelope(db, d); // LT-079: never more than the owner-approved spending envelope
       const { op, claimed } = await claim(d.id, 'activate', ap.digest, actor.userId);
       if (!claimed) return { status: op.status === 'succeeded' ? 'delivery_pending' : 'activation_requested', replayed: true };
       await db.query(`UPDATE campaign_drafts SET status='activation_requested', updated_at=now() WHERE id=$1`, [d.id]);
@@ -383,7 +432,8 @@ export function registerTarget(app: FastifyInstance, deps: Deps): void {
       } catch (e) {
         const code = (e as { code?: string }).code ?? 'provider_error';
         await finish(op.id, code === 'TIMEOUT' ? 'unknown' : 'failed', code);
-        await db.query(`UPDATE campaign_drafts SET status=$2, blocked_reason=$3, updated_at=now() WHERE id=$1`, [d.id, code === 'TIMEOUT' ? 'unknown' : 'provisioned_paused', code]);
+        if (code !== 'TIMEOUT') await db.query(`UPDATE ad_envelope_reservations SET released_at=now() WHERE draft_id=$1 AND released_at IS NULL`, [d.id]);
+        await db.query(`UPDATE campaign_drafts SET status=$2, blocked_reason=$3, updated_at=now() WHERE id=$1`, [d.id, code === 'TIMEOUT' ? 'unknown' : d.status, code]);
         return { status: code === 'TIMEOUT' ? 'unknown' : 'provisioned_paused', error: code };
       }
     });
@@ -399,9 +449,10 @@ export function registerTarget(app: FastifyInstance, deps: Deps): void {
       try {
         if (connectionBlocker(c, true)) throw Object.assign(new Error('x'), { code: 'NOT_CONNECTED' });
         await metaAdapter().pause(tokenOf(cfg, c!), ids);
-        await db.query(`UPDATE campaign_drafts SET status='paused', configured_status='PAUSED', updated_at=now() WHERE id=$1`, [d.id]);
-        await audit(db, actor, 'campaign.paused', { type: 'campaign', id: d.id }, {});
-        return { status: 'paused' };
+        // requested ≠ confirmed: "paused" only after the provider reports it (sync)
+        await db.query(`UPDATE campaign_drafts SET configured_status='PAUSED', paused_at=now(), updated_at=now() WHERE id=$1`, [d.id]);
+        await audit(db, actor, 'campaign.pause_requested', { type: 'campaign', id: d.id }, {});
+        return { status: 'pause_requested' };
       } catch {
         return { status: 'pause_requested', note: 'To‘xtatish tasdig‘i kutilmoqda' };
       }
@@ -417,10 +468,11 @@ export function registerTarget(app: FastifyInstance, deps: Deps): void {
     if (cb) throw new AppError(409, cb.toUpperCase());
     const st = await metaAdapter().status(tokenOf(cfg, c!), ids);
     const next = st.effective === 'DISAPPROVED' ? 'rejected'
-      : st.effective === 'PAUSED' || st.configured === 'PAUSED' ? (d.status === 'provisioned_paused' ? 'provisioned_paused' : 'paused')
+      : st.effective === 'PAUSED' ? (d.status === 'provisioned_paused' ? 'provisioned_paused' : 'paused')
+      : d.status === 'pause_requested' ? 'pause_requested'
       : st.effective === 'ACTIVE' ? 'delivering'
       : ['PENDING_REVIEW', 'IN_PROCESS', 'PENDING_BILLING_INFO', 'WITH_ISSUES'].includes(st.effective) ? 'delivery_pending' : 'unknown';
-    await db.query(`UPDATE campaign_drafts SET status=$2, configured_status=$3, effective_status=$4, review_feedback=$5, updated_at=now() WHERE id=$1`, [d.id, next, st.configured, st.effective, st.review_feedback]);
+    await db.query(`UPDATE campaign_drafts SET status=$2, configured_status=$3, effective_status=$4, review_feedback=$5, synced_at=now(), updated_at=now() WHERE id=$1`, [d.id, next, st.configured, st.effective, st.review_feedback]);
     await db.query(`UPDATE remote_objects SET configured_status=$2, effective_status=$3, updated_at=now() WHERE draft_id=$1`, [d.id, st.configured, st.effective]);
     return { status: next, configured_status: st.configured, effective_status: st.effective, review_feedback: st.review_feedback };
   });

@@ -112,13 +112,14 @@ export function PartnerGuard({ children }: { children: React.ReactNode }) {
 }
 
 /** Connect the partner's Telegram to receive order / delivery / payment messages. */
-export function TelegramConnect() {
+export function TelegramConnect({ compact = false }: { compact?: boolean }) {
   const [s, setS] = useState<any>(null);
   const [link, setLink] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const load = () => api('/me/telegram').then(setS).catch(() => {});
   useEffect(() => { void load(); }, []);
   if (!s) return null;
+  if (s.linked && compact) return <span className="mini-chip ok" title="Yangi buyurtma, yetkazish va to‘lovlar haqida xabar keladi">✅ Telegram ulangan</span>;
   if (s.linked) return (
     <div className="tg-card ok">
       <span aria-hidden>✅</span>

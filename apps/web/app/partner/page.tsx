@@ -45,102 +45,87 @@ export default function PartnerDashboard() {
         <div className="card"><h1>Hamkor kabineti · <code>{me.code}</code></h1><p className="notice">{me.status === 'pending' ? 'Arizangiz ko‘rib chiqilmoqda. Tasdiqlangach bu yerda Market va oqimlar ochiladi.' : 'Ariza rad etilgan. Savollar bo‘lsa, qo‘llab-quvvatlashga yozing.'}</p></div>
       ) : me && (
         <>
-          <section className="pd-hero">
+          <section className="pd-hero pd-hero2">
             <div className="pd-avatar" aria-hidden>{(me.display_name || '?').slice(0, 2).toUpperCase()}</div>
-            <div>
+            <div className="pd-who">
               <h1>{me.display_name}</h1>
-              <div className="muted-inv">Hamkor kodi: <code>{me.code}</code>{me.status !== 'active' && <span className="badge"> {stText(me.status)}</span>}</div>
-              {support && <a className="support-btn" href={support} target="_blank" rel="noopener noreferrer">✈️ Qo‘llab-quvvatlash</a>}
+              <div className="muted-inv">Kod: <code>{me.code}</code>{me.status !== 'active' && <span className="badge"> {stText(me.status)}</span>}</div>
             </div>
+            {support && <a className="pd-support" href={support} target="_blank" rel="noopener noreferrer" aria-label="Qo‘llab-quvvatlash">✈️</a>}
           </section>
 
-          <Link href="/partner/new" className="cta-order"><span aria-hidden>＋</span><div><b>Mijoz uchun buyurtma</b><small>Telefon, manzil — 1 daqiqada. Mijoz SMS bilan tasdiqlaydi.</small></div></Link>
+          {/* Big cards: each one job, each its own colour (user request: like "Mijoz uchun buyurtma", clearly different). */}
+          <div className="big-cards">
+            <Link href="/partner/new" className="big-card bc-green">
+              <span className="big-ico" aria-hidden>＋</span>
+              <span className="big-txt"><b>Mijoz uchun buyurtma</b><small>Telefon, manzil — 1 daqiqada</small></span>
+            </Link>
 
-          <section className="balance-card">
-            <div className="bc-main"><span>Hisobingizda</span><b>{som(me.balances.available_minor)}</b></div>
-            <div className="bc-row">
-              <Link href="/partner/wallet?reason=not_delivered" className="bc-link"><span>Taxminiy ›</span><b>{som(me.balances.estimated_minor)}</b></Link>
-              <Link href="/partner/wallet?reason=hold" className="bc-link"><span>Kutilmoqda ›</span><b>{som(me.balances.pending_minor)}</b></Link>
-              <Link href="/partner/wallet?reason=available" className="bc-link"><span>Yechish mumkin</span><b>{som(me.balances.available_minor)}</b></Link>
+            <Link href="/partner/wallet" className="big-card bc-gold">
+              <span className="big-ico" aria-hidden>💰</span>
+              <span className="big-txt"><small>Yechish mumkin</small><b>{som(me.balances.available_minor)}</b>
+                <small className="big-sub">Kutilmoqda {som(me.balances.pending_minor)} · Taxminiy {som(me.balances.estimated_minor)}</small></span>
+              <span className="big-go" aria-hidden>›</span>
+            </Link>
+
+            {att && (att.action.length > 0 || att.waiting.length > 0) ? (
+              <details className="big-card bc-orange big-det">
+                <summary>
+                  <span className="big-ico" aria-hidden>⚡</span>
+                  <span className="big-txt"><b>Hozir nima qilish kerak</b>
+                    <small>{att.action.length > 0 ? `${att.action.length} ta ish sizni kutyapti` : 'Sizdan amal kerak emas'}{att.waiting.length > 0 ? ` · ${att.waiting.length} ta javob kutilmoqda` : ''}</small></span>
+                  <span className="big-go" aria-hidden>⌄</span>
+                </summary>
+                <div className="big-body">
+                  {att.action.length > 0 && <AttGroup cls="act" title="Sizdan amal kerak" items={att.action} />}
+                  {att.waiting.length > 0 && <AttGroup cls="wait" title="Magazin / mijoz javobini kutyapmiz" items={att.waiting} />}
+                </div>
+              </details>
+            ) : att && BigInt(me.balances.estimated_minor) + BigInt(me.balances.pending_minor) + BigInt(me.balances.available_minor) + BigInt(me.balances.paid_minor) === 0n ? (
+              <Link href="/partner/market" className="big-card bc-orange">
+                <span className="big-ico" aria-hidden>🚀</span>
+                <span className="big-txt"><b>Boshlash: mahsulot tanlang</b><small>Havolani joylang yoki mijoz buyurtmasini kiriting</small></span>
+                <span className="big-go" aria-hidden>›</span>
+              </Link>
+            ) : att ? (
+              <div className="big-card bc-orange"><span className="big-ico" aria-hidden>✓</span><span className="big-txt"><b>Shoshilinch ish yo‘q</b><small>Hammasi joyida</small></span></div>
+            ) : null}
+
+            <div className="big-card bc-blue big-stats">
+              <div className="big-head"><b>Natijalar</b>
+                <label className="sr-only" htmlFor="pd-period">Davr</label>
+                <select id="pd-period" className="big-select" value={period} onChange={(e) => setPeriod(e.target.value)}>{PERIODS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>
+              </div>
+              {err && <div className="small" role="alert">{errText(err)}</div>}
+              {d && (
+                <div className="big-nums">
+                  <Link href={`/partner/orders?status=all&period=${period}`}><b>{d.orders.total}</b><small>buyurtma</small></Link>
+                  <Link href={`/partner/orders?status=new&period=${period}`}><b>{d.orders.new}</b><small>{BUCKET_LABEL.new.toLowerCase()}</small></Link>
+                  <Link href={`/partner/orders?status=delivered&period=${period}`}><b>{d.orders.delivered}</b><small>yetkazildi</small></Link>
+                  <Link href={`/partner/orders?status=returned&period=${period}`}><b>{d.orders.returned}</b><small>qaytdi</small></Link>
+                </div>
+              )}
+              {d && <Link href="/partner/stats" className="big-more">{d.delivery_rate_30d === null ? 'Batafsil statistika' : `Yetkazish foizi (30 kun): ${d.delivery_rate_30d}%`} ›</Link>}
             </div>
-            <Link href="/partner/wallet" className="btn bc-btn">Hamyon va pul yechish</Link>
-          </section>
+          </div>
 
-          {att && (att.action.length > 0 || att.waiting.length > 0) ? (
-            <section className="attention" aria-labelledby="att-h">
-              <h2 id="att-h">Hozir nima qilishim kerak?</h2>
-              {att.action.length > 0 && (
-                <AttGroup cls="act" title="Sizdan amal kerak" items={att.action} />
-              )}
-              {att.waiting.length > 0 && (
-                <AttGroup cls="wait" title="Magazin / mijoz javobini kutyapmiz" items={att.waiting} />
-              )}
-            </section>
-          ) : att && BigInt(me.balances.estimated_minor) + BigInt(me.balances.pending_minor) + BigInt(me.balances.available_minor) + BigInt(me.balances.paid_minor) === 0n ? (
-            <section className="card start-path">
-              <h2>Boshlash uchun 3 qadam</h2>
-              <ol>
-                <li><Link href="/partner/market">Mahsulot tanlang</Link> — narx, sizning komissiyangiz va zaxira ko‘rinadi.</li>
-                <li>Post yoki havolani Telegram/Instagram’ga joylang yoki <Link href="/partner/new">mijoz buyurtmasini o‘zingiz kiriting</Link>.</li>
-                <li>Buyurtma yetkazilgach komissiya <Link href="/partner/wallet">Hamyon</Link>da «Yechish mumkin» bo‘ladi.</li>
-              </ol>
-            </section>
-          ) : att ? <p className="notice ok">Hozircha shoshilinch ish yo‘q ✓</p> : null}
+          {/* Small facts in one row. */}
+          <div className="mini-row">
+            <TelegramConnect compact />
+            <Link href="/partner/top" className="mini-chip">👑 {day ? `Kun admini: ${day.name}${day.me ? ' (siz!)' : ''}` : 'Kun admini: hali yo‘q'}</Link>
+            {d?.month_rank && <Link href="/partner/top" className="mini-chip">🏅 Oydagi o‘rningiz: #{d.month_rank.rank}</Link>}
+          </div>
 
-          <TelegramConnect />
-
-          <section className="rank-card day-card">
-            <div className="rank-badge">👑</div>
-            <div><b>Kun admini</b><div className="muted">{day ? `${day.name}${day.me ? ' (siz!)' : ''} — bugun ${day.delivered} yetkazilgan / ${day.total} buyurtma` : 'Bugun hali yetakchi yo‘q — birinchi bo‘ling!'}</div></div>
-          </section>
-
-          {d?.month_rank && (
-            <section className="rank-card">
-              <div className="rank-badge">#{d.month_rank.rank}</div>
-              <div><b>Shu oydagi o‘rningiz</b><div className="muted">{d.month_rank.delivered} ta yetkazilgan buyurtma</div></div>
-              <Link href="/partner/top" className="see-all">TOP hamkorlar →</Link>
-            </section>
-          )}
-
-          <div className="rail-head" style={{ marginTop: 20 }}><h2>Natijalar</h2></div>
-          <Chips items={PERIODS} value={period} onChange={setPeriod} label="Davr" />
-          {err && <div className="notice" role="alert">{errText(err)}</div>}
-          {d && (
-            <>
-              <div className="stat-grid">
-                <Link href={`/partner/orders?status=all&period=${period}`} className="stat s-total"><b>{d.orders.total}</b><span>Jami buyurtmalar ›</span></Link>
-                {(['new', 'accepted', 'shipping', 'delivered', 'returned', 'cancelled'] as const).map((k) => (
-                  <Link key={k} href={`/partner/orders?status=${k}&period=${period}`} className={`stat s-${k}`}><b>{d.orders[k]}</b><span>{BUCKET_LABEL[k]} ›</span></Link>
-                ))}
-                <Link href="/partner/stats" className="stat s-rate"><b>{d.delivery_rate_30d === null ? '—' : `${d.delivery_rate_30d}%`}</b><span>Yetkazish foizi (30 kun) ›</span></Link>
-              </div>
-              <div className="kpi-row">
-                <Link href="/partner/streams" className="card kpi kpi-link"><span className="muted">Bosishlar ›</span><b>{d.clicks}</b></Link>
-                <div className="card kpi" title={d.conversion?.formula}><span className="muted">Konversiya (veb)</span><b>{d.conversion_pct === null ? '—' : `${d.conversion_pct}%`}</b>
-                  <small className="muted">{d.conversion ? (d.conversion.clicks < d.conversion.min_sample ? `Ma’lumot kam: ${d.conversion.clicks} bosish (kamida ${d.conversion.min_sample} kerak)` : `${d.conversion.web_orders} buyurtma / ${d.conversion.clicks} bosish`) : ''}</small></div>
-                <Link href="/partner/wallet?reason=not_delivered" className="card kpi kpi-link"><span className="muted">Kutilayotgan daromad ›</span><b>{som(d.earned.estimated_minor)}</b></Link>
-                <Link href="/partner/wallet?reason=available" className="card kpi kpi-link"><span className="muted">Tasdiqlangan daromad ›</span><b>{som(d.earned.confirmed_minor)}</b></Link>
-              </div>
-            </>
-          )}
-
-          <div className="tile-grid">
-            <Link href="/partner/orders" className="tile-link"><span>📋</span>Buyurtmalar va qoralamalar</Link>
-            <Link href="/partner/market" className="tile-link"><span>🛍️</span>Market — mahsulot tanlash</Link>
-            <Link href="/partner/streams" className="tile-link"><span>🔗</span>Oqimlarim</Link>
-            <Link href="/partner/new" className="tile-link"><span>📞</span>Mijoz uchun buyurtma</Link>
-            <Link href="/partner/analytics" className="tile-link"><span>📈</span>Reklama va daromad</Link>
-            <Link href="/partner/offers" className="tile-link"><span>🧺</span>Taklif to‘plami (2–3 variant)</Link>
-            <Link href="/partner/contacts" className="tile-link"><span>📒</span>Mijozlar daftari</Link>
-            <Link href="/partner/wallet" className="tile-link"><span>💳</span>Hamyon: komissiya va to‘lovlar</Link>
-            <Link href="/partner/stats" className="tile-link"><span>📊</span>Statistika</Link>
-            <Link href="/partner/programs#konkurs" className="tile-link"><span>🏆</span>Konkurs</Link>
-            <Link href="/partner/programs#bonus" className="tile-link"><span>🎁</span>Bonuslar</Link>
-            <Link href="/partner/programs#jarima" className="tile-link"><span>⚠️</span>Jarimalar</Link>
-            <Link href="/partner/programs#hayriya" className="tile-link"><span>💝</span>Hayriya qutisi</Link>
-            <Link href="/partner/top" className="tile-link"><span>📈</span>TOP hamkorlar</Link>
-            <Link href="/partner/notifications" className="tile-link"><span>🔔</span>Bildirishnomalar</Link>
-            <Link href="/partner/about" className="tile-link"><span>📘</span>Dastur haqida</Link>
+          {/* Small tiles: about a third of a big card. */}
+          <div className="mini-tiles">
+            {([
+              ['/partner/orders', '📋', 'Buyurtmalar', 't1'], ['/partner/market', '🛍️', 'Market', 't2'], ['/partner/streams', '🔗', 'Oqimlar', 't3'], ['/partner/analytics', '📈', 'Reklama', 't4'],
+              ['/partner/offers', '🧺', 'Taklif to‘plami', 't5'], ['/partner/contacts', '📒', 'Mijozlar', 't6'], ['/partner/stats', '📊', 'Statistika', 't7'], ['/partner/wallet', '💳', 'Hamyon', 't8'],
+              ['/partner/programs#konkurs', '🏆', 'Konkurs', 't1'], ['/partner/programs#bonus', '🎁', 'Bonuslar', 't2'], ['/partner/programs#jarima', '⚠️', 'Jarimalar', 't3'], ['/partner/programs#hayriya', '💝', 'Hayriya', 't4'],
+              ['/partner/top', '🥇', 'TOP', 't5'], ['/partner/notifications', '🔔', 'Xabarlar', 't6'], ['/partner/expenses', '🧾', 'Xarajatlar', 't7'], ['/partner/about', '📘', 'Qoidalar', 't8'],
+            ] as const).map(([href, ico, label, tone]) => (
+              <Link key={href} href={href} className={`mini-tile ${tone}`}><span aria-hidden>{ico}</span>{label}</Link>
+            ))}
           </div>
         </>
       )}

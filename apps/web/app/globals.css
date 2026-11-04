@@ -1490,3 +1490,30 @@ button.cc-card, a.cc-card { display: grid; gap: 4px; text-align: left; font: inh
 .cc-form, .cc-panel { display: grid; gap: 8px; }
 .cc-prize { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .cc-prize input:not([style]) { flex: 1; min-width: 120px; }
+/* ===== Contest podium (top 3) ===== */
+.podium-wrap { display: grid; gap: 10px; }
+.podium { display: grid; grid-template-columns: 1fr 1.15fr 1fr; align-items: end; gap: 8px; padding: 18px 10px 0; border-radius: 20px;
+  background: radial-gradient(circle at 50% 0%, rgba(255,214,10,.35) 0, transparent 55%), linear-gradient(180deg, #0f2a1d 0%, #134e33 100%); color: #fff; overflow: hidden; }
+.pod { display: grid; justify-items: center; gap: 4px; text-align: center; min-width: 0; position: relative; }
+.pod-crown { font-size: 22px; line-height: 1; animation: pod-bob 2.4s ease-in-out infinite; }
+@keyframes pod-bob { 50% { transform: translateY(-3px); } }
+.pod-ava { width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; font-weight: 900; font-size: 18px; color: #0f2a1d; border: 3px solid #fff; box-shadow: 0 6px 16px rgba(0,0,0,.25); }
+.pod-1 .pod-ava { width: 64px; height: 64px; font-size: 22px; background: linear-gradient(135deg, #ffe066, #f5b301); border-color: #fff3bf; }
+.pod-2 .pod-ava { background: linear-gradient(135deg, #f1f3f5, #adb5bd); }
+.pod-3 .pod-ava { background: linear-gradient(135deg, #ffd8a8, #d9822b); }
+.pod-name { font-size: 13px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pod-val { font-size: 12px; opacity: .9; font-weight: 700; }
+.pod-step { width: 100%; display: grid; justify-items: center; align-content: start; gap: 2px; padding-top: 8px; border-radius: 14px 14px 0 0; margin-top: 4px; }
+.pod-1 .pod-step { height: 104px; background: linear-gradient(180deg, #ffd43b 0%, #f59f00 100%); }
+.pod-2 .pod-step { height: 78px; background: linear-gradient(180deg, #e9ecef 0%, #adb5bd 100%); }
+.pod-3 .pod-step { height: 60px; background: linear-gradient(180deg, #ffc078 0%, #e8590c 100%); }
+.pod-medal { font-size: 22px; line-height: 1; }
+.pod-rank { font-size: 26px; font-weight: 900; color: rgba(15,42,29,.75); line-height: 1; }
+.pod-me .pod-ava { outline: 3px solid #69db7c; outline-offset: 2px; }
+.pod-empty { min-height: 60px; }
+.pod-rest { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.pod-rest li { display: grid; grid-template-columns: 40px 1fr auto; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 12px; background: var(--surface-2); }
+.pod-rest li.me { background: var(--primary-50); outline: 1px solid var(--primary); }
+.pr-rank { color: var(--muted); font-weight: 800; }
+.pr-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 360px) { .pod-ava { width: 44px; height: 44px; font-size: 15px; } .pod-1 .pod-ava { width: 54px; height: 54px; } }

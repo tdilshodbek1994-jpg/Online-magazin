@@ -5,6 +5,7 @@ import { api, som } from '@/lib/api';
 import { errText } from '@/lib/errors';
 import { toast } from '@/lib/toast';
 import { dt, fmtScore, METRIC_UZ, STATUS_UZ } from '../shared';
+import { Podium } from '@/components/Podium';
 
 /** One contest for a partner: rules, prizes, voluntary join, leaderboard (aliases), my result with counted orders, appeal. */
 export default function ContestDetail({ params }: { params: Promise<{ id: string }> }) {
@@ -82,8 +83,7 @@ export default function ContestDetail({ params }: { params: Promise<{ id: string
         <section className="card">
           <div className="spread"><b>Reyting</b><span className="small muted">{lb.kind === 'final' ? 'Yakuniy' : lb.kind === 'provisional' ? 'Dastlabki' : 'Jonli'} · {dt(lb.as_of)}</span></div>
           {lb.warning && <p className="small muted">⚠️ {lb.warning}</p>}
-          {lb.items.length === 0 && <p className="muted small">Hali natija yo‘q.</p>}
-          {lb.items.map((x: any) => <div key={`${x.rank}-${x.name}`} className={`spread small w-prod ${x.me ? 'cc-me' : ''}`}><span>{x.rank === 1 ? '🥇' : x.rank === 2 ? '🥈' : x.rank === 3 ? '🥉' : `#${x.rank}`} {x.name}</span><b>{fmtScore(r.metric, x.score)}</b></div>)}
+          <Podium rows={lb.items.map((x: any) => ({ rank: x.rank, name: x.name, value: fmtScore(r.metric, x.score), me: x.me }))} />
         </section>
       )}
 

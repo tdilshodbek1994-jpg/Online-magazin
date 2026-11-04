@@ -4,6 +4,7 @@ import { Async } from '@/components/Header';
 import { api, som } from '@/lib/api';
 import { pick, useI18n } from '@/lib/i18n';
 import { errText } from '@/lib/errors';
+import { WorkDesk } from './WorkDesk';
 
 const QUEUES: [string, string][] = [['new', 'Yangi'], ['awaiting_customer', 'Mijoz tasdig‘i'], ['callback', 'Qayta qo‘ng‘iroq'], ['awaiting_payment', 'To‘lov kutilmoqda'], ['ready_to_pick', 'Yig‘ishga tayyor'], ['in_delivery', 'Yetkazishda'], ['problem', 'Muammoli'], ['returns', 'Qaytarish'], ['closed', 'Yopilgan']];
 
@@ -32,6 +33,8 @@ export default function Ops() {
   return (
     <>
       <h1>Operator xonasi</h1>
+      <WorkDesk onChanged={() => void load()} />
+      <h2 className="ops-h2">Barcha navbatlar</h2>
       <div className="chips ops-queues" role="tablist">{QUEUES.map(([k, l]) => <button key={k} role="tab" aria-selected={queue === k} className={`chip ${queue === k ? 'on' : ''}`} onClick={() => setQueue(k)}>{l} <span className="q-count">{counts[k] ?? 0}</span></button>)}</div>
       {msg && <div className="notice" role="status">{msg}</div>}
       <Async loading={st.loading} error={st.error} onRetry={load}>

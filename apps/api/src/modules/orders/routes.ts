@@ -100,30 +100,7 @@ export function registerOrders(app: FastifyInstance, deps: Deps): void {
     body: z.object({ outcome: z.enum(['confirmed', 'no_answer', 'rejected', 'wrong_data', 'call_later']), note: z.string().max(1000).optional(), callback_at: z.string().datetime().optional(), confirmed_total_minor: z.string().regex(/^\d+$/).optional() }) },
   async ({ actor, db, cfg, params, body }) => {
     requirePerm(actor, 'orders.operate');
-    return withTx(db, async (tx) => {
-      const o = await maybeOne<{ assigned_operator_id: string | null; payable_minor: string; commercial_status: string; quick_pending: boolean }>(tx,
-        `SELECT assigned_operator_id, payable_minor, commercial_status, (address_snapshot->>'quick'='true' AND address_snapshot->>'house'='-') AS quick_pending FROM orders WHERE id=$1 FOR UPDATE`, [params.id]);
-      if (!o) throw notFound('ORDER');
-      if (o.assigned_operator_id !== actor.userId && !can(actor, 'orders.reassign')) throw forbidden();
-      await tx.query(`INSERT INTO call_logs (order_id, operator_id, outcome, note, callback_at) VALUES ($1,$2,$3,$4,$5)`, [params.id, actor.userId, body.outcome, body.note ?? null, body.callback_at ?? null]);
-      if (body.outcome === 'confirmed') {
-        // The operator must read back the exact total; mismatch means the customer agreed to something else (AC-M39-2).
-        if (body.confirmed_total_minor !== o.payable_minor) throw unprocessable('CONFIRMED_TOTAL_MISMATCH', { payable_minor: o.payable_minor });
-        // Quick orders carry no street/house yet: the operator must record the address before confirming.
-        if (o.quick_pending) throw unprocessable('ADDRESS_REQUIRED');
-        await tx.query(`INSERT INTO order_confirmations (order_id, method, status, actor_user_id, call_outcome, shown_total_minor, note) VALUES ($1,'operator_call','verified',$2,'confirmed',$3,$4)`, [params.id, actor.userId, o.payable_minor, body.note ?? null]);
-        await confirmOrder(tx, cfg, actor, params.id, 'operator_call', { operator_id: actor.userId });
-        await tx.query(`UPDATE orders SET callback_at=NULL WHERE id=$1`, [params.id]);
-      } else if (body.outcome === 'rejected') {
-        await tx.query(`INSERT INTO order_confirmations (order_id, method, status, actor_user_id, call_outcome, note) VALUES ($1,'operator_call','rejected',$2,'rejected',$3)`, [params.id, actor.userId, body.note ?? null]);
-        await cancelOrder(tx, actor, params.id, 'customer_rejected_by_phone', true);
-      } else if (body.outcome === 'call_later' || body.outcome === 'no_answer') {
-        await tx.query(`UPDATE orders SET callback_at=COALESCE($2::timestamptz, now() + interval '2 hours') WHERE id=$1`, [params.id, body.callback_at ?? null]);
-      } else {
-        await tx.query(`UPDATE orders SET problem_reason='wrong_data' WHERE id=$1`, [params.id]);
-      }
-      return { ok: true };
-    });
+    return withTx(db, async (tx) => { await logOrderCall(tx, cfg, actor, params.id, body); return { ok: true }; });
   });
 
   route(app, deps, { method: 'POST', url: '/ops/orders/:id/notes', tags: T, summary: 'Internal note', params: zIdParam, body: z.object({ body: z.string().min(1).max(2000) }) }, async ({ actor, db, params, body }) => {
@@ -320,4 +297,31 @@ export function registerOrders(app: FastifyInstance, deps: Deps): void {
     });
 
   void maskPhone;
+}
+
+/** Records an operator call result on an order (shared by the order card and the Operator Centre task flow).
+ * Must run inside a transaction; locks the order row. */
+export async function logOrderCall(tx: any, cfg: any, actor: any, orderId: string, body: { outcome: 'confirmed' | 'no_answer' | 'rejected' | 'wrong_data' | 'call_later'; note?: string; callback_at?: string; confirmed_total_minor?: string }): Promise<void> {
+  const params = { id: orderId };
+  const o = await maybeOne<{ assigned_operator_id: string | null; payable_minor: string; commercial_status: string; quick_pending: boolean }>(tx,
+    `SELECT assigned_operator_id, payable_minor, commercial_status, (address_snapshot->>'quick'='true' AND address_snapshot->>'house'='-') AS quick_pending FROM orders WHERE id=$1 FOR UPDATE`, [params.id]);
+  if (!o) throw notFound('ORDER');
+  if (o.assigned_operator_id !== actor.userId && !can(actor, 'orders.reassign')) throw forbidden();
+  await tx.query(`INSERT INTO call_logs (order_id, operator_id, outcome, note, callback_at) VALUES ($1,$2,$3,$4,$5)`, [params.id, actor.userId, body.outcome, body.note ?? null, body.callback_at ?? null]);
+  if (body.outcome === 'confirmed') {
+    // The operator must read back the exact total; mismatch means the customer agreed to something else (AC-M39-2).
+    if (body.confirmed_total_minor !== o.payable_minor) throw unprocessable('CONFIRMED_TOTAL_MISMATCH', { payable_minor: o.payable_minor });
+    // Quick orders carry no street/house yet: the operator must record the address before confirming.
+    if (o.quick_pending) throw unprocessable('ADDRESS_REQUIRED');
+    await tx.query(`INSERT INTO order_confirmations (order_id, method, status, actor_user_id, call_outcome, shown_total_minor, note) VALUES ($1,'operator_call','verified',$2,'confirmed',$3,$4)`, [params.id, actor.userId, o.payable_minor, body.note ?? null]);
+    await confirmOrder(tx, cfg, actor, params.id, 'operator_call', { operator_id: actor.userId });
+    await tx.query(`UPDATE orders SET callback_at=NULL WHERE id=$1`, [params.id]);
+  } else if (body.outcome === 'rejected') {
+    await tx.query(`INSERT INTO order_confirmations (order_id, method, status, actor_user_id, call_outcome, note) VALUES ($1,'operator_call','rejected',$2,'rejected',$3)`, [params.id, actor.userId, body.note ?? null]);
+    await cancelOrder(tx, actor, params.id, 'customer_rejected_by_phone', true);
+  } else if (body.outcome === 'call_later' || body.outcome === 'no_answer') {
+    await tx.query(`UPDATE orders SET callback_at=COALESCE($2::timestamptz, now() + interval '2 hours') WHERE id=$1`, [params.id, body.callback_at ?? null]);
+  } else {
+    await tx.query(`UPDATE orders SET problem_reason='wrong_data' WHERE id=$1`, [params.id]);
+  }
 }

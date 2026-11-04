@@ -11,6 +11,7 @@ import { recalcOrder } from '../commissions/service.js';
 import { postJournal } from '../finance/journal.js';
 import { moveStock } from '../inventory/service.js';
 import { statusEvent } from '../orders/service.js';
+import { recordRefund } from '../tracking/service.js';
 
 export function registerReturns(app: FastifyInstance, deps: Deps): void {
   const T = ['returns'];
@@ -196,6 +197,7 @@ export function registerReturns(app: FastifyInstance, deps: Deps): void {
       await postJournal(tx, `refund:${params.id}`, 'refund', [{ account: 'sales_clearing', debit: amt }, { account: r.method === 'provider' ? 'psp_receivable' : 'cash_bank', credit: amt }]);
       await recalcOrder(tx, r.order_id, 'refund_succeeded', actor.userId);
       await emit(tx, { type: 'RefundSucceeded', aggregateType: 'order', aggregateId: r.order_id, payload: { refund_id: params.id, amount_minor: r.amount_minor } });
+      await recordRefund(tx, r.order_id, `refund:${params.id}`, r.amount_minor); // internal correction; never a negative Purchase
       return { ok: true };
     });
   });

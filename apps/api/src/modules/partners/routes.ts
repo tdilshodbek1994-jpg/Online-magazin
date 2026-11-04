@@ -19,6 +19,7 @@ import { notifyPartner } from '../notifications/telegram.js';
 import { cancelOrder, confirmOrder, createOrder, m, priceLines, pricedToJson, storeQuote } from '../orders/service.js';
 import { isBotUserAgent, visitorHash } from './attribution.js';
 import { applyAmendment, rejectAmendment } from '../orders/amendments.js';
+import { captureOrderContext } from '../tracking/service.js';
 
 /** The partner is always derived from the authenticated user — never from payload (§12, T039). */
 export async function myPartner(tx: { query: Tx['query'] }, actor: Actor, requireActive = true) {
@@ -55,6 +56,8 @@ export async function createAssistedOrder(tx: Tx, cfg: AppConfig, actor: Actor, 
       WHERE o2.customer_phone=$1 AND o2.id<>$2 AND o2.commercial_status<>'cancelled' AND o2.created_at > now() - interval '48 hours'
         AND l2.sku_id IN (SELECT sku_id FROM order_lines WHERE order_id=$2) LIMIT 1`, [phone, order.id]);
   if (dup) await tx.query(`UPDATE orders SET duplicate_signal=true WHERE id=$1`, [order.id]);
+  // On-behalf order: the partner's cookie/IP/UA/fbp/fbc are never sent as the customer's; no Lead from the partner's session.
+  await captureOrderContext(tx, actor, order.id, undefined, { onBehalf: true });
   await tx.query(`INSERT INTO order_notes (order_id, author_id, body, internal) VALUES ($1,$2,$3,true)`, [order.id, p.user_id, `Partner note: ${o.note}`]);
   // One-time, short-lived confirmation link + code to the customer's phone. Never shown to the partner (T043).
   const ttl = (await getPolicy<{ hours: number }>(tx, POLICY.partnerConfirmTtlHours, cfg.env))?.value.hours ?? 24;

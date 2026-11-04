@@ -6,6 +6,7 @@ import { promoteToPending } from '../commissions/service.js';
 import { postJournal } from '../finance/journal.js';
 import { reserveForOrder } from '../inventory/service.js';
 import { statusEvent } from '../orders/service.js';
+import { maybeRecognizeSale } from '../tracking/service.js';
 
 /**
  * Apply an authenticated provider capture (never a browser redirect — T061, INV06).
@@ -30,6 +31,7 @@ export async function capturePayment(tx: Tx, env: string, attemptId: string, act
   const o = (await tx.query(`SELECT * FROM orders WHERE id=$1 FOR UPDATE`, [pi.order_id])).rows[0];
   await tx.query(`UPDATE orders SET payment_status='paid', paid_at=now(), version=version+1 WHERE id=$1`, [o.id]);
   await statusEvent(tx, o.id, 'payment', o.payment_status, 'paid', actor, a.provider);
+  await maybeRecognizeSale(tx, o.id); // prepaid: captured payment is the recognition moment (never authorization)
   const live = await tx.query(`UPDATE reservations SET status='allocated_for_fulfillment', expires_at=NULL, version=version+1 WHERE order_id=$1 AND status='active_unpaid' RETURNING id`, [o.id]);
   if (!live.rowCount) {
     const allocated = await tx.query(`SELECT 1 FROM reservations WHERE order_id=$1 AND status IN ('allocated_for_fulfillment','consumed_on_dispatch')`, [o.id]);

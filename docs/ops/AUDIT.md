@@ -90,3 +90,5 @@ P3: real telephony adapter, Telegram Business, AI assistant (read-only, human ap
 | Opt-out / attempt spacing per customer | not enforced yet | **owner decision needed** |
 | 4+ units quantity tier | not invented; manual review | **owner decision needed** |
 | Partner customer discount (discount link) | paid from the partner's commission; max = commission per unit at link creation (and < price); commission never below 0 | demo default, owner to approve |
+| Ad-measurement server event max age (tracking outbox) | 7 days, then `expired` (time never rewritten) | demo default; re-check against the pinned Meta API version |
+| Ad-measurement consent | strict: no Pixel/CAPI export without granted consent; refusing never blocks ordering | proposed safe default (D11); legal review before launch |

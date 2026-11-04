@@ -14,6 +14,7 @@ import { consumeOnDispatch } from '../inventory/service.js';
 import { queueNotification } from '../notifications/service.js';
 import { cancelOrder, confirmOrder, statusEvent } from './service.js';
 import { assertNoPendingAmendment } from './amendments.js';
+import { maybeRecognizeSale, recordEvent } from '../tracking/service.js';
 
 const QUEUES: Record<string, string> = {
   new: `o.commercial_status='awaiting_confirmation' AND o.assigned_operator_id IS NULL AND o.callback_at IS NULL`,
@@ -194,6 +195,8 @@ export function registerOrders(app: FastifyInstance, deps: Deps): void {
       await tx.query(`UPDATE order_lines SET delivered_qty = shipped_qty WHERE order_id=$1`, [params.id]);
       await tx.query(`UPDATE orders SET fulfillment_status='delivered', delivered_at=now(), version=version+1, updated_at=now() WHERE id=$1`, [params.id]);
       await statusEvent(tx, params.id, 'fulfillment', 'shipped', 'delivered', actor, body.proof.method);
+      // Internal only: delivery alone does not prove payment (COD Purchase waits for the reconciled remittance).
+      await recordEvent(tx, { businessKey: `order.delivered:order:${params.id}`, internalEvent: 'order.delivered', eventTime: new Date(), actionSource: 'system_generated', orderId: params.id });
       if (o.payment_method === 'cod') {
         // Delivered != paid: COD money is only "with courier" until remitted and reconciled (T057).
         const collected = body.cod_collected_minor ?? o.payable_minor;
@@ -270,6 +273,7 @@ export function registerOrders(app: FastifyInstance, deps: Deps): void {
           await tx.query(`UPDATE payment_intents SET captured_minor = amount_minor, status='succeeded', version=version+1, updated_at=now() WHERE order_id=$1 AND status <> 'succeeded'`, [order_id]);
           await tx.query(`UPDATE orders SET payment_status='paid', paid_at=now(), commercial_status = CASE WHEN fulfillment_status='delivered' THEN 'completed' ELSE commercial_status END, version=version+1 WHERE id=$1`, [order_id]);
           await statusEvent(tx, order_id, 'payment', 'pending', 'paid', actor, 'cod_reconciled');
+          await maybeRecognizeSale(tx, order_id); // COD: delivered + remittance reconciled
           await promoteToPending(tx, order_id, hold?.value.days ?? null);
           await queueNotification(tx, { userId: null, phone: null, channel: 'in_app', purpose: 'transactional', template: 'payment_settled', locale: 'uz-Latn', params: { order_id }, dedupeKey: `paid:${order_id}` });
         }

@@ -10,6 +10,10 @@ import { type Deps, requireIdempotencyKey, route, zIdParam } from '../../platfor
 import type { Actor } from '../../platform/auth.js';
 import { resolveAttribution } from '../partners/attribution.js';
 import { type Attribution, createOrder, m, partnerDiscountForLink, priceLines, pricedToJson, storeQuote } from '../orders/service.js';
+import { captureOrderContext, currentConsent, recordEvent, recordLead, subjectKey, uzs } from '../tracking/service.js';
+
+/** Browser identifiers the real customer's own page supplies (only kept when ad-measurement consent is granted). */
+const zTrackingInput = z.object({ fbp: z.string().max(600).optional(), fbc: z.string().max(600).optional(), source_url: z.string().max(2000).optional() }).strict().optional();
 
 /** Discount stream the visitor came through (last eligible click): the shown price is price − the partner's discount. */
 async function visitorDiscount(tx: Tx, env: string, actor: Actor) {
@@ -82,10 +86,23 @@ export function registerCheckout(app: FastifyInstance, deps: Deps): void {
       const offer = await maybeOne<{ id: string }>(tx, `SELECT o.id FROM offers o JOIN skus s ON s.id=o.sku_id JOIN products p ON p.id=s.product_id WHERE s.id=$1 AND o.merchant_org_id=p.owner_org_id`, [body.sku_id]);
       if (!offer) throw notFound('SKU');
       const c = (await findCart(tx, actor, true))!;
+      const prev = (await maybeOne<{ qty: number }>(tx, `SELECT qty FROM cart_lines WHERE cart_id=$1 AND offer_id=$2`, [c.id, offer.id]))?.qty ?? 0;
       if (body.qty === 0) await tx.query(`DELETE FROM cart_lines WHERE cart_id=$1 AND offer_id=$2`, [c.id, offer.id]);
       else await tx.query(`INSERT INTO cart_lines (cart_id, offer_id, qty) VALUES ($1,$2,$3) ON CONFLICT (cart_id, offer_id) DO UPDATE SET qty=EXCLUDED.qty`, [c.id, offer.id, body.qty]);
-      await tx.query(`UPDATE carts SET version=version+1, updated_at=now() WHERE id=$1`, [c.id]);
-      return cartView(tx, c.id);
+      const v = await tx.query(`UPDATE carts SET version=version+1, updated_at=now() WHERE id=$1 RETURNING version`, [c.id]);
+      // AddToCart only after the cart service accepted the item (same transaction; a failed add records nothing).
+      let tracking: { event_id: string; event_name: string | null } | null = null;
+      if (body.qty > prev) {
+        const subject = subjectKey(actor);
+        const consent = await currentConsent(tx, subject);
+        if (consent?.status === 'granted') {
+          const f = await one<{ product_id: string; price_minor: string }>(tx, `SELECT s.product_id, o.price_minor::text FROM offers o JOIN skus s ON s.id=o.sku_id WHERE o.id=$1`, [offer.id]);
+          const e = await recordEvent(tx, { businessKey: `cart.item_added:${c.id}:${v.rows[0].version}`, internalEvent: 'cart.item_added', eventTime: new Date(), actionSource: 'website', subject, consent,
+            customData: { content_ids: [f.product_id], content_type: 'product', currency: 'UZS', value: uzs(BigInt(f.price_minor) * BigInt(body.qty - prev)), num_items: body.qty - prev } });
+          tracking = { event_id: e.event_id, event_name: e.meta_event };
+        }
+      }
+      return { ...(await cartView(tx, c.id)), tracking };
     }));
 
   route(app, deps, { method: 'GET', url: '/referral/discount', tags: T, summary: 'Partner discount this visitor gets on a product (from the stream they came through)',
@@ -116,7 +133,7 @@ export function registerCheckout(app: FastifyInstance, deps: Deps): void {
 
   route(app, deps, {
     method: 'POST', url: '/checkout/confirmations', tags: T, summary: 'Place order from quote (Idempotency-Key required)',
-    body: z.object({ quote_id: z.string().uuid(), quote_hash: z.string().length(64), payment_method: z.enum(['cod', 'online']), accept_terms: z.literal(true), referral_code: z.string().max(20).optional(), marketing_opt_in: z.boolean().default(false) }),
+    body: z.object({ quote_id: z.string().uuid(), quote_hash: z.string().length(64), payment_method: z.enum(['cod', 'online']), accept_terms: z.literal(true), referral_code: z.string().max(20).optional(), marketing_opt_in: z.boolean().default(false), tracking: zTrackingInput }),
   }, async ({ actor, db, cfg, body, idempotencyKey, reply }) => {
     const key = requireIdempotencyKey(idempotencyKey);
     const scope = `checkout:${actor.userId ?? 'guest:' + (actor.guestToken ?? '')}`;
@@ -140,7 +157,10 @@ export function registerCheckout(app: FastifyInstance, deps: Deps): void {
         });
         if (own) await tx.query(`UPDATE carts SET status='converted', updated_at=now() WHERE id=$1`, [own.id]);
         if (actor.userId && body.marketing_opt_in) await tx.query(`INSERT INTO consents (user_id, purpose, channel, granted, source) VALUES ($1,'marketing','any',true,'checkout_optional')`, [actor.userId]);
-        return { status: 201, body: { order_id: order.id, number: order.number, confirmation: verified ? 'verified' : 'pending_operator_call' } };
+        // Ad measurement (P0C): consent snapshot + Lead in the same transaction; a missing consent/provider never blocks the order.
+        await captureOrderContext(tx, actor, order.id, body.tracking, { onBehalf: false });
+        const lead = await recordLead(tx, order.id);
+        return { status: 201, body: { order_id: order.id, number: order.number, confirmation: verified ? 'verified' : 'pending_operator_call', tracking: lead?.status === 'pending' ? { event_id: lead.event_id, event_name: lead.meta_event } : null } };
       }),
     );
     reply.status(res.replayed ? 200 : res.status);
@@ -156,7 +176,7 @@ export function registerCheckout(app: FastifyInstance, deps: Deps): void {
     method: 'POST', url: '/checkout/quick-order', tags: T, summary: 'One-step order: SKU + name + phone; operator collects address by phone (Idempotency-Key required)',
     body: z.object({ sku_id: z.string().uuid(), qty: z.number().int().min(1).max(20).default(1), name: z.string().trim().min(2).max(120), phone: z.string().min(5).max(32),
       delivery_zone_id: z.string().uuid().optional(), accept_terms: z.literal(true), referral_code: z.string().max(20).optional(),
-      landing: z.object({ landing_id: z.string().uuid(), revision: z.number().int().min(1) }).optional() }),
+      landing: z.object({ landing_id: z.string().uuid(), revision: z.number().int().min(1) }).optional(), tracking: zTrackingInput }),
   }, async ({ actor, db, cfg, body, idempotencyKey, reply }) => {
     const key = requireIdempotencyKey(idempotencyKey);
     if (!actor.userId && !actor.guestToken) throw badRequest('GUEST_TOKEN_REQUIRED');
@@ -185,7 +205,10 @@ export function registerCheckout(app: FastifyInstance, deps: Deps): void {
               WHERE l.id=$1 AND l.status='published' AND l.published_revision=$2 AND (SELECT s.product_id FROM skus s WHERE s.id=$3) = ANY(l.product_ids)`, [body.landing.landing_id, body.landing.revision, body.sku_id]);
           if (lp) await tx.query(`UPDATE orders SET landing_snapshot=$2 WHERE id=$1`, [order.id, JSON.stringify({ landing_id: body.landing.landing_id, revision: body.landing.revision, digest: lp.digest, quote_id: q.id })]);
         }
-        return { status: 201, body: { order_id: order.id, number: order.number, confirmation: 'pending_operator_call', payable: pricedToJson(priced).payable } };
+        const landingOk = body.landing ? (await maybeOne<{ ok: boolean }>(tx, `SELECT true AS ok FROM orders WHERE id=$1 AND landing_snapshot IS NOT NULL`, [order.id]))?.ok : false;
+        await captureOrderContext(tx, actor, order.id, body.tracking, { onBehalf: false, landingId: landingOk ? body.landing!.landing_id : null });
+        const lead = await recordLead(tx, order.id);
+        return { status: 201, body: { order_id: order.id, number: order.number, confirmation: 'pending_operator_call', payable: pricedToJson(priced).payable, tracking: lead?.status === 'pending' ? { event_id: lead.event_id, event_name: lead.meta_event } : null } };
       }),
     );
     reply.status(res.replayed ? 200 : res.status);

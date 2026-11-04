@@ -4,6 +4,7 @@ import type { Db, Tx } from '../../platform/db.js';
 import { withTx } from '../../platform/db.js';
 import { releaseReservation } from '../inventory/service.js';
 import { capturePayment } from './service.js';
+import { recordRefund } from '../tracking/service.js';
 
 /**
  * Payme Business Merchant API adapter (JSON-RPC 2.0, Basic auth "Paycom:<key>", amount in tiyin) [S3].
@@ -120,6 +121,7 @@ export async function handlePayme(db: Db, cfg: AppConfig, authHeader: string | u
           await releaseReservation(tx, o.id, 'released');
           const { recalcOrder } = await import('../commissions/service.js');
           await recalcOrder(tx, o.id, 'payment_cancelled');
+          await recordRefund(tx, o.id, `payme-cancel:${a.id}`, a.amount_minor);
           return { transaction: a.id, cancel_time: cancelTime, state: -2 };
         }
         case 'CheckTransaction': {

@@ -36,6 +36,7 @@ import { registerQualityCenter } from './modules/quality/routes.js';
 import { registerCharityCenter } from './modules/charity/routes.js';
 import { registerUzcoin } from './modules/uzcoin/routes.js';
 import { registerLandings } from './modules/landings/routes.js';
+import { registerTracking } from './modules/tracking/routes.js';
 import { registerReturns } from './modules/returns/routes.js';
 import { registerPayments } from './modules/payments/routes.js';
 import { registerSupport } from './modules/support/routes.js';
@@ -169,6 +170,7 @@ export async function buildApp(cfg: AppConfig, db: Db): Promise<FastifyInstance>
       registerCharityCenter(api, deps);
       registerUzcoin(api, deps);
       registerLandings(api, deps);
+      registerTracking(api, deps);
       registerVideos(api, deps);
       registerReturns(api, deps);
       registerPayments(api, deps);

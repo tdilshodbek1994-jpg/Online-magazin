@@ -239,9 +239,13 @@ function Composer({ taskId }: { taskId: string }) {
   const [text, setText] = useState('');
   const [items, setItems] = useState<any[]>([]);
   const [msg, setMsg] = useState<string | null>(null);
+  const [tpls, setTpls] = useState<any[]>([]);
+  const [script, setScript] = useState<'latn' | 'cyrl'>('latn');
   const load = useCallback(() => { api(`/ops/center/tasks/${taskId}/messages`).then((r) => setItems(r.items)).catch(() => {}); }, [taskId]);
   useEffect(load, [load]);
+  useEffect(() => { api(`/ops/center/tasks/${taskId}/templates?script=${script}`).then((r) => setTpls(r.items)).catch(() => {}); }, [taskId, script]);
   const cur = AUD.find((a) => a[0] === aud)!;
+  const unfilled = text.match(/\{[a-z_]+\}/g);
   return (
     <details className="task-more composer">
       <summary>Xabar / izoh yozish {items.length ? `(${items.length})` : ''}</summary>
@@ -249,8 +253,19 @@ function Composer({ taskId }: { taskId: string }) {
         {AUD.map(([k, l]) => <button key={k} type="button" role="radio" aria-checked={aud === k} className={aud === k ? 'on' : ''} onClick={() => setAud(k)}>{l}</button>)}
       </div>
       <p className={`aud-note aud-${aud}`}>Kimga: <b>{cur[1]}</b> — {cur[2]}</p>
-      <textarea rows={2} maxLength={1000} value={text} onChange={(e) => setText(e.target.value)} aria-label={`Matn: ${cur[1]}`} />
-      <button className="btn secondary full" disabled={text.trim().length < 2} onClick={async () => {
+      {aud !== 'internal' && tpls.some((t) => t.audience === aud) && (
+        <div className="tpl-row">
+          <label className="sr-only" htmlFor={`tpl-${taskId}`}>Tayyor javob</label>
+          <select id={`tpl-${taskId}`} value="" onChange={(e) => { const t = tpls.find((x) => x.id === e.target.value); if (t) setText(t.text); }}>
+            <option value="">📄 Tayyor javobni tanlash…</option>
+            {tpls.filter((t) => t.audience === aud).map((t) => <option key={t.id} value={t.id}>{t.title}{t.missing.length ? ' (to‘ldirish kerak)' : ''}</option>)}
+          </select>
+          <button type="button" className="btn secondary sm" onClick={() => setScript(script === 'latn' ? 'cyrl' : 'latn')}>{script === 'latn' ? 'Кирилл' : 'Lotin'}</button>
+        </div>
+      )}
+      <textarea rows={3} maxLength={1000} value={text} onChange={(e) => setText(e.target.value)} aria-label={`Matn: ${cur[1]}`} />
+      {unfilled && aud !== 'internal' && <p className="field-error small">To‘ldiring: {[...new Set(unfilled)].join(', ')} — noma’lum ma’lumotni taxmin qilib yozmang.</p>}
+      <button className="btn secondary full" disabled={text.trim().length < 2 || (!!unfilled && aud !== 'internal')} onClick={async () => {
         setMsg(null);
         try { const r = await api(`/ops/center/tasks/${taskId}/messages`, { method: 'POST', body: { audience: aud, body: text } }); setText(''); setMsg(r.delivery_state === 'no_partner' ? 'Bu buyurtmada hamkor yo‘q.' : `✓ Saqlandi (${DELIV[r.delivery_state] ?? r.delivery_state})`); load(); } catch (e: any) { setMsg(errText(e)); }
       }}>{aud === 'internal' ? 'Izohni saqlash' : 'Yuborish'}</button>

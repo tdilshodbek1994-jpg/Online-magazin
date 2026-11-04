@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { requirePerm } from '../../platform/auth.js';
 import { many, maybeOne, one, withTx } from '../../platform/db.js';
-import { notFound } from '../../platform/errors.js';
+import { notFound, unprocessable } from '../../platform/errors.js';
 import { type Deps, route, zIdParam } from '../../platform/http.js';
 import { queueNotification } from '../notifications/service.js';
 import { event } from './routes.js';
@@ -30,6 +30,9 @@ export function registerOrderMessages(app: FastifyInstance, deps: Deps): void {
         await event(tx, t.id, actor.userId!, 'note_internal', null, null, {});
         return { audience: 'internal', delivery_state: 'stored' };
       }
+      // A saved reply with an unfilled {placeholder} is never sent outside (no invented dates/prices).
+      const unfilled = body.body.match(/\{[a-z_]+\}/g);
+      if (unfilled) throw unprocessable('TEMPLATE_UNFILLED', { fields: [...new Set(unfilled)] });
       if (body.audience === 'partner' && !o.partner_id) return { audience: 'partner', delivery_state: 'no_partner' };
       let channel = 'cabinet', state = 'stored';
       if (body.audience === 'partner' && o.partner_user) {

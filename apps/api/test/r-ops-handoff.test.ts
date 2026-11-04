@@ -73,3 +73,19 @@ describe('Operator Centre P1: handoff, supervisor transfer, contact hours', () =
     expect(fitContactHours(day).getTime()).toBe(day.getTime());
   });
 });
+
+describe('Bulk-safe transfer (T53)', () => {
+  it('previews first, then moves item by item with a per-item result and summary; closed tasks are skipped', async () => {
+    const a = await claimedTask(s.operator.token);
+    const b = await claimedTask(s.operator.token);
+    await t.db.query(`UPDATE ops_tasks SET state='resolved' WHERE id=$1`, [b.id]);
+    expect((await api(t, 'POST', '/ops/center/bulk/assign', { token: s.operator.token, body: { task_ids: [a.id], to_user_id: null, reason: 'smena tugadi', dry_run: true } })).status).toBe(403);
+    const prev = await api(t, 'POST', '/ops/center/bulk/assign', { token: s.owner.token, body: { task_ids: [a.id, b.id], to_user_id: s.operator2.id, reason: 'Operator kasal', dry_run: true } });
+    expect(prev.json.summary).toEqual({ would_move: 1, skipped: 1 });
+    expect((await t.db.query(`SELECT assignee_id FROM ops_tasks WHERE id=$1`, [a.id])).rows[0].assignee_id).toBe(s.operator.id); // preview changes nothing
+    const run = await api(t, 'POST', '/ops/center/bulk/assign', { token: s.owner.token, body: { task_ids: [a.id, b.id], to_user_id: s.operator2.id, reason: 'Operator kasal', dry_run: false } });
+    expect(run.json.summary).toEqual({ moved: 1, skipped: 1 });
+    expect(run.json.results.find((r: any) => r.task_id === b.id).reason).toBe('ish yopilgan');
+    expect((await t.db.query(`SELECT assignee_id FROM ops_tasks WHERE id=$1`, [a.id])).rows[0].assignee_id).toBe(s.operator2.id);
+  });
+});

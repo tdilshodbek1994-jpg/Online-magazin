@@ -1248,3 +1248,7 @@ a.admin-tab { text-decoration: none; color: inherit; }
 .tpl-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
 .dup-box { display: grid; gap: 6px; padding: 10px; border-radius: 12px; background: color-mix(in srgb, #f59e0b 14%, var(--surface)); }
 .dup-item { display: grid; gap: 4px; padding: 8px; border-radius: 10px; background: var(--surface); }
+.bulk-bar { position: sticky; top: 64px; z-index: 5; display: grid; gap: 8px; border: 2px solid var(--primary); }
+.bulk-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+@media (max-width: 480px) { .bulk-row { grid-template-columns: minmax(0, 1fr); } }
+.bulk-prev { margin: 0; padding-left: 18px; max-height: 160px; overflow: auto; }

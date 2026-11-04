@@ -17,6 +17,10 @@ export default function OpsBoard() {
   const [err, setErr] = useState<any>(null);
   const [f, setF] = useState<string>('attention');
   const [msg, setMsg] = useState<string | null>(null);
+  const [picked, setPicked] = useState<string[]>([]);
+  const [bulkTo, setBulkTo] = useState('');
+  const [bulkReason, setBulkReason] = useState('');
+  const [preview, setPreview] = useState<any>(null);
   const load = useCallback(() => { api('/ops/center/board').then((r) => { setD(r); setErr(null); }).catch(setErr); }, []);
   useEffect(() => { load(); const i = setInterval(load, 60_000); return () => clearInterval(i); }, [load]);
   if (err) return <div className="notice" role="alert">{err.status === 403 ? 'Bu panel faqat rahbar (ishni qayta taqsimlash huquqi bor xodim) uchun.' : errText(err)}</div>;
@@ -41,6 +45,13 @@ export default function OpsBoard() {
     setMsg(null);
     try { await api(`/ops/center/tasks/${taskId}/assign`, { method: 'POST', body: { to_user_id: to, reason } }); setMsg('✓ O‘tkazildi'); load(); } catch (e: any) { setMsg(errText(e)); }
   };
+  const bulk = async (dry: boolean) => {
+    setMsg(null);
+    try {
+      const r = await api('/ops/center/bulk/assign', { method: 'POST', body: { task_ids: picked, to_user_id: bulkTo === 'queue' ? null : bulkTo, reason: bulkReason, dry_run: dry } });
+      if (dry) setPreview(r); else { setPreview(null); setPicked([]); setMsg(`✓ Bajarildi: ${r.summary.moved ?? 0} ta o‘tkazildi${r.summary.skipped ? `, ${r.summary.skipped} ta o‘tkazib yuborildi` : ''}${r.summary.failed ? `, ${r.summary.failed} ta xato` : ''}`); load(); }
+    } catch (e: any) { setMsg(errText(e)); }
+  };
   return (
     <div className="board">
       <div className="spread"><h1>Rahbar paneli</h1><Link href="/ops" className="btn secondary sm">← Operator xonasi</Link></div>
@@ -57,11 +68,31 @@ export default function OpsBoard() {
         {groups.map(([k, l, fn]) => <button key={k} role="tab" aria-selected={f === k} className={`chip ${f === k ? 'on' : ''}`} onClick={() => setF(k)}>{l} <span className="q-count">{items.filter(fn).length}</span></button>)}
       </div>
       {msg && <div className="notice" role="status">{msg}</div>}
+      {picked.length > 0 && (
+        <section className="card bulk-bar" aria-label="Ommaviy amal">
+          <b>{picked.length} ta ish tanlandi</b>
+          <div className="bulk-row">
+            <select value={bulkTo} onChange={(e) => { setBulkTo(e.target.value); setPreview(null); }} aria-label="Tanlanganlarni kimga o‘tkazish">
+              <option value="">Kimga o‘tkazish…</option>
+              {d.staff.map((s: any) => <option key={s.id} value={s.id}>{s.display_name} ({s.active} ta)</option>)}
+              <option value="queue">↩ Umumiy navbatga</option>
+            </select>
+            <input value={bulkReason} onChange={(e) => { setBulkReason(e.target.value); setPreview(null); }} placeholder="Sabab (majburiy)" aria-label="Ommaviy amal sababi" />
+          </div>
+          <div className="row" style={{ gap: 8 }}>
+            <button className="btn secondary sm" disabled={!bulkTo || bulkReason.trim().length < 3} onClick={() => bulk(true)}>1. Oldindan ko‘rish</button>
+            <button className="btn sm" disabled={!preview || !preview.summary.would_move} onClick={() => bulk(false)}>2. Bajarish ({preview?.summary.would_move ?? 0})</button>
+            <button className="link-btn small" onClick={() => { setPicked([]); setPreview(null); }}>Bekor qilish</button>
+          </div>
+          {preview && <ul className="bulk-prev small">{preview.results.map((r: any) => <li key={r.task_id}>{r.number ?? r.task_id.slice(0, 8)}: {r.result === 'would_move' ? 'o‘tkaziladi' : 'o‘tkazilmaydi'}{r.reason ? ` — ${r.reason}` : ''}</li>)}</ul>}
+          <p className="muted small">Ommaviy amal faqat ishni o‘tkazish uchun. To‘lov, qaytarish va komissiya ommaviy o‘zgartirilmaydi.</p>
+        </section>
+      )}
       {list.length === 0 ? <div className="empty">Bu bo‘limda ish yo‘q ✓</div> : (
         <div className="slist">
           {list.map((t) => (
             <article key={t.id} className="scard board-task">
-              <div className="spread"><b>{t.number}</b><span className={`pill ${t.state === 'blocked' ? 'b-returned' : t.state === 'scheduled' ? 'b-accepted' : 'b-new'}`}>{STATE_UZ[t.state] ?? t.state}</span></div>
+              <div className="spread"><label className="s-check"><input type="checkbox" checked={picked.includes(t.id)} onChange={(e) => { setPreview(null); setPicked(e.target.checked ? [...picked, t.id] : picked.filter((x) => x !== t.id)); }} aria-label={`${t.number} ni tanlash`} /><b>{t.number}</b></label><span className={`pill ${t.state === 'blocked' ? 'b-returned' : t.state === 'scheduled' ? 'b-accepted' : 'b-new'}`}>{STATE_UZ[t.state] ?? t.state}</span></div>
               <div className="small">{t.five.what}</div>
               {t.sla === 'critical' && <div className="sla-pill sla-crit">🔥 Muddat 2 soatdan ko‘p o‘tgan</div>}{t.sla === 'late' && <div className="sla-pill sla-late">⚠️ Muddat o‘tgan</div>}
               {t.blocked_by && <div className="small warn-t">⛔ {t.blocked_by}</div>}

@@ -92,3 +92,4 @@ P3: real telephony adapter, Telegram Business, AI assistant (read-only, human ap
 | Partner customer discount (discount link) | paid from the partner's commission; max = commission per unit at link creation (and < price); commission never below 0 | demo default, owner to approve |
 | Ad-measurement server event max age (tracking outbox) | 7 days, then `expired` (time never rewritten) | demo default; re-check against the pinned Meta API version |
 | Ad-measurement consent | strict: no Pixel/CAPI export without granted consent; refusing never blocks ordering | proposed safe default (D11); legal review before launch |
+| Partner gift discount per level | 0–20% by level (Elita 10% from the task example) | demo default; owner approves in admin «Darajalar» |

@@ -42,6 +42,7 @@ import { registerTarget } from './modules/target/routes.js';
 import { registerTargetSafety } from './modules/target/safety.js';
 import { registerExperiments } from './modules/landings/experiments.js';
 import { isCustomHost, registerDomains } from './modules/landings/domains.js';
+import { registerLevels } from './modules/levels/routes.js';
 import { registerReturns } from './modules/returns/routes.js';
 import { registerPayments } from './modules/payments/routes.js';
 import { registerSupport } from './modules/support/routes.js';
@@ -189,6 +190,7 @@ export async function buildApp(cfg: AppConfig, db: Db): Promise<FastifyInstance>
       registerTargetSafety(api, deps);
       registerExperiments(api, deps);
       registerDomains(api, deps);
+      registerLevels(api, deps);
       registerVideos(api, deps);
       registerReturns(api, deps);
       registerPayments(api, deps);

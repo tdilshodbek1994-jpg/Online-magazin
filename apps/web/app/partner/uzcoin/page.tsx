@@ -1,4 +1,5 @@
 'use client';
+import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { api, som } from '@/lib/api';
 import { errText } from '@/lib/errors';
@@ -13,11 +14,12 @@ const n = (v: string | number) => Number(v).toLocaleString('ru-RU');
 export default function UzCoin() {
   const [d, setD] = useState<any>(null);
   const [gifts, setGifts] = useState<any[]>([]);
+  const [lvl, setLvl] = useState<any>(null);
   const [err, setErr] = useState<any>(null);
   const [tab, setTab] = useState<'wallet' | 'gifts' | 'exchange' | 'history'>('wallet');
   const [coins, setCoins] = useState('');
   const [pv, setPv] = useState<any>(null);
-  const load = useCallback(() => { api('/partner/uzcoin').then(setD).catch(setErr); api('/partner/uzcoin/gifts').then((r) => setGifts(r.items)).catch(() => {}); }, []);
+  const load = useCallback(() => { api('/partner/uzcoin').then(setD).catch(setErr); api('/partner/uzcoin/gifts').then((r) => { setGifts(r.items); setLvl(r.level); }).catch(() => {}); }, []);
   useEffect(load, [load]);
   useEffect(() => { if (!coins || coins === '0') { setPv(null); return; } const id = setTimeout(() => api(`/partner/uzcoin/preview?coins=${coins}`).then(setPv).catch(() => setPv(null)), 250); return () => clearTimeout(id); }, [coins]);
   if (err) return <div className="notice" role="alert">{errText(err)}</div>;
@@ -41,19 +43,21 @@ export default function UzCoin() {
 
       {tab === 'gifts' && (
         <div className="slist">
+          {lvl && <div className="notice small">{lvl.badge} Darajangiz: <b>{lvl.name}</b> · sovg‘alarga chegirma <b>{lvl.discount_bps / 100}%</b> <Link href="/partner/level">Darajam ›</Link></div>}
           {gifts.length === 0 && <div className="empty">Hozircha sovg‘a yo‘q.</div>}
           {gifts.map((g) => (
             <div key={g.id} className="scard uzc-gift">
               {g.images?.[0] && <img src={g.images[0]} alt="" loading="lazy" />}
-              <div className="spread"><b>{g.title}</b><b className="uzc-price">🪙 {n(g.price_coins)}</b></div>
+              <div className="spread"><b>{g.title}</b><b className="uzc-price">🪙 {n(g.final_price_coins ?? g.price_coins)}</b></div>
+              {g.discount_bps > 0 && <div className="small">Asl narx: <s>🪙 {n(g.base_price_coins)}</s> · {lvl?.name} chegirmasi {g.discount_bps / 100}% · <b>Tejaysiz: 🪙 {n(g.saved_coins)}</b></div>}
               {g.description && <p className="small muted">{g.description}</p>}
               <div className="small muted">{g.stock > 0 ? `${g.stock} ta qoldi` : 'Tugagan'}{g.delivery_terms ? ` · ${g.delivery_terms}` : ''}{g.per_partner_limit ? ` · bir kishiga ${g.per_partner_limit} ta` : ''}</div>
-              <button className="btn sm" disabled={g.stock < 1 || BigInt(b.available) < BigInt(g.price_coins)} onClick={async () => {
+              <button className="btn sm" disabled={g.stock < 1 || BigInt(b.available) < BigInt(g.final_price_coins ?? g.price_coins)} onClick={async () => {
                 const address = prompt('Yetkazish manzili (shahar, tuman, ko‘cha, uy)'); if (!address) return;
-                if (!confirm(`${g.title} uchun ${n(g.price_coins)} UzCoin band qilinadi. Tasdiqlaysizmi?`)) return;
+                if (!confirm(`${g.title} uchun ${n(g.final_price_coins ?? g.price_coins)} UzCoin band qilinadi. Tasdiqlaysizmi?`)) return;
                 try { await api(`/partner/uzcoin/gifts/${g.id}/order`, { method: 'POST', idem: crypto.randomUUID(), body: { address } }); toast('✓ Sovg‘a buyurtmasi yaratildi'); load(); }
                 catch (e: any) { toast(e.code === 'GIFT_OUT_OF_STOCK' ? 'Sovg‘a tugab qoldi.' : e.code === 'UZCOIN_INSUFFICIENT' ? 'UzCoin yetarli emas.' : e.code === 'GIFT_LIMIT_REACHED' ? 'Bu sovg‘a uchun limitingiz tugagan.' : errText(e), 'err'); }
-              }}>{BigInt(b.available) < BigInt(g.price_coins) ? `Yana ${n(String(BigInt(g.price_coins) - BigInt(b.available)))} coin kerak` : 'UzCoin evaziga olish'}</button>
+              }}>{BigInt(b.available) < BigInt(g.final_price_coins ?? g.price_coins) ? `Yana ${n(String(BigInt(g.final_price_coins ?? g.price_coins) - BigInt(b.available)))} coin kerak` : 'Sovg‘ani olish'}</button>
             </div>
           ))}
           {d.gift_orders.length > 0 && <section className="card"><b>Mening sovg‘alarim</b>{d.gift_orders.map((o: any) => <div key={o.id} className="spread small w-prod"><span>{o.gift_title} · 🪙 {n(o.price_coins)}</span><span>{GO_UZ[o.status]}{o.status === 'created' && <button className="link-btn small" onClick={async () => { if (!confirm('Bekor qilinsinmi? Coin qaytadi.')) return; await api(`/partner/uzcoin/gift-orders/${o.id}/cancel`, { method: 'POST' }).catch(() => {}); load(); }}> · bekor</button>}</span></div>)}</section>}

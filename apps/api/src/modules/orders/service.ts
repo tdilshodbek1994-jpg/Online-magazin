@@ -8,6 +8,7 @@ import { AppError, conflict, notFound, unprocessable } from '../../platform/erro
 import { emit } from '../../platform/outbox.js';
 import { getPolicy, POLICY } from '../../platform/policies.js';
 import { accrueForOrder, recalcOrder, ruleForProduct } from '../commissions/service.js';
+import { benefitRule } from '../levels/service.js';
 import { releaseReservation, reserveForOrder } from '../inventory/service.js';
 import { queueNotification } from '../notifications/service.js';
 
@@ -247,7 +248,8 @@ export async function createOrder(tx: Tx, cfg: AppConfig, actor: Actor, input: C
   const mo = await tx.query(`INSERT INTO merchant_orders (order_id, merchant_org_id, subtotal_net_minor) VALUES ($1,$2,$3) RETURNING id`, [order.id, fresh.lines[0]!.merchantOrgId, fresh.lines.reduce((a, l) => a + l.net, 0n).toString()]);
   const stockLines = [];
   for (const l of fresh.lines) {
-    const rule = await ruleForProduct(tx, l.productId);
+    // Level benefit (50% VIP / one-time coupon) changes only this NEW line's snapshot; old orders never change.
+    const rule = await benefitRule(tx, input.attribution?.eligible ? input.attribution.partner_id : null, order.id, { productId: l.productId, qty: l.qty, net: l.net, costMinor: l.costMinor ?? null }, await ruleForProduct(tx, l.productId));
     const ol = await tx.query(
       `INSERT INTO order_lines (order_id, merchant_order_id, offer_id, sku_id, merchant_org_id, qty, unit_price_minor, line_gross_minor, line_discount_minor, allocated_cart_discount_minor, line_net_minor, tax_policy, product_snapshot, offer_snapshot, attribution_snapshot, cost_snapshot_minor, commission_rule_snapshot, partner_discount_minor)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) RETURNING id`,

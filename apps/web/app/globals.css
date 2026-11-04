@@ -1621,3 +1621,10 @@ img.t3-ava { object-fit: cover; display: block; }
 .foot-grid > *, .lp > * { min-width: 0; overflow-wrap: anywhere; }
 @media (max-width: 360px) { .foot-grid { grid-template-columns: 1fr; } }
 .lp-promo { padding: 10px 12px; border-radius: 12px; background: var(--warn-bg); text-align: center; }
+/* Partner level page */
+.lvl-page { display: grid; gap: 12px; }
+.lvl-hero { display: flex; gap: 14px; align-items: center; padding: 18px; border-radius: 18px; color: #fff; }
+.lvl-hero h1 { margin: 2px 0; font-size: 24px; color: #fff; }
+.lvl-badge { font-size: 44px; width: 68px; height: 68px; display: grid; place-items: center; border-radius: 50%; background: rgba(255,255,255,.15); flex: none; }
+.lvl-bar { height: 12px; border-radius: 999px; background: var(--surface-2); overflow: hidden; margin: 8px 0; }
+.lvl-bar span { display: block; height: 100%; border-radius: 999px; }

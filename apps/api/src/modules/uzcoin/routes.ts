@@ -9,6 +9,7 @@ import { transfer } from '../commissions/service.js';
 import { postJournal } from '../finance/journal.js';
 import { myPartner } from '../partners/routes.js';
 import { currentRate, post } from './service.js';
+import { discounted, giftDiscountBps } from '../levels/service.js';
 
 /**
  * UZSHOP PRO — UzCoin API. Partner: wallet (earned / available / pending / reserved / exchanged / spent / adjusted /
@@ -73,8 +74,15 @@ export function registerUzcoin(app: FastifyInstance, deps: Deps): void {
     });
 
   route(app, deps, { method: 'GET', url: '/partner/uzcoin/gifts', tags: P, summary: 'Gift shop (published gifts only)' }, async ({ actor, db }) => {
-    await myPartner(db, actor, false);
-    return { items: await many(db, `SELECT id, title, description, category, brand, images, videos, variant, kit, delivery_terms, conditions, price_coins::text, stock, per_partner_limit FROM uzcoin_gifts WHERE status='published' ORDER BY price_coins`) };
+    const p = await myPartner(db, actor, false);
+    // Level discount shown on every card: original price, level, %, final price, saved coins.
+    const lv = await maybeOne<{ level: number }>(db, `SELECT level FROM partner_level_state WHERE partner_id=$1`, [p.id]);
+    const level = lv?.level ?? 0;
+    const def = await maybeOne<{ name: string; badge: string }>(db, `SELECT name, badge FROM partner_level_defs WHERE level=$1`, [level]);
+    const bps = await giftDiscountBps(db, level);
+    const items = await many<any>(db, `SELECT id, title, description, category, brand, images, videos, variant, kit, delivery_terms, conditions, price_coins::text, stock, per_partner_limit FROM uzcoin_gifts WHERE status='published' ORDER BY price_coins`);
+    return { level: { level, name: def?.name ?? null, badge: def?.badge ?? null, discount_bps: bps },
+      items: items.map((g) => { const d = discounted(BigInt(g.price_coins), bps); return { ...g, base_price_coins: g.price_coins, discount_bps: bps, final_price_coins: d.final.toString(), saved_coins: d.saved.toString() }; }) };
   });
 
   route(app, deps, { method: 'POST', url: '/partner/uzcoin/gifts/:id/order', tags: P, summary: 'Get a gift for UzCoin: balance + stock checked, price snapshot, coins reserved (Idempotency-Key)', params: zIdParam, body: z.object({ address: z.string().trim().min(5).max(500) }) },
@@ -93,12 +101,16 @@ export function registerUzcoin(app: FastifyInstance, deps: Deps): void {
         }
         await tx.query(`INSERT INTO uzcoin_balances (partner_id) VALUES ($1) ON CONFLICT DO NOTHING`, [p.id]);
         const bal = await one<{ available: string }>(tx, `SELECT available::text FROM uzcoin_balances WHERE partner_id=$1 FOR UPDATE`, [p.id]);
-        if (BigInt(bal.available) < BigInt(g.price_coins)) throw new AppError(422, 'UZCOIN_INSUFFICIENT', { available: bal.available, price_coins: String(g.price_coins) });
-        const o = await one<{ id: string }>(tx, `INSERT INTO uzcoin_gift_orders (gift_id, partner_id, price_coins, gift_title, address, idem_key) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`, [g.id, p.id, g.price_coins, g.title, body.address, idempotencyKey]);
+        const lv = await maybeOne<{ level: number }>(tx, `SELECT level FROM partner_level_state WHERE partner_id=$1`, [p.id]);
+        const bps = await giftDiscountBps(tx, lv?.level ?? 0);
+        const { final: price, saved } = discounted(BigInt(g.price_coins), bps);
+        if (BigInt(bal.available) < price) throw new AppError(422, 'UZCOIN_INSUFFICIENT', { available: bal.available, price_coins: price.toString() });
+        const o = await one<{ id: string }>(tx, `INSERT INTO uzcoin_gift_orders (gift_id, partner_id, price_coins, gift_title, address, idem_key, base_price_coins, discount_bps, level_snapshot) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id`,
+          [g.id, p.id, price.toString(), g.title, body.address, idempotencyKey, g.price_coins, bps, lv?.level ?? 0]);
         await tx.query(`UPDATE uzcoin_gifts SET stock=stock-1, updated_at=now() WHERE id=$1`, [g.id]);
-        await post(tx, { partnerId: p.id, kind: 'gift_reserve', available: -BigInt(g.price_coins), reserved: BigInt(g.price_coins), sourceType: 'gift_order', sourceId: o.id, effectKey: 'reserve', reason: `sovg‘a: ${g.title}`, actorId: actor.userId });
-        await audit(tx, actor, 'uzcoin.gift_ordered', { type: 'uzcoin_gift_order', id: o.id }, { after: { gift_id: g.id, price_coins: String(g.price_coins) } });
-        return { id: o.id, status: 'created', price_coins: String(g.price_coins) };
+        await post(tx, { partnerId: p.id, kind: 'gift_reserve', available: -price, reserved: price, sourceType: 'gift_order', sourceId: o.id, effectKey: 'reserve', reason: `sovg‘a: ${g.title}${bps ? ` (−${bps / 100}%)` : ''}`, actorId: actor.userId });
+        await audit(tx, actor, 'uzcoin.gift_ordered', { type: 'uzcoin_gift_order', id: o.id }, { after: { gift_id: g.id, base_price_coins: String(g.price_coins), discount_bps: bps, price_coins: price.toString() } });
+        return { id: o.id, status: 'created', price_coins: price.toString(), base_price_coins: String(g.price_coins), discount_bps: bps, saved_coins: saved.toString() };
       });
     });
 

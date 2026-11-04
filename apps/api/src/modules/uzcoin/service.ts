@@ -67,4 +67,8 @@ export async function syncOrderCoins(tx: Tx, orderId: string): Promise<void> {
         orderId, orderLineId: l.id, productName: l.name, qty: delta, reason: 'qaytarilgan mahsulot uchun tuzatish' });
     }
   }
+  // Level progress and coupon state follow the same qualified units (same transaction).
+  const { syncPartnerLevel, syncCouponForOrder } = await import('../levels/service.js');
+  await syncCouponForOrder(tx, orderId);
+  await syncPartnerLevel(tx, o.pid, `order:${orderId}`);
 }

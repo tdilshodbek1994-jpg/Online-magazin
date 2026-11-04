@@ -292,7 +292,7 @@ export async function statusEvent(tx: Queryable, orderId: string, dimension: str
  * Mark customer confirmation verified (customer OTP or independent operator call) and allocate stock.
  * Unconfirmed orders never hold stock (T056); if stock ran out meanwhile the order goes to the problem queue.
  */
-export async function confirmOrder(tx: Tx, cfg: AppConfig, actor: Actor, orderId: string, method: 'customer_otp' | 'operator_call', evidence: Record<string, unknown>): Promise<void> {
+export async function confirmOrder(tx: Tx, cfg: AppConfig, actor: Actor, orderId: string, method: 'customer_otp' | 'operator_call' | 'customer_link', evidence: Record<string, unknown>): Promise<void> {
   const o = (await tx.query(`SELECT * FROM orders WHERE id=$1 FOR UPDATE`, [orderId])).rows[0];
   if (!o) throw notFound('ORDER');
   if (o.confirmation_status === 'verified') return; // idempotent no-op

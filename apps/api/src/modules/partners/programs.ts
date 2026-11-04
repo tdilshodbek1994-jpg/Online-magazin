@@ -10,6 +10,7 @@ import { postJournal } from '../finance/journal.js';
 import { notifyPartner } from '../notifications/telegram.js';
 import { BUCKET_SQL } from './cabinet.js';
 import { myPartner } from './routes.js';
+import { assertMonetaryPenaltyAllowed } from '../quality/routes.js';
 
 /**
  * Partner programs (owner-defined rules, never hard-coded amounts):
@@ -274,6 +275,8 @@ export function registerPartnerPrograms(app: FastifyInstance, deps: Deps): void 
     body: z.object({ partner_id: z.string().uuid(), reason_id: z.string().uuid().optional(), reason_text: z.string().trim().min(3).max(300).optional(), amount_minor: zMinor, order_number: z.string().max(40).optional(), note: z.string().max(500).optional() }) },
   async ({ actor, db, body }) => {
     requirePerm(actor, 'partners.manage'); requireStepUp(actor);
+    // Money penalties only with an active, legally approved policy and the feature flag (Quality Q13).
+    await assertMonetaryPenaltyAllowed(db);
     return withTx(db, async (tx) => {
       if (!(await maybeOne(tx, `SELECT 1 FROM partners WHERE id=$1`, [body.partner_id]))) throw notFound('PARTNER');
       const reason = body.reason_id ? await maybeOne<{ name: string }>(tx, `SELECT name FROM penalty_reasons WHERE id=$1`, [body.reason_id]) : null;

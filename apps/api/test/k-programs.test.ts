@@ -69,6 +69,9 @@ describe('Partner programs', () => {
   });
 
   it('penalty takes available first, rest becomes visible debt; cancel restores exactly', async () => {
+    // Money penalties need an active, legally approved policy + flag (Quality Center Q13).
+    await t.db.query(`UPDATE feature_flags SET enabled=true WHERE key='quality.monetary_penalties'`);
+    await t.db.query(`INSERT INTO quality_policies (version, metric, threshold_pct, monetary_enabled, legal_approved_at, legal_reference) VALUES (9000,'confirmation_rate',30,true,now(),'test contract') ON CONFLICT (version) DO NOTHING`);
     const p = await mkPartner(t);
     await api(t, 'POST', '/admin/bonuses', { token: s.owner.token, body: { partner_id: p.partnerId, amount_minor: '5000000', reason: 'boshlang‘ich' } });
     const reason = await api(t, 'POST', '/admin/penalty-reasons', { token: s.owner.token, body: { name: 'Soxta buyurtma', default_amount_minor: '7000000' } });

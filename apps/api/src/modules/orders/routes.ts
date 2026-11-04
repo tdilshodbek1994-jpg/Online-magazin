@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { audit } from '../../platform/audit.js';
 import { can, requirePerm, requireStepUp } from '../../platform/auth.js';
 import { many, maybeOne, one, withTx } from '../../platform/db.js';
-import { conflict, forbidden, notFound, unprocessable } from '../../platform/errors.js';
+import { AppError, conflict, forbidden, notFound, unprocessable } from '../../platform/errors.js';
 import { type Deps, route, zIdParam } from '../../platform/http.js';
 import { emit } from '../../platform/outbox.js';
 import { getPolicy, POLICY } from '../../platform/policies.js';
@@ -210,13 +210,13 @@ export function registerOrders(app: FastifyInstance, deps: Deps): void {
     });
   });
 
-  route(app, deps, { method: 'POST', url: '/courier/orders/:id/fail', tags: ['courier'], summary: 'Failed delivery attempt', params: zIdParam, body: z.object({ reason: z.string().min(3).max(300), return_to_warehouse: z.boolean().default(false) }) },
+  route(app, deps, { method: 'POST', url: '/courier/orders/:id/fail', tags: ['courier'], summary: 'Failed delivery attempt', params: zIdParam, body: z.object({ reason: z.string().min(3).max(300), fault: z.enum(['customer', 'courier', 'warehouse', 'operator', 'other']).default('other'), return_to_warehouse: z.boolean().default(false) }) },
     async ({ actor, db, params, body }) =>
       withTx(db, async (tx) => {
         const s = await maybeOne<{ courier_user_id: string; status: string }>(tx, `SELECT courier_user_id, status FROM shipments WHERE order_id=$1 FOR UPDATE`, [params.id]);
         if (!s || (s.courier_user_id !== actor.userId && !can(actor, 'fulfillment.operate'))) throw notFound('ORDER');
         if (s.status !== 'shipped') throw conflict('INVALID_FULFILLMENT_TRANSITION');
-        await tx.query(`UPDATE shipments SET failed_attempts=failed_attempts+1, last_failure_reason=$2, status=CASE WHEN $3 THEN 'failed' ELSE status END, updated_at=now() WHERE order_id=$1`, [params.id, body.reason, body.return_to_warehouse]);
+        await tx.query(`UPDATE shipments SET failed_attempts=failed_attempts+1, last_failure_reason=$2, failure_fault=$4, status=CASE WHEN $3 THEN 'failed' ELSE status END, updated_at=now() WHERE order_id=$1`, [params.id, body.reason, body.return_to_warehouse, body.fault]);
         if (body.return_to_warehouse) {
           await tx.query(`UPDATE orders SET fulfillment_status='failed', problem_reason='delivery_failed', version=version+1 WHERE id=$1`, [params.id]);
           await statusEvent(tx, params.id, 'fulfillment', 'shipped', 'failed', actor, body.reason);
@@ -310,6 +310,9 @@ export async function logOrderCall(tx: any, cfg: any, actor: any, orderId: strin
   if (o.assigned_operator_id !== actor.userId && !can(actor, 'orders.reassign')) throw forbidden();
   await tx.query(`INSERT INTO call_logs (order_id, operator_id, outcome, note, callback_at) VALUES ($1,$2,$3,$4,$5)`, [params.id, actor.userId, body.outcome, body.note ?? null, body.callback_at ?? null]);
   if (body.outcome === 'confirmed') {
+    // Conflict of interest (Quality Q06): the partner who gets the commission cannot be the independent confirmer.
+    const own = await maybeOne(tx, `SELECT 1 FROM orders o JOIN partners p ON p.id=o.attributed_partner_id WHERE o.id=$1 AND p.user_id=$2`, [params.id, actor.userId]);
+    if (own) throw new AppError(403, 'SELF_CONFIRMATION_FORBIDDEN');
     // The operator must read back the exact total; mismatch means the customer agreed to something else (AC-M39-2).
     if (body.confirmed_total_minor !== o.payable_minor) throw unprocessable('CONFIRMED_TOTAL_MISMATCH', { payable_minor: o.payable_minor });
     // Quick orders carry no street/house yet: the operator must record the address before confirming.

@@ -200,6 +200,11 @@ export function registerContestCenter(app: FastifyInstance, deps: Deps): void {
         const open = await one<{ n: number }>(tx, `SELECT COUNT(*)::int AS n FROM cc_appeals WHERE contest_id=$1 AND status='open'`, [params.id]);
         if (open.n) throw conflict('APPEALS_OPEN', { open: open.n });
         const r = (await loadRules(tx, params.id))!;
+        // Quality Q15: an order under an open quality case keeps the result non-final until a human closes the case.
+        const disputes = await one<{ n: number }>(tx, `SELECT COUNT(*)::int AS n FROM quality_cases q JOIN cc_enrollments e ON e.partner_id=q.partner_id AND e.contest_id=$1
+            WHERE q.status IN ('detected','triage','investigating','awaiting_partner_response','reviewed','appealed')
+              AND EXISTS (SELECT 1 FROM orders o WHERE o.id = ANY(q.order_ids) AND o.created_at >= $2 AND o.created_at < $3)`, [params.id, r.starts_at, r.ends_at]);
+        if (disputes.n) throw conflict('QUALITY_DISPUTES_OPEN', { open: disputes.n });
         await recompute(tx, params.id);
         const rows = await liveRanking(tx, params.id, 'final', r);
         await tx.query(`INSERT INTO cc_rankings (contest_id, kind, contest_version, rows, computed_by) VALUES ($1,'final',$2,$3,$4)`, [params.id, r.version, JSON.stringify(rows), actor.userId])

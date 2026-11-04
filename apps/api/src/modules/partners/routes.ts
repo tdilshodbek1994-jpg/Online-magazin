@@ -2,6 +2,7 @@ import { maskPhone, normalizeUzPhone } from '@om/shared';
 import { createHash, randomBytes, randomInt, timingSafeEqual } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+import { openDeniedCase } from '../quality/routes.js';
 import { audit } from '../../platform/audit.js';
 import { type Actor, hashToken, requirePerm, requireStepUp, requireUser } from '../../platform/auth.js';
 import { many, maybeOne, one, type Tx, withTx } from '../../platform/db.js';
@@ -214,7 +215,7 @@ export function registerPartners(app: FastifyInstance, deps: Deps): void {
           if (body.decision === 'confirm') await applyAmendment(tx, cfg, sys, am.id);
           else await rejectAmendment(tx, sys, am.id);
         } else if (body.decision === 'confirm') await confirmOrder(tx, cfg, sys, c.order_id, 'customer_otp', { confirmation_id: c.id });
-        else await cancelOrder(tx, sys, c.order_id, 'customer_rejected_confirmation', true);
+        else { await cancelOrder(tx, sys, c.order_id, 'customer_rejected_confirmation', true); await openDeniedCase(tx, c.order_id, 'customer_otp_rejected'); }
         // Confirming an order grants no account access: no session is issued here (T043).
         return { ok: true, decision: body.decision };
       });

@@ -21,6 +21,13 @@ export default function OpsBoard() {
   const [bulkTo, setBulkTo] = useState('');
   const [bulkReason, setBulkReason] = useState('');
   const [preview, setPreview] = useState<any>(null);
+  const [incs, setIncs] = useState<any[]>([]);
+  const [incTitle, setIncTitle] = useState('');
+  const [incKind, setIncKind] = useState('delivery');
+  const loadIncs = useCallback(() => { api('/ops/center/incidents').then((r) => setIncs(r.items)).catch(() => {}); }, []);
+  useEffect(loadIncs, [loadIncs]);
+  const [qual, setQual] = useState<any>(null);
+  useEffect(() => { api('/ops/center/quality?days=30').then(setQual).catch(() => {}); }, []);
   const load = useCallback(() => { api('/ops/center/board').then((r) => { setD(r); setErr(null); }).catch(setErr); }, []);
   useEffect(() => { load(); const i = setInterval(load, 60_000); return () => clearInterval(i); }, [load]);
   if (err) return <div className="notice" role="alert">{err.status === 403 ? 'Bu panel faqat rahbar (ishni qayta taqsimlash huquqi bor xodim) uchun.' : errText(err)}</div>;
@@ -57,6 +64,18 @@ export default function OpsBoard() {
       <div className="spread"><h1>Rahbar paneli</h1><Link href="/ops" className="btn secondary sm">← Operator xonasi</Link></div>
       <p className="muted small">Hisoblangan vaqt: {new Date(d.computed_at).toLocaleTimeString('uz-UZ', { timeZone: 'Asia/Tashkent', hour: '2-digit', minute: '2-digit' })} · har daqiqada yangilanadi</p>
       {oldest && <p className="notice">Eng uzoq kutgan egasiz ish: <b>{oldest.number}</b> — {age(oldest.age_seconds)}</p>}
+      {incs.some((i) => i.status === 'open') && (
+        <section className="card inc-box">
+          <h2>Ochiq umumiy muammolar</h2>
+          {incs.filter((i) => i.status === 'open').map((i) => (
+            <div key={i.id} className="inc-item">
+              <div className="spread"><b>{i.title}</b><span className="pill b-returned">{i.kind_uz}</span></div>
+              <div className="small muted">{i.open_tasks} ta ish kutyapti · {i.author} · {new Date(i.created_at).toLocaleString('uz-UZ', { timeZone: 'Asia/Tashkent', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</div>
+              <button className="btn secondary sm" onClick={async () => { const resolution = prompt('Muammo qanday hal bo‘ldi?'); if (!resolution) return; try { const r = await api(`/ops/center/incidents/${i.id}/resolve`, { method: 'POST', body: { resolution } }); setMsg(`✓ Yopildi: ${r.returned_to_queue} ta ish navbatga qaytdi — har bir buyurtmani operator yakunlaydi`); load(); loadIncs(); } catch (e: any) { setMsg(errText(e)); } }}>Hal bo‘ldi</button>
+            </div>
+          ))}
+        </section>
+      )}
       <section className="card">
         <h2>Operatorlar</h2>
         <div className="board-staff">
@@ -64,6 +83,20 @@ export default function OpsBoard() {
           {d.staff.map((s: any) => <div key={s.id} className="board-op"><b>{s.display_name}</b><span className="small">{SHIFT_UZ[s.shift] ?? s.shift}</span><span className="small">{s.active} ta faol ish</span></div>)}
         </div>
       </section>
+      {qual && qual.items.length > 0 && (
+        <details className="card q-box">
+          <summary><b>Operatorlar sifati ({qual.days} kun)</b></summary>
+          <div className="table-wrap"><table className="q-table">
+            <thead><tr><th>Operator</th><th>Ishlar</th><th>Tasdiq</th><th>Rad</th><th>1-aloqa (median)</th></tr></thead>
+            <tbody>{qual.items.map((r: any) => (
+              <tr key={r.id}><td>{r.display_name}{!r.enough_data && <small className="muted"> · ma’lumot kam</small>}</td>
+                <td>{r.tasks_contacted}</td><td>{r.confirm_rate_pct === null ? '—' : `${r.confirmed} (${r.confirm_rate_pct}%)`}</td><td>{r.rejected}</td>
+                <td>{r.median_first_contact_min === null ? '—' : r.median_first_contact_min < 60 ? `${r.median_first_contact_min} daq` : `${Math.round(r.median_first_contact_min / 60)} soat`}</td></tr>
+            ))}</tbody>
+          </table></div>
+          <p className="muted small">{qual.note} Kamida {qual.min_sample} ta ish bo‘lmaguncha xulosa chiqarmang. Reyting yo‘q — bu faqat suhbat uchun ma’lumot.</p>
+        </details>
+      )}
       <div className="chips" role="tablist" aria-label="Filtr">
         {groups.map(([k, l, fn]) => <button key={k} role="tab" aria-selected={f === k} className={`chip ${f === k ? 'on' : ''}`} onClick={() => setF(k)}>{l} <span className="q-count">{items.filter(fn).length}</span></button>)}
       </div>
@@ -85,6 +118,16 @@ export default function OpsBoard() {
             <button className="link-btn small" onClick={() => { setPicked([]); setPreview(null); }}>Bekor qilish</button>
           </div>
           {preview && <ul className="bulk-prev small">{preview.results.map((r: any) => <li key={r.task_id}>{r.number ?? r.task_id.slice(0, 8)}: {r.result === 'would_move' ? 'o‘tkaziladi' : 'o‘tkazilmaydi'}{r.reason ? ` — ${r.reason}` : ''}</li>)}</ul>}
+          <details className="task-more">
+            <summary>Umumiy muammoga bog‘lash</summary>
+            <div className="bulk-row">
+              <input value={incTitle} onChange={(e) => setIncTitle(e.target.value)} placeholder="Masalan: Kuryer xizmati kechikmoqda" aria-label="Muammo nomi" />
+              <select value={incKind} onChange={(e) => setIncKind(e.target.value)} aria-label="Muammo turi">
+                <option value="delivery">Yetkazish</option><option value="warehouse">Ombor</option><option value="payment">To‘lov</option><option value="provider">Tashqi xizmat</option><option value="other">Boshqa</option>
+              </select>
+            </div>
+            <button className="btn secondary sm mt8" disabled={incTitle.trim().length < 3} onClick={async () => { try { const r = await api('/ops/center/incidents', { method: 'POST', body: { title: incTitle, kind: incKind, task_ids: picked } }); setMsg(`✓ Muammo ochildi, ${r.linked} ta ish bog‘landi`); setPicked([]); setIncTitle(''); load(); loadIncs(); } catch (e: any) { setMsg(errText(e)); } }}>Bog‘lash ({picked.length})</button>
+          </details>
           <p className="muted small">Ommaviy amal faqat ishni o‘tkazish uchun. To‘lov, qaytarish va komissiya ommaviy o‘zgartirilmaydi.</p>
         </section>
       )}

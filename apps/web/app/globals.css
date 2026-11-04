@@ -1252,3 +1252,6 @@ a.admin-tab { text-decoration: none; color: inherit; }
 .bulk-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
 @media (max-width: 480px) { .bulk-row { grid-template-columns: minmax(0, 1fr); } }
 .bulk-prev { margin: 0; padding-left: 18px; max-height: 160px; overflow: auto; }
+.inc-box { display: grid; gap: 8px; border-color: color-mix(in srgb, #ef4444 45%, var(--border)); }
+.inc-item { display: grid; gap: 4px; padding: 10px; border-radius: 12px; background: var(--surface-2); }
+.q-box summary { cursor: pointer; min-height: 36px; display: flex; align-items: center; } .q-table td, .q-table th { white-space: nowrap; font-size: 13px; }

@@ -89,3 +89,37 @@ describe('Bulk-safe transfer (T53)', () => {
     expect((await t.db.query(`SELECT assignee_id FROM ops_tasks WHERE id=$1`, [a.id])).rows[0].assignee_id).toBe(s.operator2.id);
   });
 });
+
+describe('Incident grouping', () => {
+  it('links tasks to one root cause; resolving returns them to the queue and never changes the orders', async () => {
+    const a = await claimedTask(s.operator.token);
+    const b = await claimedTask(s.operator.token);
+    const inc = await api(t, 'POST', '/ops/center/incidents', { token: s.owner.token, body: { title: 'Kuryer xizmati kechikmoqda', kind: 'delivery', task_ids: [a.id, b.id] } });
+    expect(inc.json.linked).toBe(2);
+    let rows = (await t.db.query(`SELECT state, blocked_by FROM ops_tasks WHERE id = ANY($1)`, [[a.id, b.id]])).rows;
+    expect(rows.every((r: any) => r.state === 'waiting_internal' && /Kuryer/.test(r.blocked_by))).toBe(true);
+    const before = (await t.db.query(`SELECT id, commercial_status, fulfillment_status FROM orders WHERE id = ANY($1) ORDER BY id`, [[a.orderId, b.orderId]])).rows;
+    const res = await api(t, 'POST', `/ops/center/incidents/${inc.json.id}/resolve`, { token: s.owner.token, body: { resolution: 'Kuryer xizmati tiklandi' } });
+    expect(res.json.returned_to_queue).toBe(2);
+    rows = (await t.db.query(`SELECT state, next_action FROM ops_tasks WHERE id = ANY($1)`, [[a.id, b.id]])).rows;
+    expect(rows.every((r: any) => r.state === 'queued' && /hal bo‘ldi/.test(r.next_action))).toBe(true);
+    const after = (await t.db.query(`SELECT id, commercial_status, fulfillment_status FROM orders WHERE id = ANY($1) ORDER BY id`, [[a.orderId, b.orderId]])).rows;
+    expect(after).toEqual(before);
+    expect((await api(t, 'POST', `/ops/center/incidents/${inc.json.id}/resolve`, { token: s.owner.token, body: { resolution: 'yana' } })).json.code).toBe('INCIDENT_ALREADY_RESOLVED');
+    expect((await api(t, 'POST', '/ops/center/incidents', { token: s.operator.token, body: { title: 'x y z', kind: 'other', task_ids: [a.id] } })).status).toBe(403);
+  });
+});
+
+describe('Operator quality (fair, with denominators)', () => {
+  it('reports several measures with sample size and flags small samples', async () => {
+    const a = await claimedTask(s.operator.token);
+    await api(t, 'POST', `/ops/center/tasks/${a.id}/contact`, { token: s.operator.token, body: { expected_version: a.version, outcome: 'no_answer' } });
+    const q = await api(t, 'GET', '/ops/center/quality?days=30', { token: s.owner.token });
+    expect(q.status).toBe(200);
+    const me = q.json.items.find((x: any) => x.id === s.operator.id);
+    expect(me.tasks_contacted).toBeGreaterThanOrEqual(1);
+    expect(me.enough_data).toBe(false);
+    expect(q.json.min_sample).toBe(20);
+    expect((await api(t, 'GET', '/ops/center/quality', { token: s.operator.token })).status).toBe(403);
+  });
+});

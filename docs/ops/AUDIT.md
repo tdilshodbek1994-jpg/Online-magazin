@@ -58,10 +58,19 @@ Vertical slice UI → API → DB → tests:
 * **Three-audience messages** (`migrations/0018_order_messages.sql`, `modules/opscenter/messages.ts`): composer names the audience (🔒 internal / 🤝 partner / 👤 customer) before sending; internal notes stay in `order_notes`; partner messages show on the sales passport (+ Telegram outbox), customer messages on the customer's order page (in-app notice for logged-in customers, no SMS from here). Delivery states: stored / queued / sent / failed / unknown — never "read" (T25).
 * Tests: SLA in `q-ops-center.test.ts`, `t-order-messages.test.ts`.
 
+## 2e. Done in P2
+
+* **Saved replies** (`0019_reply_templates.sql`, `templates.ts`): Latin/Cyrillic, versioned (edit = new version, old retired), placeholders only from verified order data; an unfilled `{placeholder}` cannot be sent outside (`TEMPLATE_UNFILLED`). Composer picker per audience.
+* **Duplicate review** (`0020_duplicate_review.sql`, `duplicates.ts`, T03): evidence list (same phone ±7 days, minutes apart, shared items, source); "not a duplicate" clears the signal for good; "duplicate" cancels this order with a canonical link (both IDs + histories kept); paid/shipped refused.
+* **Bulk-safe transfer** (`bulk.ts`, T53): preview (dry run) → per-item execution, results and summary; only task transfer, no money actions.
+* **Incidents** (`0021_ops_incidents.sql`, `incidents.ts`): one root cause links many tasks (they wait as "ichki muammo"); resolving returns them to the queue with a clear next action and never changes orders.
+* **Operator quality** (`GET /ops/center/quality`): tasks contacted, confirmed (rate with denominator), rejected, median minutes to first contact; "ma'lumot kam" below 20 tasks; no ranking.
+* Tests: `u-reply-templates`, `v-duplicates`, bulk/incident/quality in `r-ops-handoff`.
+
 ## 3. Not done yet (honest list)
 
 P1 (remaining): skill/language routing and capacity round-robin, business calendar (holidays) for SLA, quiet-hours digest for notifications.
-P2: supervisor dashboard UI (API exists), incident grouping, QA sampling, duplicate review, bulk-safe actions, KB/templates, load and restore tests.
+P2 (remaining): QA sampling with human review and appeal, knowledge-base articles per product, load test (100k orders / 30 operators) and restore drill.
 P3: real telephony adapter, Telegram Business, AI assistant (read-only, human approval).
 
 ## 4. Policy register (owner decisions pending — no hidden production defaults)

@@ -1280,3 +1280,11 @@ a.admin-tab { text-decoration: none; color: inherit; }
 .pw-open { margin-top: 6px; }
 .pw-box { display: grid; gap: 6px; margin-top: 8px; padding: 10px; border-radius: 12px; background: var(--surface-2); }
 .pw-done { margin: 6px 0 0; color: var(--primary-600); font-weight: 700; }
+/* Order Studio: product search */
+.lp-search { font-size: 16px; }
+.lp-hits { display: grid; gap: 4px; }
+.lp-hit { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 6px 8px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); color: var(--text); font: inherit; text-align: left; cursor: pointer; min-height: 52px; }
+.lp-hit:hover { border-color: var(--primary); }
+.lp-hit img, .lp-hit .ph { width: 40px; height: 40px; border-radius: 8px; object-fit: cover; }
+.lp-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
+.lp-hit b { font-size: 13px; white-space: nowrap; }

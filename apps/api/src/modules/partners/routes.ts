@@ -100,6 +100,7 @@ export function registerPartners(app: FastifyInstance, deps: Deps): void {
     await myPartner(db, actor);
     return { items: await many(db, `
       SELECT p.id, p.slug, p.name, (SELECT MIN(o.price_minor)::text FROM skus s JOIN offers o ON o.sku_id=s.id WHERE s.product_id=p.id AND s.status='active' AND o.status='active') AS min_price_minor,
+             (SELECT '/media/' || ma.storage_key FROM media_assets ma WHERE ma.product_id=p.id AND ma.status='approved' ORDER BY ma.sort LIMIT 1) AS image,
              (SELECT json_build_object('kind', kind, 'rate_bps', rate_bps, 'fixed_minor', fixed_minor::text) FROM commission_rules cr WHERE cr.product_id=p.id AND cr.effective_from <= now() AND (cr.effective_to IS NULL OR cr.effective_to > now()) ORDER BY version DESC LIMIT 1) AS commission
         FROM products p WHERE p.status='published' ORDER BY p.published_at DESC LIMIT 200`) };
   });

@@ -220,7 +220,7 @@ export default function OrderStudio() {
                 <label htmlFor="cn">Ismi</label>
                 <input id="cn" value={f.customer_name} onChange={(e) => update({ customer_name: e.target.value })} autoComplete="off" />
                 <label htmlFor="cp">Telefon raqami</label>
-                <input id="cp" type="tel" inputMode="tel" value={f.customer_phone} onChange={(e) => update({ customer_phone: e.target.value })} placeholder="+998 90 123 45 67" autoComplete="off" />
+                <input id="cp" type="tel" inputMode="tel" value={f.customer_phone} onChange={(e) => update({ customer_phone: e.target.value })} onBlur={(e) => { const d = e.target.value.replace(/\D/g, ''); const n = d.length === 9 ? '998' + d : d; if (n.length === 12 && n.startsWith('998')) update({ customer_phone: `+${n.slice(0, 3)} ${n.slice(3, 5)} ${n.slice(5, 8)} ${n.slice(8, 10)} ${n.slice(10)}` }); }} placeholder="+998 90 123 45 67" autoComplete="off" />
                 <label>Qachon qo‘ng‘iroq qilish qulay?</label>
                 <div className="chips">{TIME_CHIPS.map((c) => <button type="button" key={c} className={`chip ${f.contact_time === c ? 'on' : ''}`} aria-pressed={f.contact_time === c} onClick={() => update({ contact_time: f.contact_time === c ? '' : c })}>{c}</button>)}</div>
                 {placements.length > 0 && (
@@ -245,7 +245,7 @@ export default function OrderStudio() {
                 <label className="check-row"><input type="checkbox" checked={f.address_later} onChange={(e) => update({ address_later: e.target.checked })} /> Manzil keyin aniqlanadi</label>
                 {f.address_later ? <p className="muted small">Qoralama saqlanadi, lekin manzil kiritilmaguncha buyurtma yuborilmaydi.</p> : (
                   <div className="addr-grid">
-                    <div><label htmlFor="ad">Tuman</label><input id="ad" value={f.district} onChange={(e) => update({ district: e.target.value })} /></div>
+                    <div><label htmlFor="ad">Tuman</label><input id="ad" list="tash-districts" value={f.district} onChange={(e) => update({ district: e.target.value })} autoComplete="off" /><datalist id="tash-districts">{['Bektemir', 'Chilonzor', 'Mirobod', 'Mirzo Ulug‘bek', 'Olmazor', 'Sergeli', 'Shayxontohur', 'Uchtepa', 'Yakkasaroy', 'Yangihayot', 'Yashnobod', 'Yunusobod'].map((d) => <option key={d} value={d} />)}</datalist></div>
                     <div><label htmlFor="as">Ko‘cha / mahalla</label><input id="as" value={f.street} onChange={(e) => update({ street: e.target.value })} /></div>
                     <div><label htmlFor="ah">Uy</label><input id="ah" value={f.house} onChange={(e) => update({ house: e.target.value })} /></div>
                     <div><label htmlFor="al">Mo‘ljal</label><input id="al" value={f.landmark} onChange={(e) => update({ landmark: e.target.value })} /></div>
@@ -324,11 +324,32 @@ function LineEditor({ line, products, lang, onChange, onRemove }: { line: Line; 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [line.slug]);
   const sel = variants.find((v) => v.sku_id === line.sku_id);
+  const [q, setQ] = useState('');
+  const norm = (x: string) => x.toLowerCase().replace(/[‘’ʻʼ']/g, '').replace(/q/g, 'k').replace(/x/g, 'h');
+  const hits = q.trim().length >= 2 ? products.filter((p) => Object.values(p.name ?? {}).some((n: any) => norm(String(n)).includes(norm(q.trim())))).slice(0, 6) : [];
   return (
     <div className="line-ed">
+      {!line.slug && (
+        <>
+          <label className="sr-only" htmlFor={`lq-${line.slug}`}>Mahsulotni qidirish</label>
+          <input id={`lq-${line.slug}`} className="lp-search" type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="🔍 Mahsulot nomini yozing…" autoComplete="off" />
+          {hits.length > 0 && (
+            <div className="lp-hits">
+              {hits.map((p) => (
+                <button type="button" key={p.id} className="lp-hit" onClick={() => { setQ(''); onChange({ slug: p.slug, sku_id: '', qty: line.qty }); }}>
+                  {p.image ? <img src={p.image} alt="" width={40} height={40} /> : <span className="ph" aria-hidden />}
+                  <span className="lp-name">{pick(p.name, lang)}</span>
+                  {p.min_price_minor && <b>{som(p.min_price_minor)}</b>}
+                </button>
+              ))}
+            </div>
+          )}
+          {q.trim().length >= 2 && hits.length === 0 && <p className="muted small">Topilmadi — boshqacha yozib ko‘ring yoki ro‘yxatdan tanlang.</p>}
+        </>
+      )}
       <label className="sr-only" htmlFor={`lp-${line.slug}`}>Mahsulot</label>
       <select id={`lp-${line.slug}`} value={line.slug} onChange={(e) => onChange({ slug: e.target.value, sku_id: '', qty: line.qty })}>
-        <option value="">— mahsulot tanlang —</option>
+        <option value="">{line.slug ? '— boshqa mahsulot —' : 'yoki ro‘yxatdan tanlang'}</option>
         {products.map((p) => <option key={p.id} value={p.slug}>{pick(p.name, lang)}{p.min_price_minor ? ` · ${som(p.min_price_minor)}` : ''}</option>)}
       </select>
       {variants.length > 1 && (

@@ -2,14 +2,12 @@
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
-import { CategoryIcon } from '@/components/Icons';
 import { ProductCard, SkeletonGrid } from '@/components/ProductCard';
 import { api } from '@/lib/api';
 import { pick, useI18n } from '@/lib/i18n';
 import { errText } from '@/lib/errors';
 
 const PAGE = 24;
-const PRICE_CAPS: [string, string][] = [['100000', '100 000 gacha'], ['300000', '300 000 gacha'], ['1000000', '1 mln gacha']];
 
 /**
  * Catalog / search results in marketplace style: photo category chips, one-tap sort chips, price caps,
@@ -82,23 +80,18 @@ function Catalog() {
 
   return (
     <div className="catalog2">
-      <nav className="crumbs" aria-label="breadcrumb"><Link href="/">{t('home')}</Link><span>/</span><span>{t('catalog')}</span></nav>
-      <h1>{title}</h1>
-      <div className="cat-chips" role="list">
-        <button role="listitem" className={`cchip ${!category ? 'on' : ''}`} onClick={() => go({ category: null })}><span className="cc-ico">🛍️</span>{t('allCategories')}</button>
-        {cats.map((c) => (
-          <button role="listitem" key={c.id} className={`cchip ${category === c.slug ? 'on' : ''}`} onClick={() => go({ category: c.slug })}>
-            {c.cover ? <img src={c.cover} alt="" /> : <span className="cc-ico"><CategoryIcon slug={c.slug} size={18} /></span>}{pick(c.name, lang)}
-          </button>
-        ))}
-      </div>
+      {/* Clean header (user request): no breadcrumb, no big title, no category/price chip rows. Categories live in the
+          "☰ Katalog" dropdown next to the search; a chosen category or search shows as one small removable chip. */}
+      <h1 className="sr-only">{title}</h1>
+      {(current || q) && (
+        <div className="cat-current">
+          {current && <button type="button" className="schip on" onClick={() => go({ category: null })} aria-label={`${pick(current.name, lang)} filtrini olib tashlash`}>{pick(current.name, lang)} ×</button>}
+          {q && <span className="small muted">“{q}” bo‘yicha</span>}
+        </div>
+      )}
       <div className="filter-bar">
         <div className="sort-chips" role="group" aria-label={t('sort')}>
           {sorts.map(([k, l]) => <button key={k} className={`schip ${sort === k ? 'on' : ''}`} aria-pressed={sort === k} onClick={() => go({ sort: k })}>{l}</button>)}
-        </div>
-        <div className="sort-chips" role="group" aria-label="Narx">
-          {PRICE_CAPS.map(([v, l]) => <button key={v} className={`schip ${maxPrice === v ? 'on' : ''}`} aria-pressed={maxPrice === v} onClick={() => go({ max_price: maxPrice === v ? null : v })}>{l}</button>)}
-          <button className={`schip ${inStock ? 'on' : ''}`} aria-pressed={inStock} onClick={() => go({ in_stock: inStock ? null : '1' })}>✓ {t('inStockOnly')}</button>
         </div>
       </div>
       {fuzzy && !loading && <div className="notice fuzzy-note" role="status">“{q}” bo‘yicha aniq topilmadi — shunga o‘xshash mahsulotlar ko‘rsatilmoqda.</div>}

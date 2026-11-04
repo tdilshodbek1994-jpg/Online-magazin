@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { IconBag, IconCart, IconPlay, IconUser } from '@/components/Icons';
 import { api, getToken, setToken } from '@/lib/api';
 import { SearchBox } from '@/components/SearchBox';
+import { CatalogMenu } from '@/components/CatalogMenu';
 import { useI18n } from '@/lib/i18n';
 
 /** Fire after any cart change so the header/bottom-nav badges refresh. */
@@ -124,7 +125,7 @@ export function Header() {
           <span className="logo-mark"><IconBag size={20} /></span>
           <span>Uz<b>Shop</b></span>
         </Link>
-        <SearchBox />
+        <div className="search-row"><CatalogMenu /><SearchBox /></div>
         <nav className="head-actions" aria-label="Asosiy">
           <Link href="/reels" className="icon-link"><IconPlay /><span className="icon-label">Video</span></Link>
           <Link href="/favorites" className="icon-link" aria-label="Sevimlilar"><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.5-9.2C1.1 8.4 3.3 5 6.8 5c2 0 3.4 1.1 4.2 2.4h2c.8-1.3 2.2-2.4 4.2-2.4 3.5 0 5.7 3.4 4.3 6.8C19.5 16.4 12 21 12 21z" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" /></svg><span className="icon-label">Sevimlilar</span></Link>

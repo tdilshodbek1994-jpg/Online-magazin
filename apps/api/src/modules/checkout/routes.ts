@@ -155,7 +155,8 @@ export function registerCheckout(app: FastifyInstance, deps: Deps): void {
   route(app, deps, {
     method: 'POST', url: '/checkout/quick-order', tags: T, summary: 'One-step order: SKU + name + phone; operator collects address by phone (Idempotency-Key required)',
     body: z.object({ sku_id: z.string().uuid(), qty: z.number().int().min(1).max(20).default(1), name: z.string().trim().min(2).max(120), phone: z.string().min(5).max(32),
-      delivery_zone_id: z.string().uuid().optional(), accept_terms: z.literal(true), referral_code: z.string().max(20).optional() }),
+      delivery_zone_id: z.string().uuid().optional(), accept_terms: z.literal(true), referral_code: z.string().max(20).optional(),
+      landing: z.object({ landing_id: z.string().uuid(), revision: z.number().int().min(1) }).optional() }),
   }, async ({ actor, db, cfg, body, idempotencyKey, reply }) => {
     const key = requireIdempotencyKey(idempotencyKey);
     if (!actor.userId && !actor.guestToken) throw badRequest('GUEST_TOKEN_REQUIRED');
@@ -179,6 +180,11 @@ export function registerCheckout(app: FastifyInstance, deps: Deps): void {
           quoteId: q.id, quoteHash: priced.hash, paymentMethod: 'cod', channel: 'web', customerUserId: actor.userId, customerPhone: phone,
           createdBy: actor.userId, confirmation: 'pending', attribution, acceptedTerms: body.accept_terms,
         });
+        if (body.landing) {
+          const lp = await maybeOne<{ digest: string }>(tx, `SELECT r.digest FROM landing_pages l JOIN landing_revisions r ON r.landing_id=l.id AND r.revision=$2
+              WHERE l.id=$1 AND l.status='published' AND l.published_revision=$2 AND (SELECT s.product_id FROM skus s WHERE s.id=$3) = ANY(l.product_ids)`, [body.landing.landing_id, body.landing.revision, body.sku_id]);
+          if (lp) await tx.query(`UPDATE orders SET landing_snapshot=$2 WHERE id=$1`, [order.id, JSON.stringify({ landing_id: body.landing.landing_id, revision: body.landing.revision, digest: lp.digest, quote_id: q.id })]);
+        }
         return { status: 201, body: { order_id: order.id, number: order.number, confirmation: 'pending_operator_call', payable: pricedToJson(priced).payable } };
       }),
     );

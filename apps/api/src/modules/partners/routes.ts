@@ -142,15 +142,15 @@ export function registerPartners(app: FastifyInstance, deps: Deps): void {
       if (!actor.guestToken) throw badRequest('GUEST_TOKEN_REQUIRED');
       // A placement code (one per Telegram post / Instagram campaign) resolves to its root link and is recorded on the touch.
       const plc = await maybeOne<{ id: string; root_link_id: string; status: string }>(db, `SELECT id, root_link_id, status FROM campaign_placements WHERE code=$1`, [body.code]);
-      const l = await maybeOne<{ id: string; partner_id: string; status: string; pstatus: string; cstatus: string | null; slug: string | null }>(db,
-        `SELECT l.id, l.partner_id, l.status, p.status AS pstatus, c.status AS cstatus, pr.slug FROM referral_links l JOIN partners p ON p.id=l.partner_id LEFT JOIN partner_campaigns c ON c.id=l.campaign_id LEFT JOIN products pr ON pr.id=l.product_id WHERE ${plc ? 'l.id=$1' : 'l.code=$1'}`, [plc ? plc.root_link_id : body.code]);
+      const l = await maybeOne<{ id: string; partner_id: string; status: string; pstatus: string; cstatus: string | null; slug: string | null; landing_slug: string | null }>(db,
+        `SELECT l.id, l.partner_id, l.status, p.status AS pstatus, c.status AS cstatus, pr.slug, (SELECT lp.slug FROM landing_pages lp WHERE lp.id=l.landing_id AND lp.status='published') AS landing_slug FROM referral_links l JOIN partners p ON p.id=l.partner_id LEFT JOIN partner_campaigns c ON c.id=l.campaign_id LEFT JOIN products pr ON pr.id=l.product_id WHERE ${plc ? 'l.id=$1' : 'l.code=$1'}`, [plc ? plc.root_link_id : body.code]);
       // Invalid codes do not break browsing (T035): just no attribution.
       if (!l) return { ok: true, attributed: false, redirect: '/' };
       const bot = isBotUserAgent(req.headers['user-agent']);
       const reason = bot ? 'bot_or_preview' : l.status !== 'active' ? 'link_disabled' : l.pstatus !== 'active' ? `partner_${l.pstatus}` : l.cstatus && l.cstatus !== 'active' ? 'campaign_disabled' : plc && plc.status !== 'active' ? 'placement_archived' : null;
       await db.query(`INSERT INTO referral_touches (link_id, partner_id, visitor_hash, user_id, is_bot, eligible, ineligible_reason, placement_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
         [l.id, l.partner_id, visitorHash(actor.guestToken), actor.userId, bot, reason === null, reason, plc?.id ?? null]);
-      return { ok: true, attributed: reason === null, redirect: l.slug ? `/p/${l.slug}` : '/' };
+      return { ok: true, attributed: reason === null, redirect: l.landing_slug ? `/l/${l.landing_slug}` : l.slug ? `/p/${l.slug}` : '/' };
     });
 
   // ---------- Partner-assisted order (§12) ----------

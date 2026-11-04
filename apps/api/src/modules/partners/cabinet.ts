@@ -184,7 +184,8 @@ export function registerPartnerCabinet(app: FastifyInstance, deps: Deps): void {
     });
 
   route(app, deps, { method: 'POST', url: '/partner/streams', tags: T, summary: 'Create a named stream (referral link) for a product, optionally with a customer discount paid from the commission',
-    body: z.object({ product_id: z.string().uuid(), name: z.string().trim().min(1).max(80), customer_discount_minor: z.coerce.bigint().min(0n).optional() }) },
+    body: z.object({ product_id: z.string().uuid(), name: z.string().trim().min(1).max(80), customer_discount_minor: z.coerce.bigint().min(0n).optional(),
+      landing_id: z.string().uuid().optional(), channel: z.enum(['telegram', 'instagram', 'facebook', 'other']).optional() }) },
     async ({ actor, db, cfg, body }) => {
       const p = await myPartner(db, actor);
       const pr = await maybeOne<{ slug: string }>(db, `SELECT slug FROM products WHERE id=$1 AND status='published'`, [body.product_id]);
@@ -194,8 +195,10 @@ export function registerPartnerCabinet(app: FastifyInstance, deps: Deps): void {
         const lim = await discountLimit(db, body.product_id);
         if (!lim || discount > BigInt(lim.max_discount_minor)) throw badRequest('DISCOUNT_TOO_BIG', { max_discount_minor: lim?.max_discount_minor ?? '0' });
       }
+      // Flow on a landing: only a published landing that contains this product (LT-021).
+      if (body.landing_id && !(await maybeOne(db, `SELECT 1 FROM landing_pages WHERE id=$1 AND status='published' AND $2 = ANY(product_ids)`, [body.landing_id, body.product_id]))) throw notFound('LANDING');
       const code = randomBytes(9).toString('base64url').replace(/[^A-Za-z0-9]/g, 'x').slice(0, 12);
-      const l = await one<{ id: string }>(db, `INSERT INTO referral_links (partner_id, product_id, code, name, customer_discount_minor) VALUES ($1,$2,$3,$4,$5) RETURNING id`, [p.id, body.product_id, code, body.name, discount.toString()]);
+      const l = await one<{ id: string }>(db, `INSERT INTO referral_links (partner_id, product_id, code, name, customer_discount_minor, landing_id, channel) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`, [p.id, body.product_id, code, body.name, discount.toString(), body.landing_id ?? null, body.channel ?? null]);
       if (discount > 0n) await audit(db, actor, 'partner.discount_stream_created', { type: 'referral_link', id: l.id }, { after: { product_id: body.product_id, customer_discount_minor: discount.toString() } });
       return { id: l.id, code, name: body.name, customer_discount_minor: discount.toString(), url: `${cfg.publicWebUrl}/r/${code}` };
     });

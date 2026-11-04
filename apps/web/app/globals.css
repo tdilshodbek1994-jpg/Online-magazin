@@ -1614,3 +1614,6 @@ img.t3-ava { object-fit: cover; display: block; }
 .tr-form { display: grid; gap: 8px; }
 .tr-form input { width: 100%; min-width: 0; }
 .tr-table td, .tr-table th { padding: 6px 4px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
+.cc-panel > *, .ln-block > * { min-width: 0; }
+.tr-grid .tile { min-width: 0; overflow-wrap: anywhere; }
+.cc > * { min-width: 0; } .ln-preview { box-sizing: border-box; }

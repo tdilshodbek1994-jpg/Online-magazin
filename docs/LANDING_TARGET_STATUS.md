@@ -34,15 +34,28 @@ Branch `claude/online-marketplace-platform-sdtv52` · not merged to main · not 
 | Admin «📡 Pixel / CAPI diagnostikasi» (inside Landinglar): readiness, counts by status, last success/rejection, dictionary, recent events; owner sets dataset id + on/off; tokens are never entered here | done |
 | Real Meta HTTP adapter (Graph API CAPI), browser Pixel script loader, CSP allowlist | **blocked**: no Meta app/credentials/app review (D19); owner OAuth is P1 |
 
+## P1A — done (spend read-model + landing analytics)
+| Item | State |
+|---|---|
+| Reused from the ad/commission analytics module (0014): FX snapshots frozen at entry, versioned expenses, manual/provider reconciliation, ad-level Meta Insights adapter (read-only), cohort vs financial basis, quantity-matrix commission | reused |
+| Migration `0032_landing_spend.sql`: shop-paid spend without a partner (`payer='shop'`), `landing_id`, own dedupe key, `report_level` | done |
+| `POST /admin/landings/:id/spend` (finance/owner): replay by external key = same row (updated as new version), campaign/adset totals refused (`SPEND_GRAIN_NOT_AD`), manual + ad-level same days → `needs_reconcile`, split over the landing's flows (≤100%); never a wallet/ledger/journal entry | done |
+| `POST /admin/landings/spend/:id/reconcile` keep provider or manual (history kept) | done |
+| `GET /admin/landings/:id/analytics`: visits, orders (link vs on-behalf), reviewed/confirmed/delivered, delivered units + 1/2/3/4+ distribution, funnel %, click conversion (link orders only), delivered gross, commission waiting/available, shop spend (missing ≠ 0), cost per delivered order/unit, per-flow allocation, Meta mixed label | done |
+| Partner report: Meta mixed spend stays its own channel (was shown as Instagram); new `click_conversion` ratio (partner-entered orders excluded) | done |
+| Admin UI «📊 Tahlil va reklama xarajati» inside the landing editor (period, tiles, flows, spend rows, spend form with flow split, explicit zero) | done |
+| Live Meta Insights for the shop account | blocked: needs owner Meta OAuth (P1B/D19) |
+
 ## Tests
 - `apps/api/test/zf-landings.test.ts` (own DB `om_test_landing`): LT-001, 002, 004, 005, 008, 010, 011, 012, 013, 014, 015, 016, 020, 021, 022, 023, 026, 027, 028, 029, 030.
 - P0B not yet mapped: LT-003 (parallel stock — covered by existing reservation tests, not re-run for landings), LT-006 (expired quote — existing checkout test), LT-007 (multi-product single order — storefront cart; landing multi UI not built), LT-009 (offline form — client), LT-017 (AI draft, P1B), LT-018 (reduced motion — CSS, needs browser check), LT-019 (promotion timer from backend — no timer block yet), LT-024/025 (on-behalf verification exists; tracking separation is P0C).
 - `apps/api/test/zg-tracking.test.ts` (own DB `om_test_tracking`): LT-041, 042, 043, 044, 045, 046, 047, 048, 049, 050, 051, 052, 053, 054, 055, 056, 057, 058, 059, 060 + readiness/health test (15 tests).
+- `apps/api/test/zh-landing-analytics.test.ts` (own DB `om_test_landing_analytics`): LT-081 (orders vs units on a landing), 082 (funnel 100/70/56 → 70/80/56), 083 (20 visits, 2 link + 2 on-behalf orders → 10%), 084, 085, 086, 087, 088 (100 000 UZS split 60/40, no ledger/journal change, partner ad stays null), 090. LT-081 matrix amount (56 orders/76 units/1 830 000) and LT-089 (cohort vs financial month) are covered by the existing `n-ad-analytics.test.ts` T07 and T32.
 - LT-048 note: local outbox dedup is tested; provider-side dedup can only be verified with a real dataset (not run).
-- Full run 2026-11-04: `cd apps/api && pnpm vitest run` → 32 files, 238 tests passed, exit 0. Web build OK; manual browser check: consent banner appears only after the owner connects a dataset, PageView recorded after consent. Web E2E not re-run for P0C (banner hidden by default).
+- Full run 2026-11-04 (after P1A): `cd apps/api && pnpm vitest run` → 33 files, 244 tests passed, exit 0. (After P0C: 32 files, 238.) Web build OK; manual browser check: consent banner appears only after the owner connects a dataset, PageView recorded after consent. Web E2E not re-run for P0C (banner hidden by default).
 
 ## Not started
-P1A–P2B (spend import, AI drafts, Meta OAuth + PAUSED provisioning, live activation gate, custom domains, A/B).
+P1B–P2B (AI drafts, Meta OAuth + PAUSED provisioning, live activation gate, custom domains, A/B).
 
 ## Policy register (demo defaults, not approved business values)
 - `tracking.server_event_max_age_days` = 7 (draft, is_demo) — provider acceptance window must be re-checked for the pinned API version.

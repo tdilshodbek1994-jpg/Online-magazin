@@ -213,9 +213,13 @@ export async function buildReport(q: Queryable, f: Filter) {
     if (v === null) continue;
     const r = row(e.link);
     if (e.payer === 'shop') { r.adShop += v; tot.adShop += v; continue; } // shop-paid ads never reduce the partner's result (T20)
-    if (e.isOther) { r.other += v; tot.other += v; } else { r.ad += v; tot.ad += v; ser(e.date).ad += v; ch(e.channel === 'meta_mixed' ? 'instagram_target' : e.channel).ad += v; }
+    if (e.isOther) { r.other += v; tot.other += v; } else { r.ad += v; tot.ad += v; ser(e.date).ad += v; ch(e.channel).ad += v; /* 'meta_mixed' stays mixed: no invented Facebook/Instagram split (LT-090) */ }
   }
 
+  // Click conversion (LT-083): only orders that came through a link click count; partner-entered orders are separate.
+  const visits = (await q.query(`SELECT COUNT(*)::int AS n FROM referral_touches WHERE partner_id=$1 AND NOT is_bot AND touched_at >= $2 AND touched_at < $3 ${f.linkId ? 'AND link_id=$4' : ''}`,
+    f.linkId ? [f.partnerId, f.from, f.to, f.linkId] : [f.partnerId, f.from, f.to])).rows[0].n as number;
+  const clickOrders = [...tot.orders].filter((id) => { const o = byOrder.get(id)!; return o.capture_mode !== 'partner_assisted' && !!(o.link_id || o.placement_id); }).length;
   const ratio = (num: number | bigint, den: number | bigint, label: string, formula: string) => ({
     label, formula, num: String(num), den: String(den),
     value: Number(den) > 0 ? Math.round((Number(num) / Number(den)) * 1000) / 10 : null, // null → "Hisoblanmaydi" (never 0%, 100% or ∞)
@@ -261,6 +265,7 @@ export async function buildReport(q: Queryable, f: Filter) {
       confirmation: ratio(tot.confirmed.size, tot.orders.size, 'Tasdiqlash ulushi', 'tasdiqlangan distinct buyurtmalar / jami distinct buyurtmalar'),
       delivery: ratio(tot.delivered.size, tot.confirmed.size, 'Yetkazish ulushi', 'yetkazilgan distinct buyurtmalar / tasdiqlangan distinct buyurtmalar'),
       delivery_total: ratio(tot.delivered.size, tot.orders.size, 'Umumiy yetkazish', 'yetkazilgan / jami'),
+      click_conversion: ratio(clickOrders, visits, 'Klikdan buyurtma', 'havola orqali kelgan buyurtmalar / o‘lchangan havola tashriflari (o‘zingiz kiritgan buyurtmalar kirmaydi)'),
       commission_per_ad: spendKnown && tot.ad > 0n ? { label: 'Komissiya / reklama', formula: 'komissiya / reklama', value: Math.round((Number(tot.commission) / Number(tot.ad)) * 100) / 100 } : { label: 'Komissiya / reklama', formula: 'komissiya / reklama', value: null },
       ad_result_pct: ratio(result, spendKnown ? tot.ad : 0n, 'Reklama natijasi foizi', '(komissiya − reklama − boshqa xarajat) / reklama × 100'),
       cost_per_delivered_order: spendKnown ? per(tot.ad, tot.delivered.size) : null,

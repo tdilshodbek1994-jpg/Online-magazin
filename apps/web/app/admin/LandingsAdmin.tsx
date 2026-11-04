@@ -5,6 +5,7 @@ import { errText } from '@/lib/errors';
 import { toast } from '@/lib/toast';
 import { LandingView } from '@/components/LandingView';
 import { TrackingAdmin } from './TrackingAdmin';
+import { LandingStats } from './LandingStats';
 
 const ST: Record<string, string> = { draft: 'Qoralama', review: 'Ko‘rib chiqilmoqda', approved: 'Tasdiqlangan', published: 'Nashrda', archived: 'Arxiv', revoked: 'Bekor qilingan' };
 const ADDABLE: [string, string, any][] = [['benefits', 'Afzalliklar', { items: [] }], ['faq', 'Savollar (FAQ)', { items: [] }], ['gallery', 'Galereya', { max: 6 }], ['specs', 'Tavsif (katalogdan)', { from_catalog: true }], ['video', 'Video (YouTube ID)', { provider: 'youtube', ref: '' }], ['contact', 'Aloqa matni', { text: '' }], ['delivery_returns', 'Yetkazish/qaytarish', {}]];
@@ -69,8 +70,9 @@ function Editor({ id, onChanged }: { id: string; onChanged: () => void }) {
         {d.status === 'published' && <a className="btn secondary sm" href={`/l/${d.slug}`} target="_blank" rel="noopener noreferrer">Ochish ↗</a>}
         {d.status !== 'archived' && <button className="btn secondary sm danger-t" onClick={() => act('archive')}>Arxivlash</button>}
       </div>
+      <LandingStats id={id} />
       <div className="chips" aria-label="Ekran o‘lchami">{[360, 390, 430].map((x) => <button key={x} className={`chip ${w === x ? 'on' : ''}`} onClick={() => setW(x)}>{x}px</button>)}</div>
-      <div className="ln-preview" style={{ width: w }}><LandingView data={{ ...d, template: d.template, definition: def, products: d.products, preview: true, revision: d.draft_revision, availability: 'in_stock' }} /></div>
+      <div className="ln-preview" style={{ width: "100%", maxWidth: w }}><LandingView data={{ ...d, template: d.template, definition: def, products: d.products, preview: true, revision: d.draft_revision, availability: 'in_stock' }} /></div>
     </div>
   );
 }

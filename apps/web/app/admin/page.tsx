@@ -398,29 +398,59 @@ function Integrations() {
   );
 }
 
+const FIELD_UZ: Record<string, string> = { sku_code: 'SKU (artikul)', product_slug: 'Mahsulot slug', name_uz_latn: 'Nomi', name_uz_cyrl: 'Nomi (kirill)', category_slug: 'Toifa', price_som: 'Narx', cost_som: 'Tannarx', stock_receipt: 'Qoldiq', brand: 'Brend', variant: 'Variant' };
+const CODE_UZ: Record<string, string> = { required: 'to‘ldirilmagan', invalid: 'noto‘g‘ri qiymat', unknown: 'bunday toifa yo‘q (pastdagi ro‘yxatdan oling)', duplicate_in_file: 'faylda ikki marta yozilgan', variant_exists: 'bu mahsulotda shu variant allaqachon bor (boshqa SKU bilan) — SKU ni o‘zgartirmang, mavjudini yangilang', variant_duplicate_in_file: 'shu mahsulotning shu varianti faylda ikki marta' };
+
 function Import() {
-  const [csv, setCsv] = useState('sku_code,product_slug,name_uz_latn,name_uz_cyrl,category_slug,price_som,cost_som,stock_receipt,brand,variant\n');
+  const { lang } = useI18n();
+  const [csv, setCsv] = useState('');
+  const [fileName, setFileName] = useState('');
   const [pv, setPv] = useState<any>(null);
   const [res, setRes] = useState<any>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [cats, setCats] = useState<any[]>([]);
+  useEffect(() => { api('/categories').then((c) => setCats(c.items ?? [])).catch(() => {}); }, []);
+  const sample = () => {
+    const cat = cats[0]?.slug ?? 'elektronika';
+    const rows = [
+      'SKU;Nomi;Toifa;Narx;Qoldiq;Brend;Tannarx;variant',
+      `QUL-001-QORA;Namuna quloqchin A1;${cat};246 000;10;Navro‘z;180 000;rang=qora`,
+      `QUL-001-OQ;Namuna quloqchin A1;${cat};246 000;5;Navro‘z;180 000;rang=oq`,
+    ];
+    const blob = new Blob(['﻿' + rows.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'uzshop-mahsulotlar-namuna.csv'; a.click(); URL.revokeObjectURL(a.href);
+  };
   return (
-    <section className="card" style={{ marginTop: 12 }}>
-      <p className="muted">Avval tekshiruv (hech narsa yozilmaydi), keyin tasdiqlash. Qayta import SKU dublikatini yaratmaydi.</p>
+    <section className="card import-box" style={{ marginTop: 12 }}>
+      <h2>Mahsulotlarni Excel/CSV orqali yuklash</h2>
+      <ol className="small import-steps">
+        <li><button type="button" className="link-btn small" onClick={sample}>⬇ Namuna faylni yuklab oling</button> va Excel’da oching.</li>
+        <li>Har bir qator — bitta SKU (masalan, bitta o‘lcham yoki rang). Majburiy ustunlar: <b>SKU, Nomi, Toifa, Narx</b>.</li>
+        <li>Narxni so‘mda yozing: <code>246 000</code> yoki <code>246000</code> bo‘laveradi.</li>
+        <li>Excel’da <b>«CSV (разделители — точка с запятой)»</b> yoki <b>«CSV UTF-8»</b> qilib saqlang va shu yerga yuklang.</li>
+      </ol>
       {err && <div className="notice" role="alert">{err}</div>}
-      <label htmlFor="csv">CSV</label>
-      <textarea id="csv" rows={8} value={csv} onChange={(e) => { setCsv(e.target.value); setPv(null); }} />
-      <input type="file" accept=".csv,text/csv" onChange={(e) => { const f = e.target.files?.[0]; if (f) f.text().then((t) => { setCsv(t); setPv(null); }); }} />
-      <div className="row" style={{ marginTop: 8 }}>
-        <button className="btn secondary" onClick={async () => { setErr(null); setRes(null); try { setPv(await api('/admin/imports/products/preview', { method: 'POST', body: { csv } })); } catch (e: any) { setErr(errText(e)); } }}>Tekshirish</button>
-        {pv && pv.valid_rows > 0 && <button className="btn" onClick={async () => { try { setRes(await api(`/admin/imports/${pv.batch_id}/commit`, { method: 'POST' })); } catch (e: any) { setErr(errText(e)); } }}>Tasdiqlash ({pv.valid_rows} qator)</button>}
+      <label className="btn secondary file-btn">📄 Faylni tanlash<input type="file" accept=".csv,text/csv" style={{ display: 'none' }} onChange={(e) => { const f = e.target.files?.[0]; if (f) { setFileName(f.name); f.text().then((t) => { setCsv(t); setPv(null); setRes(null); }); } e.target.value = ''; }} /></label>
+      {fileName && <span className="small muted"> {fileName}</span>}
+      <details className="task-more"><summary>Yoki matnni shu yerga qo‘ying</summary>
+        <textarea id="csv" aria-label="CSV matni" rows={6} value={csv} onChange={(e) => { setCsv(e.target.value); setPv(null); }} />
+      </details>
+      <div className="row" style={{ marginTop: 8, gap: 8 }}>
+        <button className="btn secondary" disabled={csv.trim().length < 10} onClick={async () => { setErr(null); setRes(null); try { setPv(await api('/admin/imports/products/preview', { method: 'POST', body: { csv } })); } catch (e: any) { setErr(e.code === 'CSV_HEADER_INVALID' ? `Faylda majburiy ustun yo‘q: ${Object.keys(e.field_errors ?? {}).map((k) => FIELD_UZ[k] ?? k).join(', ')}` : errText(e)); } }}>1. Tekshirish</button>
+        {pv && pv.valid_rows > 0 && <button className="btn" onClick={async () => { try { setRes(await api(`/admin/imports/${pv.batch_id}/commit`, { method: 'POST' })); setPv(null); } catch (e: any) { setErr(errText(e)); } }}>2. Yuklash ({pv.valid_rows} qator)</button>}
       </div>
+      <p className="muted small">Tekshirishda hech narsa yozilmaydi. Qayta yuklash dublikat yaratmaydi — SKU bo‘yicha yangilaydi.</p>
       {pv && (
-        <div style={{ marginTop: 8 }}>
-          <p>Jami {pv.total_rows} · to‘g‘ri {pv.valid_rows} · xato {pv.rejected_rows} · o‘zgarishlar: {Object.entries(pv.changes).map(([k, v]) => `${k}: ${v}`).join(', ') || '—'} · qabul qilinadigan qoldiq: {pv.stock_units_to_receive}</p>
-          {pv.errors.length > 0 && <div className="table-wrap"><table><thead><tr><th>Qator</th><th>Maydon</th><th>Xato</th></tr></thead><tbody>{pv.errors.map((e: any, i: number) => <tr key={i}><td>{e.line}</td><td>{e.field}</td><td>{e.code}</td></tr>)}</tbody></table></div>}
+        <div className="import-res">
+          <div className="desk-stats"><span><b>{pv.total_rows}</b> qator</span><span><b>{pv.valid_rows}</b> to‘g‘ri</span>{pv.rejected_rows > 0 && <span className="bad"><b>{pv.rejected_rows}</b> xato</span>}{pv.stock_units_to_receive > 0 && <span><b>{pv.stock_units_to_receive}</b> dona omborga</span>}</div>
+          {pv.errors.length > 0 && <div className="table-wrap"><table><thead><tr><th>Qator</th><th>Ustun</th><th>Muammo</th></tr></thead><tbody>{pv.errors.map((e: any, i: number) => <tr key={i}><td>{e.line}</td><td>{FIELD_UZ[e.field] ?? e.field}</td><td>{CODE_UZ[e.code] ?? e.code}</td></tr>)}</tbody></table></div>}
+          {pv.rejected_rows > 0 && pv.valid_rows > 0 && <p className="small">Xato qatorlar yuklanmaydi. Ularni tuzatib, faylni qayta yuklashingiz mumkin.</p>}
         </div>
       )}
-      {res && <div className="notice ok" role="status">Yozildi: {res.committed_rows} qator {res.replayed ? '(avval yozilgan)' : ''}</div>}
+      {res && <div className="notice ok" role="status">✓ Yuklandi: {res.committed_rows} qator {res.replayed ? '(avval yuklangan)' : ''}</div>}
+      <details className="task-more"><summary>Toifalar ro‘yxati («Toifa» ustuniga shu kodlardan birini yozing)</summary>
+        <div className="table-wrap"><table><tbody>{cats.map((c) => <tr key={c.id}><td><code>{c.slug}</code></td><td>{pick(c.name, lang)}</td></tr>)}</tbody></table></div>
+      </details>
     </section>
   );
 }

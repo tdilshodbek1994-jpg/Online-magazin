@@ -12,6 +12,10 @@ import { ownerOrgId } from './routes.js';
 
 /** RFC 4180 CSV parser (quotes, escaped quotes, CRLF). */
 export function parseCsv(text: string): string[][] {
+  // One delimiter per file, detected from the header line: Excel in Uzbek/Russian locales saves with ';' and uses ','
+  // for decimals, so splitting on both would break "246 000,50".
+  const firstLine = text.split(/\r?\n/, 1)[0] ?? '';
+  const delim = (firstLine.match(/;/g)?.length ?? 0) > (firstLine.match(/,/g)?.length ?? 0) ? ';' : ',';
   const rows: string[][] = [];
   let row: string[] = [], cell = '', q = false;
   for (let i = 0; i < text.length; i++) {
@@ -21,7 +25,7 @@ export function parseCsv(text: string): string[][] {
       else if (c === '"') q = false;
       else cell += c;
     } else if (c === '"') q = true;
-    else if (c === ',' || c === ';') { row.push(cell); cell = ''; }
+    else if (c === delim) { row.push(cell); cell = ''; }
     else if (c === '\n' || c === '\r') {
       if (c === '\r' && text[i + 1] === '\n') i++;
       row.push(cell); cell = '';
@@ -38,7 +42,10 @@ const COLS = ['sku_code', 'product_slug', 'name_uz_latn', 'name_uz_cyrl', 'categ
 type Row = Record<(typeof COLS)[number], string>;
 interface Valid { line: number; action: 'create_product' | 'create_sku' | 'update_price' | 'no_change'; row: Row; price_minor: string; cost_minor: string | null; stock: number; category_id: string; variant: Record<string, string> }
 
-const somToMinor = (s: string): string | null => (/^\d{1,13}(\.\d{1,2})?$/.test(s) ? String(BigInt(s.split('.')[0]!) * 100n + BigInt((s.split('.')[1] ?? '0').padEnd(2, '0'))) : null);
+// Excel-friendly money: "246 000", "246000 so'm", "246 000,50" → minor units. Thousands separators are spaces only.
+const cleanSom = (s: string) => s.replace(/[\s\u00a0\u202f]/g, '').replace(/(so['‘’ʻ]?m|сўм|sum|uzs)$/i, '').replace(/,(\d{1,2})$/, '.$1');
+const somToMinorStrict = (s: string): string | null => (/^\d{1,13}(\.\d{1,2})?$/.test(s) ? String(BigInt(s.split('.')[0]!) * 100n + BigInt((s.split('.')[1] ?? '0').padEnd(2, '0'))) : null);
+const somToMinor = (s: string): string | null => somToMinorStrict(cleanSom(s));
 
 export function registerImports(app: FastifyInstance, deps: Deps): void {
   const T = ['catalog'];
@@ -47,7 +54,10 @@ export function registerImports(app: FastifyInstance, deps: Deps): void {
       requirePerm(actor, 'catalog.write');
       const org = await ownerOrgId(db);
       const rows = parseCsv(body.csv.replace(/^﻿/, ''));
-      const header = (rows.shift() ?? []).map((h) => h.trim().toLowerCase());
+      // Uzbek column names are accepted too (as people title them in Excel).
+      const ALIAS: Record<string, string> = { sku: 'sku_code', artikul: 'sku_code', kod: 'sku_code', nomi: 'name_uz_latn', nom: 'name_uz_latn', 'nomi (kirill)': 'name_uz_cyrl', toifa: 'category_slug', kategoriya: 'category_slug',
+        narx: 'price_som', narxi: 'price_som', tannarx: 'cost_som', qoldiq: 'stock_receipt', soni: 'stock_receipt', brend: 'brand', variant: 'variant', slug: 'product_slug' };
+      const header = (rows.shift() ?? []).map((h) => { const k = h.trim().toLowerCase().replace(/[‘’ʻ']/g, ''); return ALIAS[k] ?? k; });
       const missing = ['sku_code', 'name_uz_latn', 'category_slug', 'price_som'].filter((c) => !header.includes(c));
       if (missing.length) throw badRequest('CSV_HEADER_INVALID', Object.fromEntries(missing.map((m) => [m, 'validation.required'])));
       if (rows.length > 10_000) throw badRequest('CSV_TOO_MANY_ROWS');
@@ -55,6 +65,12 @@ export function registerImports(app: FastifyInstance, deps: Deps): void {
       const valid: Valid[] = [];
       const seen = new Set<string>();
       const cats = new Map((await db.query(`SELECT slug, id FROM categories`)).rows.map((r) => [r.slug as string, r.id as string]));
+      // Existing product slugs and their variant keys, so the preview catches what the commit would reject.
+      const prodVariants = new Map<string, Set<string>>();
+      for (const r of (await db.query(`SELECT p.slug, s.variant_key FROM products p JOIN skus s ON s.product_id=p.id`)).rows) {
+        if (!prodVariants.has(r.slug)) prodVariants.set(r.slug, new Set()); prodVariants.get(r.slug)!.add(r.variant_key);
+      }
+      const fileVariants = new Set<string>();
       const existing = new Map((await db.query(`SELECT s.sku_code, o.price_minor, p.slug FROM skus s JOIN products p ON p.id=s.product_id JOIN offers o ON o.sku_id=s.id AND o.merchant_org_id=$1`, [org])).rows.map((r) => [r.sku_code as string, r]));
       rows.forEach((cells, i) => {
         const line = i + 2;
@@ -80,7 +96,15 @@ export function registerImports(app: FastifyInstance, deps: Deps): void {
         }
         if (errors.length > before) return;
         const ex = existing.get(r.sku_code);
-        const action = !ex ? ((r.product_slug && [...existing.values()].some((e) => e.slug === r.product_slug)) ? 'create_sku' : 'create_product') : ex.price_minor === price ? 'no_change' : 'update_price';
+        if (!ex) {
+          // A new SKU must not repeat a variant the product already has (or another row of this file adds).
+          const slug = r.product_slug || slugify(r.name_uz_latn);
+          const vKey = Object.keys(variant).sort().map((k) => `${k}=${variant[k]}`).join('|') || `sku=${r.sku_code}`;
+          if (prodVariants.get(slug)?.has(vKey)) { err('variant', 'variant_exists'); return; }
+          if (fileVariants.has(`${slug}|${vKey}`)) { err('variant', 'variant_duplicate_in_file'); return; }
+          fileVariants.add(`${slug}|${vKey}`);
+        }
+        const action = !ex ? (prodVariants.has(r.product_slug || slugify(r.name_uz_latn)) ? 'create_sku' : 'create_product') : ex.price_minor === price ? 'no_change' : 'update_price';
         valid.push({ line, action, row: r, price_minor: price!, cost_minor: cost, stock, category_id: cat!, variant });
       });
       const hash = createHash('sha256').update(body.csv).digest('hex');

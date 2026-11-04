@@ -1313,3 +1313,7 @@ a.admin-tab { text-decoration: none; color: inherit; }
 .mfa-steps li > .btn { display: inline-flex; margin: 8px 0 6px; }
 .mfa-steps li > span { display: block; margin-top: 4px; }
 .mfa-steps li > .mfa-key { display: flex; }
+.import-box { display: grid; gap: 8px; }
+.import-steps { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+.file-btn { justify-self: start; cursor: pointer; }
+.import-res { display: grid; gap: 8px; }

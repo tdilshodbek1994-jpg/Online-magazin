@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AiAssistant } from '@/components/AiAssistant';
-import { CategoryIcon, IconCash, IconChevron, IconReturn, IconShield, IconTruck } from '@/components/Icons';
+import { CategoryIcon, IconCash, IconChevron, IconTruck } from '@/components/Icons';
 import { discountPct, ProductCard, SkeletonGrid } from '@/components/ProductCard';
 import { api, som } from '@/lib/api';
 import { pick, useI18n } from '@/lib/i18n';
@@ -191,8 +191,6 @@ export default function Home() {
       <ul className="trust">
         <li><IconCash size={20} /><span>{t('bCod')}</span></li>
         <li><IconTruck size={20} /><span>{eta ? `${eta} ${t('deliveryLine')}` : t('bFast')}</span></li>
-        <li><IconReturn size={20} /><span>{t('bReturn')}</span></li>
-        <li><IconShield size={20} /><span>{t('bWarranty')}</span></li>
       </ul>
 
       <RecentRail />

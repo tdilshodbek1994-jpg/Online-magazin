@@ -31,6 +31,7 @@ import { registerPartnerWallet } from './modules/partners/wallet.js';
 import { registerPartnerP2 } from './modules/partners/p2.js';
 import { registerAnalytics } from './modules/analytics/routes.js';
 import { registerPartnerPrograms } from './modules/partners/programs.js';
+import { registerContestCenter } from './modules/contests/routes.js';
 import { registerReturns } from './modules/returns/routes.js';
 import { registerPayments } from './modules/payments/routes.js';
 import { registerSupport } from './modules/support/routes.js';
@@ -159,6 +160,7 @@ export async function buildApp(cfg: AppConfig, db: Db): Promise<FastifyInstance>
       registerPartnerP2(api, deps);
       registerAnalytics(api, deps);
       registerPartnerPrograms(api, deps);
+      registerContestCenter(api, deps);
       registerVideos(api, deps);
       registerReturns(api, deps);
       registerPayments(api, deps);

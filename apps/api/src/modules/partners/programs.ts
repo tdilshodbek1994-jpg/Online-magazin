@@ -65,15 +65,15 @@ async function contestBoard(q: Tx | Deps['db'], c: { starts_at: string; ends_at:
 
 const mask = (s: string) => { const a = Array.from(s.trim()); return a.length <= 2 ? `${a[0] ?? ''}*` : `${a.slice(0, 2).join('')}${'*'.repeat(Math.min(4, a.length - 2))}`; };
 
-async function awardBonus(tx: Tx, a: { partnerId: string; source: 'rule' | 'manual' | 'contest'; ruleId?: string; contestId?: string; periodKey?: string; amount: bigint; reason: string; actorId: string | null }): Promise<string | null> {
+export async function awardBonus(tx: Tx, a: { partnerId: string; source: 'rule' | 'manual' | 'contest' | 'cc_prize'; ruleId?: string; contestId?: string; ccAwardId?: string; periodKey?: string; amount: bigint; reason: string; actorId: string | null }): Promise<string | null> {
   const r = await tx.query(
-    `INSERT INTO bonus_awards (partner_id, source, rule_id, contest_id, period_key, amount_minor, reason, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT DO NOTHING RETURNING id`,
-    [a.partnerId, a.source, a.ruleId ?? null, a.contestId ?? null, a.periodKey ?? null, a.amount.toString(), a.reason, a.actorId]);
+    `INSERT INTO bonus_awards (partner_id, source, rule_id, contest_id, period_key, amount_minor, reason, created_by, cc_award_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT DO NOTHING RETURNING id`,
+    [a.partnerId, a.source, a.ruleId ?? null, a.contestId ?? null, a.periodKey ?? null, a.amount.toString(), a.reason, a.actorId, a.ccAwardId ?? null]);
   const id = r.rows[0]?.id as string | undefined;
   if (!id) return null; // already awarded for this rule/period or contest
   await transfer(tx, { partnerId: a.partnerId, from: 'external', to: 'available', amount: a.amount, sourceType: 'bonus', sourceId: id, effectKey: 'v1', reason: a.reason, actorId: a.actorId });
   await postJournal(tx, `bonus:${id}`, 'partner_bonus', [{ account: 'bonus_expense', debit: a.amount }, { account: 'partner_payable', credit: a.amount }]);
-  await notifyPartner(tx, a.partnerId, a.source === 'contest' ? 'partner.contest_prize' : 'partner.bonus', { amount_minor: a.amount.toString(), reason: a.reason }, `p:bonus:${id}`);
+  await notifyPartner(tx, a.partnerId, a.source === 'contest' || a.source === 'cc_prize' ? 'partner.contest_prize' : 'partner.bonus', { amount_minor: a.amount.toString(), reason: a.reason }, `p:bonus:${id}`);
   return id;
 }
 

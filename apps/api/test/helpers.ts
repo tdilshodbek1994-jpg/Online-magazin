@@ -14,7 +14,7 @@ export interface T {
 let shared: T | null = null;
 export async function setupApp(env: Partial<NodeJS.ProcessEnv> = {}): Promise<T> {
   if (shared && Object.keys(env).length === 0) return shared;
-  const url = process.env.TEST_DATABASE_URL!;
+  const url = env.DATABASE_URL ?? process.env.TEST_DATABASE_URL!;
   const cfg = loadConfig({ NODE_ENV: 'test', DATABASE_URL: url, PUBLIC_WEB_URL: 'http://localhost:3000', ...env });
   const db = createPool(url, 40);
   const app = await buildApp(cfg, db);
@@ -24,6 +24,25 @@ export async function setupApp(env: Partial<NodeJS.ProcessEnv> = {}): Promise<T>
 }
 
 let phoneSeq = Math.floor(Math.random() * 9_000_000) + 1_000_000;
+/** A separate fresh database for a test file that must not share data with the others (e.g. global leaderboards). */
+export async function setupIsolatedApp(name: string): Promise<T> {
+  const pg = (await import('pg')).default;
+  const { migrate, MIGRATIONS_DIR } = await import('../src/platform/migrate.js');
+  const { bootstrapReference } = await import('../src/platform/bootstrap.js');
+  const admin = process.env.TEST_PG_ADMIN_URL ?? 'postgres://postgres:postgres@localhost:5432/postgres';
+  const c = new pg.Client({ connectionString: admin });
+  await c.connect();
+  await c.query(`DROP DATABASE IF EXISTS ${name} WITH (FORCE)`);
+  await c.query(`CREATE DATABASE ${name}`);
+  await c.end();
+  const url = admin.replace(/\/[^/]*$/, `/${name}`);
+  const boot = createPool(url, 2);
+  await migrate(boot, MIGRATIONS_DIR);
+  await bootstrapReference(boot);
+  await boot.end();
+  return setupApp({ DATABASE_URL: url });
+}
+
 export const nextPhone = () => `+99891${String(phoneSeq++).padStart(7, '0')}`;
 
 export interface U {

@@ -164,7 +164,7 @@ export default function OpsBoard() {
   );
 }
 
-const OUT: Record<string, string> = { no_answer: 'javob bermadi', busy: 'band', wrong_number: 'noto‘g‘ri raqam', callback_requested: 'keyin qo‘ng‘iroq', info_given: 'ma’lumot berildi', confirmed: 'tasdiqladi', rejected: 'rad etdi', problem: 'muammo' };
+const OUT: Record<string, string> = { call_later: 'keyin qo‘ng‘iroq', wrong_data: 'ma’lumot noto‘g‘ri', no_answer: 'javob bermadi', busy: 'band', wrong_number: 'noto‘g‘ri raqam', callback_requested: 'keyin qo‘ng‘iroq', info_given: 'ma’lumot berildi', confirmed: 'tasdiqladi', rejected: 'rad etdi', problem: 'muammo' };
 /** Human QA on a random sample of finished work (spec §25); low scores need a reason, nobody rates their own work. */
 function QaSample() {
   const [items, setItems] = useState<any[] | null>(null);

@@ -109,8 +109,8 @@ export default function Ops() {
               </details>
             )}
             <details><summary className="muted small">Tarix ({sel.timeline.length}) va qo‘ng‘iroqlar ({sel.calls.length})</summary>
-              <ul className="small hist-list">{sel.timeline.map((e: any) => <li key={e.id}><span className="muted">{when(e.created_at)}</span> {histText(e)} <span className="muted">· {e.actor_name ?? (e.actor_kind === 'anonymous' ? 'mijoz (sayt)' : e.actor_kind === 'system' ? 'tizim' : e.actor_kind)}</span></li>)}</ul>
-              <ul className="small hist-list">{sel.calls.map((c: any) => <li key={c.id}><span className="muted">{when(c.created_at)}</span> 📞 {CALL_UZ[c.outcome] ?? c.outcome} <span className="muted">· {c.operator_name}</span>{c.note ? ` · ${c.note}` : ''}</li>)}</ul>
+              <ul className="small hist-list">{sel.timeline.map((e: any) => <li key={e.id}><span className="muted">{when(e.created_at)}</span> {histText(e)} <span className="muted">· {e.actor_name ?? (e.actor_kind === 'anonymous' ? 'mijoz (sayt)' : e.actor_kind === 'system' ? 'tizim' : e.actor_kind === 'partner' ? 'hamkor' : e.actor_kind === 'customer' ? 'mijoz' : 'xodim')}</span></li>)}</ul>
+              <ul className="small hist-list">{sel.calls.map((c: any) => <li key={c.id}><span className="muted">{when(c.created_at)}</span> 📞 {CALL_UZ[c.outcome] ?? 'natija yozildi'} <span className="muted">· {c.operator_name}</span>{c.note ? ` · ${c.note}` : ''}</li>)}</ul>
             </details>
           </section>
         </div>
@@ -123,15 +123,15 @@ const CHANNEL_UZ: Record<string, string> = { web: 'Sayt', partner_assisted: 'Ham
 const STATUS_UZ: Record<string, string> = { awaiting_confirmation: 'Tasdiq kutilmoqda', confirmed: 'Tasdiqlangan', cancelled: 'Bekor qilingan', completed: 'Yakunlangan', draft: 'Qoralama' };
 const FUL_UZ: Record<string, string> = { unallocated: 'Ajratilmagan', reserved: 'Band qilingan', picking: 'Yig‘ilmoqda', packed: 'Qadoqlangan', shipped: 'Kuryerda', delivered: 'Yetkazildi', failed: 'Yetkazilmadi', returned: 'Qaytdi' };
 const PAY_UZ: Record<string, string> = { unpaid: 'to‘lanmagan', pending: 'kutilmoqda', paid: 'to‘langan', partially_refunded: 'qisman qaytarilgan', refunded: 'qaytarilgan', unknown: 'noma’lum' };
-const CALL_UZ: Record<string, string> = { confirmed: 'Tasdiqladi', no_answer: 'Javob bermadi', call_later: 'Keyin qo‘ng‘iroq', rejected: 'Rad etdi', busy: 'Band', wrong_number: 'Noto‘g‘ri raqam', callback_requested: 'Keyin qo‘ng‘iroq so‘radi', info_given: 'Ma’lumot berildi', problem: 'Muammo' };
-const REASON_UZ: Record<string, string> = { order_created: 'buyurtma tushdi', customer_request: 'mijoz so‘radi', no_contact: 'bog‘lanib bo‘lmadi', duplicate: 'dublikat', out_of_stock: 'mahsulot tugagan', fraud_suspected: 'shubhali', operator_confirmed: 'operator tasdiqladi', customer_rejected: 'mijoz rad etdi' };
+const CALL_UZ: Record<string, string> = { wrong_data: 'Ma’lumot noto‘g‘ri', confirmed: 'Tasdiqladi', no_answer: 'Javob bermadi', call_later: 'Keyin qo‘ng‘iroq', rejected: 'Rad etdi', busy: 'Band', wrong_number: 'Noto‘g‘ri raqam', callback_requested: 'Keyin qo‘ng‘iroq so‘radi', info_given: 'Ma’lumot berildi', problem: 'Muammo' };
+const REASON_UZ: Record<string, string> = { operator_call: 'operator qo‘ng‘irog‘i', call_confirmed: 'telefonda tasdiqladi', delivered: 'yetkazildi', returned: 'qaytdi', order_created: 'buyurtma tushdi', customer_request: 'mijoz so‘radi', no_contact: 'bog‘lanib bo‘lmadi', duplicate: 'dublikat', out_of_stock: 'mahsulot tugagan', fraud_suspected: 'shubhali', operator_confirmed: 'operator tasdiqladi', customer_rejected: 'mijoz rad etdi' };
 const when = (t: string) => t ? new Date(t).toLocaleString('uz-UZ', { timeZone: 'Asia/Tashkent', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
 /** One history row in plain Uzbek: "Bekor qilindi (bog‘lanib bo‘lmadi)" instead of "commercial: awaiting_confirmation → cancelled (no_contact)". */
 function histText(e: any): string {
   const map = e.dimension === 'fulfillment' ? FUL_UZ : e.dimension === 'payment' ? PAY_UZ : STATUS_UZ;
-  const to = map[e.to_status] ?? e.to_status;
+  const to = map[e.to_status] ?? 'yangilandi';
   const label = e.dimension === 'payment' ? `To‘lov: ${to}` : e.dimension === 'fulfillment' ? `Ombor: ${to}` : (e.from_status ? to : 'Yangi buyurtma');
-  const r = e.reason ? (REASON_UZ[e.reason] ?? e.reason) : '';
+  const r = e.reason ? (REASON_UZ[e.reason] ?? '') : '';
   return r && !(label === 'Yangi buyurtma' && e.reason === 'order_created') ? `${label} (${r})` : label;
 }
 const age = (s: number) => (s < 3600 ? `${Math.max(1, Math.round(s / 60))} daq` : s < 86400 ? `${Math.round(s / 3600)} soat` : `${Math.round(s / 86400)} kun`);

@@ -1432,3 +1432,13 @@ details.offer-card { display: grid; gap: 6px; padding: 12px 14px; }
 details.clamp-more > summary { list-style: none; cursor: pointer; display: grid; gap: 4px; }
 details.clamp-more > summary::-webkit-details-marker { display: none; }
 details.clamp-more[open] > summary { display: none; }
+/* Task history rows open to show who / when / note */
+details.hist-row > summary { cursor: pointer; list-style: none; padding: 4px 0; }
+details.hist-row > summary::-webkit-details-marker { display: none; }
+details.hist-row > summary::after { content: ' ›'; color: var(--primary); font-weight: 700; }
+details.hist-row[open] > summary::after { content: ' ▾'; }
+.hist-det { margin: 4px 0 8px; padding: 8px 10px; border-radius: 10px; background: var(--surface-2); display: grid; gap: 4px; font-size: 14px; }
+.hist-det > div { display: grid; grid-template-columns: 110px 1fr; gap: 8px; }
+.hist-det dt { color: var(--muted); margin: 0; }
+.hist-det dd { margin: 0; }
+.task-hist ul { list-style: none; padding-left: 0; }

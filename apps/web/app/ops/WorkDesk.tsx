@@ -12,16 +12,17 @@ import { pick, useI18n } from '@/lib/i18n';
  */
 const SHIFT: [string, string][] = [['working', '🟢 Ishdaman'], ['break', '☕ Tanaffus'], ['busy', '⏳ Band'], ['off', '⏹ Smena tugadi']];
 const STATE_UZ: Record<string, string> = { queued: 'Navbatda', assigned: 'Menda', in_progress: 'Ishlanmoqda', scheduled: 'Qayta qo‘ng‘iroq', waiting_customer: 'Mijozni kutyapmiz', waiting_internal: 'Ichki muammo', blocked: 'To‘xtagan', resolved: 'Hal qilindi', closed: 'Yopildi' };
-const EVENT_UZ: Record<string, string> = { sla_escalated: 'Muddat jiddiy o‘tdi — rahbarga ko‘tarildi', handoff_requested: 'Topshirish so‘raldi', handoff_accepted: 'Topshirish qabul qilindi', handoff_declined: 'Topshirish rad etildi', handoff_expired: 'Topshirish muddati o‘tdi', handoff_cancelled: 'Topshirish bekor qilindi', supervisor_transfer: 'Rahbar o‘tkazdi', partner_request: 'Hamkor so‘rovi', partner_answered: 'Hamkorga javob berildi', claimed: 'Ishni oldi', reclaimed_after_lease: 'Ishni qayta oldi (oldingi egasi javob bermadi)', released: 'Navbatga qaytardi', contact: 'Aloqa natijasi', auto_closed: 'Avtomatik yopildi' };
+const EVENT_UZ: Record<string, string> = { closed: 'Ish yopildi', created: 'Ish yaratildi', resolved: 'Ish hal qilindi', assigned: 'Biriktirildi', sla_escalated: 'Muddat jiddiy o‘tdi — rahbarga ko‘tarildi', handoff_requested: 'Topshirish so‘raldi', handoff_accepted: 'Topshirish qabul qilindi', handoff_declined: 'Topshirish rad etildi', handoff_expired: 'Topshirish muddati o‘tdi', handoff_cancelled: 'Topshirish bekor qilindi', supervisor_transfer: 'Rahbar o‘tkazdi', partner_request: 'Hamkor so‘rovi', partner_answered: 'Hamkorga javob berildi', claimed: 'Ishni oldi', reclaimed_after_lease: 'Ishni qayta oldi (oldingi egasi javob bermadi)', released: 'Navbatga qaytardi', contact: 'Aloqa natijasi', auto_closed: 'Avtomatik yopildi' };
+const fullTime = (t: string) => new Date(t).toLocaleString('uz-UZ', { timeZone: 'Asia/Tashkent', dateStyle: 'medium', timeStyle: 'short' });
 /** What the operator sees on top after a successful tap. */
 function okText(path: string, body: any): string {
   if (path === 'claim') return '✓ Ish sizga olindi';
   if (path === 'release') return '✓ Navbatga qaytarildi';
   if (path === 'handoff') return '✓ Topshirish so‘rovi yuborildi';
   const o = body?.outcome;
-  return o === 'confirmed' ? '✅ Tasdiqlandi — buyurtma omborga o‘tdi' : o === 'rejected' ? '✓ Rad etildi — buyurtma bekor qilindi' : o === 'info_given' ? '✓ Ma’lumot berildi deb yozildi' : o ? `✓ Saqlandi: ${OUT_UZ[o] ?? o}` : '✓ Saqlandi';
+  return o === 'confirmed' ? '✅ Tasdiqlandi — buyurtma omborga o‘tdi' : o === 'rejected' ? '✓ Rad etildi — buyurtma bekor qilindi' : o === 'info_given' ? '✓ Ma’lumot berildi deb yozildi' : o ? `✓ Saqlandi: ${OUT_UZ[o] ?? 'natija'}` : '✓ Saqlandi';
 }
-const OUT_UZ: Record<string, string> = { no_answer: 'Javob bermadi', busy: 'Band', wrong_number: 'Noto‘g‘ri raqam', callback_requested: 'Keyin qo‘ng‘iroq qilishni so‘radi', info_given: 'Ma’lumot berildi', confirmed: 'Tasdiqladi', rejected: 'Rad etdi', problem: 'Muammo' };
+const OUT_UZ: Record<string, string> = { call_later: 'Keyin qo‘ng‘iroq qilish kerak', wrong_data: 'Ma’lumot noto‘g‘ri', no_answer: 'Javob bermadi', busy: 'Band', wrong_number: 'Noto‘g‘ri raqam', callback_requested: 'Keyin qo‘ng‘iroq qilishni so‘radi', info_given: 'Ma’lumot berildi', confirmed: 'Tasdiqladi', rejected: 'Rad etdi', problem: 'Muammo' };
 const SLA_UZ: Record<string, [string, string]> = { soon: ['⏰ Muddat yaqin', 'sla-soon'], late: ['⚠️ Kechikdi', 'sla-late'], critical: ['🔥 Jiddiy kechikdi', 'sla-crit'] };
 const tash = (v: string) => new Date(v).toLocaleString('uz-UZ', { timeZone: 'Asia/Tashkent', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
 
@@ -129,13 +130,6 @@ function TaskCard({ task, order, lang, busy, onClose, onAct }: { task: any; orde
     <div className="sheet-backdrop" onClick={onClose}>
       <section className="sheet task-sheet" role="dialog" aria-modal="true" aria-label={`Ish ${task.number}`} onClick={(e) => e.stopPropagation()}>
         <div className="spread"><h3>{task.number} · {STATE_UZ[task.state] ?? task.state}</h3><button className="btn secondary sm" onClick={onClose}>Yopish</button></div>
-        <dl className="five">
-          <div><dt>Nima bo‘ldi?</dt><dd>{f.what}</dd></div>
-          <div><dt>Nima yetishmayapti?</dt><dd>{f.missing ?? '—'}</dd></div>
-          <div><dt>Kim mas’ul?</dt><dd>{f.who}</dd></div>
-          <div><dt>Keyin nima qilinadi?</dt><dd><b>{f.next}</b></dd></div>
-          <div><dt>Qachon?</dt><dd>{f.when ? `${f.when.kind === 'callback' ? 'Qayta qo‘ng‘iroq' : 'Muddat'}: ${tash(f.when.at)}` : '—'}</dd></div>
-        </dl>
         {order && (
           <div className="task-order">
             <div className="spread"><span>{order.contact_snapshot?.name ?? 'Mijoz'}</span><a className="btn sm" href={`tel:${order.customer_phone}`}>📞 Qo‘ng‘iroq</a></div>
@@ -146,13 +140,14 @@ function TaskCard({ task, order, lang, busy, onClose, onAct }: { task: any; orde
             <div className="small muted">{[order.address_snapshot?.district, order.address_snapshot?.street, order.address_snapshot?.house].filter((x: any) => x && x !== '-').join(', ') || 'Manzil hali yo‘q'}</div>
           </div>
         )}
-        <ProductFacts taskId={task.id} lang={lang} />
-        <DuplicatePanel taskId={task.id} canAct={task.mine} />
-        <TaskPartnerRequests taskId={task.id} />
-        <Composer taskId={task.id} />
         {!task.mine && task.state !== 'resolved' && task.state !== 'closed' && <button className="btn full" disabled={busy} onClick={() => onAct('claim', {}, false)}>Bu ishni olish</button>}
         {canWrite && (
           <div className="task-actions">
+            {/* Order of work (user): fill time and note first, then read back, then confirm. Actions sit right under the order. */}
+            <label htmlFor="cb-at">Qayta qo‘ng‘iroq vaqti (Toshkent)</label>
+            <input id="cb-at" type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)} />
+            <label htmlFor="t-note">Izoh (ichki — mijoz va hamkorga ko‘rinmaydi)</label>
+            <textarea id="t-note" rows={2} value={note} onChange={(e) => setNote(e.target.value)} maxLength={1000} />
             <label className="s-check readback"><input type="checkbox" checked={readBack} onChange={(e) => setReadBack(e.target.checked)} /><span>Tarkib va <b>{order ? som(order.payable_minor) : ''}</b> summani mijozga o‘qib berdim</span></label>
             <button className="btn big full" disabled={busy || !readBack || !order} onClick={() => onAct('contact', { outcome: 'confirmed', confirmed_total_minor: order.payable_minor, note: note || 'telefonda og‘zaki tasdiqladi' }, true)}>✅ Tasdiqladi</button>
             <div className="task-grid">
@@ -161,10 +156,6 @@ function TaskCard({ task, order, lang, busy, onClose, onAct }: { task: any; orde
               <button className="btn secondary" disabled={busy} onClick={() => onAct('contact', { outcome: 'info_given', note: note || undefined }, false)}>Ma’lumot berdim</button>
               <button className="btn secondary" disabled={busy || !when} onClick={() => onAct('contact', { outcome: 'callback_requested', next_contact_at: nextAt, note: note || undefined }, true)}>Keyin qo‘ng‘iroq</button>
             </div>
-            <label htmlFor="cb-at">Qayta qo‘ng‘iroq vaqti (Toshkent)</label>
-            <input id="cb-at" type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)} />
-            <label htmlFor="t-note">Izoh (ichki — mijoz va hamkorga ko‘rinmaydi)</label>
-            <textarea id="t-note" rows={2} value={note} onChange={(e) => setNote(e.target.value)} maxLength={1000} />
             <details className="task-more">
               <summary>Boshqa natija</summary>
               <div className="task-grid">
@@ -178,11 +169,44 @@ function TaskCard({ task, order, lang, busy, onClose, onAct }: { task: any; orde
             <HandoffForm busy={busy} onSend={(to, pkg) => onAct('handoff', { to_user_id: to, package: pkg }, false)} />
           </div>
         )}
+        <dl className="five">
+          <div><dt>Nima bo‘ldi?</dt><dd>{f.what}</dd></div>
+          <div><dt>Nima yetishmayapti?</dt><dd>{f.missing ?? '—'}</dd></div>
+          <div><dt>Kim mas’ul?</dt><dd>{f.who}</dd></div>
+          <div><dt>Keyin nima qilinadi?</dt><dd><b>{f.next}</b></dd></div>
+          <div><dt>Qachon?</dt><dd>{f.when ? `${f.when.kind === 'callback' ? 'Qayta qo‘ng‘iroq' : 'Muddat'}: ${tash(f.when.at)}` : '—'}</dd></div>
+        </dl>
+        <ProductFacts taskId={task.id} lang={lang} />
+        <DuplicatePanel taskId={task.id} canAct={task.mine} />
+        <TaskPartnerRequests taskId={task.id} />
+        <Composer taskId={task.id} />
         <details className="task-hist">
           <summary>Tarix ({task.events.length + task.calls.length})</summary>
           <ul>
-            {task.calls.map((c: any, i: number) => <li key={`c${i}`}><span className="muted small">{tash(c.created_at)}</span> 📞 {OUT_UZ[c.outcome] ?? c.outcome} — {c.operator_name}{c.note ? `: ${c.note}` : ''}</li>)}
-            {task.events.map((e: any, i: number) => <li key={`e${i}`}><span className="muted small">{tash(e.created_at)}</span> {EVENT_UZ[e.kind] ?? e.kind}{e.actor_name ? ` — ${e.actor_name}` : ''}{e.data?.outcome ? ` (${OUT_UZ[e.data.outcome] ?? e.data.outcome})` : ''}</li>)}
+            {/* Every row opens (supervisor checks who did what, when, and why). */}
+            {task.calls.map((c: any, i: number) => (
+              <li key={`c${i}`}><details className="hist-row"><summary><span className="muted small">{tash(c.created_at)}</span> 📞 {OUT_UZ[c.outcome] ?? 'Qo‘ng‘iroq natijasi yozildi'} — {c.operator_name}</summary>
+                <dl className="hist-det">
+                  <div><dt>Kim</dt><dd>{c.operator_name}</dd></div>
+                  <div><dt>Qachon</dt><dd>{fullTime(c.created_at)}</dd></div>
+                  <div><dt>Natija</dt><dd>{OUT_UZ[c.outcome] ?? '—'}</dd></div>
+                  {c.callback_at && <div><dt>Qayta qo‘ng‘iroq</dt><dd>{fullTime(c.callback_at)}</dd></div>}
+                  <div><dt>Izoh</dt><dd>{c.note || <span className="muted">izoh yozilmagan</span>}</dd></div>
+                </dl>
+              </details></li>
+            ))}
+            {task.events.map((e: any, i: number) => (
+              <li key={`e${i}`}><details className="hist-row"><summary><span className="muted small">{tash(e.created_at)}</span> {EVENT_UZ[e.kind] ?? 'Holat o‘zgardi'}{e.actor_name ? ` — ${e.actor_name}` : ''}{e.data?.outcome ? ` (${OUT_UZ[e.data.outcome] ?? 'natija yozildi'})` : ''}</summary>
+                <dl className="hist-det">
+                  <div><dt>Kim</dt><dd>{e.actor_name ?? 'tizim (avtomatik)'}</dd></div>
+                  <div><dt>Qachon</dt><dd>{fullTime(e.created_at)}</dd></div>
+                  {(e.from_state || e.to_state) && <div><dt>Holat</dt><dd>{STATE_UZ[e.from_state] ?? (e.from_state ? '—' : 'yangi')} → {STATE_UZ[e.to_state] ?? '—'}</dd></div>}
+                  {e.data?.note && <div><dt>Izoh</dt><dd>{e.data.note}</dd></div>}
+                  {e.data?.reason && <div><dt>Sabab</dt><dd>{e.data.reason}</dd></div>}
+                  {e.data?.next_contact_at && <div><dt>Qayta qo‘ng‘iroq</dt><dd>{fullTime(e.data.next_contact_at)}</dd></div>}
+                </dl>
+              </details></li>
+            ))}
           </ul>
         </details>
       </section>

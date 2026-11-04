@@ -9,6 +9,7 @@ import { pick, useI18n } from '@/lib/i18n';
 import { Gallery } from './Gallery';
 import { QuickOrder } from './QuickOrder';
 import { errText } from '@/lib/errors';
+import { PriceWatch } from './PriceWatch';
 
 export function AddToCart({ product, minPrice }: { product: any; minPrice: string | null }) {
   const { t, lang } = useI18n();
@@ -54,6 +55,7 @@ export function AddToCart({ product, minPrice }: { product: any; minPrice: strin
               {off > 0 && <><s className="was">{som(v.compare_at_minor)}</s><span className="b-off pdp-off">−{off}%</span></>}
             </div>
             {save > 0n && <div className="save-t">Tejaysiz: <b>{som(save.toString())}</b></div>}
+            <PriceWatch productId={product.id} />
             <div className="pmeta">
               {sold > 0 && <span className="sold-chip">🔥 30 kunda {sold} {t('sold')}</span>}
               {inStock && v.available <= 5 && <span className="few-t">⏳ {t('fewLeft')}: {v.available} {t('pcs')}</span>}

@@ -20,6 +20,7 @@ export function renderText(template: string, p: Record<string, unknown>): string
     case 'partner.operator_message': return `💬 Operator xabari — buyurtma ${p.number ?? ''}\n${p.text ?? ''}`;
     case 'partner.penalty': return `⚠️ Jarima: −${som(p.amount_minor)}\nSabab: ${p.reason ?? '—'}\nSavol bo‘lsa, qo‘llab-quvvatlashga yozing.`;
     case 'partner.customer_filled': return `📝 Mijoz ma’lumotlarini o‘zi to‘ldirdi (${p.source ?? 'havola'})\nBuyurtma ${p.number ?? ''} yaratildi — endi mijoz SMS kod bilan tasdiqlaydi.`;
+    case 'price_watch.dropped': return `UzShop: «${p.product ?? 'mahsulot'}» narxi tushdi: ${p.was ?? ''} → ${p.now ?? ''}. ${p.path ?? ''}`;
     case 'waitlist.back_in_stock': return `UzShop: «${p.product ?? 'mahsulot'}» yana sotuvda. Buyurtma: ${p.path ?? ''}`;
     case 'offer.reminder': return 'UzShop: sizga yuborilgan mahsulot taklifi hali amal qilmoqda. Havolani qayta ochib, tanlashingiz mumkin.';
     case 'telegram.linked': return '✅ UzShop hamkor bildirishnomalari ulandi. Yangi buyurtma, yetkazish va to‘lovlar haqida shu yerga xabar keladi.';

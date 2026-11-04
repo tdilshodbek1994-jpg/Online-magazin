@@ -1277,3 +1277,6 @@ a.admin-tab { text-decoration: none; color: inherit; }
 .spec-list > div:last-child { border-bottom: 0; }
 .spec-list dt { color: var(--muted); }
 .spec-list dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+.pw-open { margin-top: 6px; }
+.pw-box { display: grid; gap: 6px; margin-top: 8px; padding: 10px; border-radius: 12px; background: var(--surface-2); }
+.pw-done { margin: 6px 0 0; color: var(--primary-600); font-weight: 700; }

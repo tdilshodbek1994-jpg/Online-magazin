@@ -180,6 +180,18 @@ export function registerPartnerP2(app: FastifyInstance, deps: Deps): void {
         ON CONFLICT (product_id, phone) DO UPDATE SET status='waiting', consent_at=now(), notified_at=NULL, sku_id=EXCLUDED.sku_id`, [body.product_id, body.sku_id ?? null, phone, touch?.partner_id ?? null]);
     return { ok: true };
   });
+  route(app, deps, { method: 'POST', url: '/price-watch', tags: ['catalog'], summary: 'Notify me once if the price drops (explicit consent)',
+    body: z.object({ product_id: z.string().uuid(), phone: z.string().min(5).max(32), consent: z.literal(true) }) },
+  async ({ db, body }) => {
+    const phone = normalizeUzPhone(body.phone);
+    if (!phone) throw badRequest('PHONE_INVALID', { 'body.phone': 'validation.phone' });
+    const pr = await maybeOne<{ price: string | null }>(db, `SELECT (SELECT MIN(o.price_minor)::text FROM skus s JOIN offers o ON o.sku_id=s.id AND o.status='active' WHERE s.product_id=p.id AND s.status='active') AS price
+      FROM products p WHERE p.id=$1 AND p.status='published'`, [body.product_id]);
+    if (!pr || !pr.price) throw notFound('PRODUCT');
+    await db.query(`INSERT INTO price_watch (product_id, phone, price_minor_at, consent_at) VALUES ($1,$2,$3, now())
+        ON CONFLICT (product_id, phone) DO UPDATE SET status='waiting', price_minor_at=EXCLUDED.price_minor_at, consent_at=now(), notified_at=NULL, notified_price_minor=NULL`, [body.product_id, phone, pr.price]);
+    return { ok: true, price_minor_at: pr.price };
+  });
   route(app, deps, { method: 'GET', url: '/products/:id/alternatives', tags: ['catalog'], summary: 'In-stock alternatives from the same category', params: zIdParam }, async ({ db, params }) => {
     return { items: await many(db, `
       SELECT p.id, p.slug, p.name, (SELECT '/media/' || ma.storage_key FROM media_assets ma WHERE ma.product_id=p.id AND ma.status='approved' ORDER BY ma.sort LIMIT 1) AS image,
@@ -368,6 +380,22 @@ export async function runP2Scheduled(db: Db): Promise<void> {
     await withTx(db, async (tx) => {
       const u = await tx.query(`UPDATE stock_waitlist SET status='notified', notified_at=now() WHERE id=$1 AND status='waiting' RETURNING id`, [w.id]);
       if (u.rowCount) await queueNotification(tx, { phone: w.phone, channel: 'sms', purpose: 'transactional', template: 'waitlist.back_in_stock', locale: 'uz-Latn', params: { product: w.name, path: `/p/${w.slug}` }, dedupeKey: `waitlist:${w.id}` });
+    });
+  }
+  // Price watch: one SMS when the lowest active price is below the price the customer saw (and the product is in stock).
+  const drops = await db.query(`
+    SELECT w.id, w.phone, w.price_minor_at::text AS was, p.slug, p.name->>'uz-Latn' AS name,
+           (SELECT MIN(o.price_minor) FROM skus s JOIN offers o ON o.sku_id=s.id AND o.status='active' WHERE s.product_id=p.id AND s.status='active')::text AS now_price
+      FROM price_watch w JOIN products p ON p.id=w.product_id
+     WHERE w.status='waiting' AND p.status='published'
+       AND (SELECT MIN(o.price_minor) FROM skus s JOIN offers o ON o.sku_id=s.id AND o.status='active' WHERE s.product_id=p.id AND s.status='active') < w.price_minor_at
+       AND EXISTS (SELECT 1 FROM skus s JOIN stock_atp a ON a.sku_id=s.id WHERE s.product_id=p.id AND a.atp > 0)
+     LIMIT 200`);
+  for (const w of drops.rows) {
+    await withTx(db, async (tx) => {
+      const u = await tx.query(`UPDATE price_watch SET status='notified', notified_at=now(), notified_price_minor=$2 WHERE id=$1 AND status='waiting' RETURNING id`, [w.id, w.now_price]);
+      const som = (m: string) => `${String(BigInt(m) / 100n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} so‘m`;
+      if (u.rowCount) await queueNotification(tx, { phone: w.phone, channel: 'sms', purpose: 'transactional', template: 'price_watch.dropped', locale: 'uz-Latn', params: { product: w.name, was: som(w.was), now: som(w.now_price), path: `/p/${w.slug}` }, dedupeKey: `price-watch:${w.id}:${w.now_price}` });
     });
   }
   const due = await db.query(`SELECT id, remind_phone FROM partner_offers WHERE status='thinking' AND remind_phone IS NOT NULL AND remind_at <= now() AND expires_at > now() LIMIT 200`);

@@ -1422,3 +1422,13 @@ a.an-row.v-bad { border-left-color: #d92d20; }
 .an-row-main { display: grid; gap: 2px; min-width: 0; }
 .an-row-main b, .an-row-main small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .an-row-sum { white-space: nowrap; font-size: 16px; }
+.st-money { font-size: 15px !important; }
+details.offer-card > summary { display: flex; align-items: center; justify-content: space-between; gap: 10px; cursor: pointer; list-style: none; }
+details.offer-card > summary::-webkit-details-marker { display: none; }
+details.offer-card[open] > summary { margin-bottom: 8px; }
+details.offer-card { display: grid; gap: 6px; padding: 12px 14px; }
+/* Long contest text: 3 lines + "read" */
+.clamp-3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+details.clamp-more > summary { list-style: none; cursor: pointer; display: grid; gap: 4px; }
+details.clamp-more > summary::-webkit-details-marker { display: none; }
+details.clamp-more[open] > summary { display: none; }

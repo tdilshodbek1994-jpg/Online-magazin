@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { api, som } from '@/lib/api';
 import { pick, useI18n } from '@/lib/i18n';
 import Link from 'next/link';
-import { BucketPills, Chips, PERIODS } from '../shared';
+import { Chips, PERIODS } from '../shared';
 import { Insights } from './Insights';
 import { errText } from '@/lib/errors';
 import { uzDate } from '@/lib/orderStatus';
@@ -14,48 +14,46 @@ export default function PartnerStats() {
   const [period, setPeriod] = useState('month');
   const [data, setData] = useState<any>(null);
   const [err, setErr] = useState<any>(null);
-  const [shown, setShown] = useState(15);
-  useEffect(() => { setErr(null); setData(null); setShown(15); api(`/partner/stats?group=${group}&period=${period}`).then(setData).catch(setErr); }, [group, period]);
+  const [shown, setShown] = useState(10);
+  useEffect(() => { setErr(null); setData(null); setShown(10); api(`/partner/stats?group=${group}&period=${period}`).then(setData).catch(setErr); }, [group, period]);
   const sum = (data?.items ?? []).reduce((a: any, r: any) => ({ clicks: a.clicks + r.clicks, total: a.total + r.orders.total, delivered: a.delivered + r.orders.delivered, earned: a.earned + BigInt(r.earned_minor), pending: a.pending + BigInt(r.pending_minor) }), { clicks: 0, total: 0, delivered: 0, earned: 0n, pending: 0n });
   return (
     <>
+      {/* Short (user: "bardak, nimaligini tushunmadim"): period, 4 numbers, one line per link; the rest folds away. */}
       <h1>Statistika</h1>
-      <Insights />
-      <h2>Batafsil jadval</h2>
-      <Chips items={[['stream', 'Oqim bo‘yicha'], ['day', 'Sana bo‘yicha']]} value={group} onChange={setGroup} label="Guruhlash" />
       <Chips items={PERIODS} value={period} onChange={setPeriod} label="Davr" />
       {err && <div className="notice" role="alert">{errText(err)}</div>}
       {data && (
-        <div className="kpi-row">
-          <div className="card kpi"><span className="muted">Bosishlar</span><b>{sum.clicks}</b></div>
-          <div className="card kpi"><span className="muted">Buyurtmalar</span><b>{sum.total}</b></div>
-          <div className="card kpi"><span className="muted">Yetkazilgan</span><b>{sum.delivered}</b></div>
-          <div className="card kpi"><span className="muted">Daromad (tasdiqlangan)</span><b>{som(sum.earned.toString())}</b></div>
-          <div className="card kpi"><span className="muted">Kutilmoqda</span><b>{som(sum.pending.toString())}</b></div>
+        <div className="an-mini">
+          <div><b>{sum.clicks}</b><span>bosish</span></div>
+          <Link href={`/partner/orders?status=all&period=${period}`}><b>{sum.total}</b><span>buyurtma</span></Link>
+          <Link href={`/partner/orders?status=delivered&period=${period}`}><b>{sum.delivered}</b><span>yetkazildi</span></Link>
+          <Link href="/partner/wallet"><b className="ok-t st-money">{som(sum.earned.toString())}</b><span>topildi</span></Link>
         </div>
       )}
+      {data && sum.pending > 0n && <p className="small muted">⏳ Yana {som(sum.pending.toString())} yetkazilgach qo‘shiladi.</p>}
+      <div className="spread"><h2 className="an-h2">{group === 'day' ? 'Kunlar bo‘yicha' : 'Havolalar bo‘yicha'}</h2><button type="button" className="link-btn small" onClick={() => setGroup(group === 'day' ? 'stream' : 'day')}>{group === 'day' ? 'Havolalar bo‘yicha ko‘rish' : 'Kunlar bo‘yicha ko‘rish'}</button></div>
       {!data && !err && <div className="loading" role="status"><span className="spinner" aria-hidden />Yuklanmoqda…</div>}
       {data && data.items.length === 0 && <div className="empty">Bu davrda ma’lumot yo‘q</div>}
       <div className="slist">
-        {data?.items.slice(0, shown).map((r: any) => (
-          <article key={r.key} className="scard">
-            <div className="spread">
-              <div>
-                <h3>{group === 'day' ? uzDate(r.key, true) : r.label ?? 'To‘g‘ridan-to‘g‘ri (havolasiz)'}</h3>
-                {r.product_name && <div className="muted small">{pick(r.product_name, lang)}</div>}
+        {data?.items.slice(0, shown).map((r: any) => {
+          const linkQ = group === 'stream' && r.key !== 'direct' ? `&link=${r.key}&link_name=${encodeURIComponent(r.label ?? '')}` : '';
+          return (
+            <Link key={r.key} href={`/partner/orders?status=all&period=${period}${linkQ}`} className="scard an-row">
+              <div className="an-row-main">
+                <b>{group === 'day' ? uzDate(r.key, true) : r.label ?? 'Havolasiz (o‘zingiz kiritgan)'}</b>
+                <small className="muted">{r.product_name ? `${pick(r.product_name, lang)} · ` : ''}{r.orders.total} buyurtma · {r.orders.delivered} yetkazildi</small>
               </div>
-              <div className="big-num ok-t" title="Yetkazilgan buyurtmalar">{r.orders.delivered}<small className="big-cap">yetkazildi</small></div>
-            </div>
-            <div className="muted small">👆 {r.clicks} bosish · Yetkazish foizi: {r.delivery_rate_pct === null ? '—' : `${r.delivery_rate_pct}%`}</div>
-            <div className="money-row">
-              <Link className="m-ok m-link" href={group === 'stream' && r.key !== 'direct' ? `/partner/analytics/link/${r.key}` : '/partner/wallet'}><span>Daromad ›</span><b>{som(r.earned_minor)}</b></Link>
-              <Link className="m-wait m-link" href="/partner/wallet"><span>Kutilmoqda ›</span><b>{som(r.pending_minor)}</b></Link>
-            </div>
-            <details className="s2-more"><summary>Holatlar bo‘yicha</summary><BucketPills c={r.orders} href={(st) => `/partner/orders?status=${st}&period=${period}${group === 'stream' && r.key !== 'direct' ? `&link=${r.key}&link_name=${encodeURIComponent(r.label ?? '')}` : ''}`} /></details>
-          </article>
-        ))}
+              <b className="an-row-sum ok-t">{BigInt(r.earned_minor) > 0n ? som(r.earned_minor) : <span className="muted">⏳ {som(r.pending_minor)}</span>} ›</b>
+            </Link>
+          );
+        })}
       </div>
-      {data && data.items.length > shown && <button className="btn secondary full mt8" onClick={() => setShown(shown + 15)}>Yana ko‘rsatish ({data.items.length - shown} ta qoldi)</button>}
+      {data && data.items.length > shown && <button className="btn secondary full mt8" onClick={() => setShown(shown + 10)}>Yana 10 ta ({data.items.length - shown} ta qoldi)</button>}
+      <details className="card pp-more st-more">
+        <summary>Mahsulotlar va hududlar bo‘yicha</summary>
+        <Insights />
+      </details>
     </>
   );
 }

@@ -54,16 +54,20 @@ export default function Offers() {
       {items?.length === 0 && <div className="empty">Hali taklif to‘plami yo‘q.</div>}
       <div className="slist">
         {items?.map((o) => (
-          <article key={o.id} className="scard">
-            <div className="spread"><b>{(o.products ?? []).map((p: any) => pick(p.name, lang)).join(' · ')}</b><span className={`pill ${STATUS[o.status]?.[1] ?? ''}`}>{STATUS[o.status]?.[0] ?? o.status}</span></div>
-            {o.note && <div className="small muted">«{o.note}»</div>}
+          // Tap to open (user: "ustiga bosib bo‘lmayapti"): short line closed, note/date/actions when open.
+          <details key={o.id} className="scard offer-card">
+            <summary>
+              <span className="ocard-items"><b>{(o.products ?? []).map((p: any) => pick(p.name, lang)).join(' · ')}</b></span>
+              <span className={`pill ${STATUS[o.status]?.[1] ?? ''}`}>{STATUS[o.status]?.[0] ?? o.status} ▾</span>
+            </summary>
             <div className="small">{o.seen_at ? '👀 Mijoz ochdi' : 'Mijoz hali ochmadi'}{o.wants_reminder ? ' · 🔔 eslatma so‘radi' : ''}{o.chosen ? ` · Tanladi: ${pick(o.chosen, lang)}` : ''}</div>
+            {o.note && <div className="small muted">«{o.note}»</div>}
             <div className="spread">
-              <span className="muted small">{new Date(o.created_at).toLocaleString('uz-UZ', { dateStyle: 'short', timeStyle: 'short' })}</span>
-              {o.order_id ? <Link className="see-all" href={`/partner/orders/${o.order_id}`}>{o.order_masked} · pasport →</Link>
-                : ['open', 'thinking'].includes(o.status) && <button className="link-btn small" onClick={async () => { await api(`/partner/offers/${o.id}/close`, { method: 'POST' }).catch(() => {}); void load(); }}>Yopish</button>}
+              <span className="muted small">{new Date(o.created_at).toLocaleString('uz-UZ', { timeZone: 'Asia/Tashkent', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
+              {o.order_id ? <Link className="see-all" href={`/partner/orders/${o.order_id}`}>Buyurtma {o.order_masked} →</Link>
+                : ['open', 'thinking'].includes(o.status) && <button className="btn secondary sm" onClick={async () => { await api(`/partner/offers/${o.id}/close`, { method: 'POST' }).catch(() => {}); void load(); }}>Havolani yopish</button>}
             </div>
-          </article>
+          </details>
         ))}
       </div>
     </>

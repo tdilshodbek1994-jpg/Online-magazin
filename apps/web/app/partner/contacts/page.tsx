@@ -40,22 +40,22 @@ export default function Contacts() {
       {items?.length === 0 && <div className="empty">Hali mijoz yo‘q. <Link href="/partner/new">Birinchi buyurtmani kiriting</Link> — mijoz shu yerda paydo bo‘ladi.</div>}
       <div className="slist">
         {items?.slice(0, shown).map((c) => (
-          <article key={c.id} className={`scard ${c.do_not_contact ? 'muted-card' : ''}`}>
-            <div className="spread">
-              <b>{c.name || 'Ismsiz'} · {c.entered_by_partner ? <a href={`tel:${c.phone}`}>{c.phone}</a> : c.phone}</b>
-              {c.last_bucket && <span className={`pill b-${c.last_bucket}`}>{BUCKET_LABEL[c.last_bucket]}</span>}
-            </div>
-            {c.interested?.length > 0 && <div className="small">Qiziqqan: {c.interested.map((n: any) => pick(n, lang)).join(', ')}</div>}
-            <div className="small muted">{c.contact_time ? `📞 ${c.contact_time} · ` : ''}Oxirgi: {new Date(c.last_activity_at).toLocaleDateString('uz-UZ')}{c.last_order_masked ? ` · ${c.last_order_masked}` : ''}</div>
+          // Short line closed (name, product, status); phone, note and actions when tapped.
+          <details key={c.id} className={`scard offer-card ${c.do_not_contact ? 'muted-card' : ''}`}>
+            <summary>
+              <span className="an-row-main"><b>{c.name || 'Ismsiz'}</b>{c.interested?.length > 0 && <small className="muted">{c.interested.map((n: any) => pick(n, lang)).join(', ')}</small>}</span>
+              {c.last_bucket ? <span className={`pill b-${c.last_bucket}`}>{BUCKET_LABEL[c.last_bucket]} ▾</span> : <span className="muted">▾</span>}
+            </summary>
+            <div className="small">{c.entered_by_partner ? <a href={`tel:${c.phone}`}>📞 {c.phone}</a> : c.phone}{c.contact_time ? ` · ${c.contact_time}` : ''} · oxirgi: {new Date(c.last_activity_at).toLocaleDateString('uz-UZ')}</div>
             {c.do_not_contact && <div className="small no-t">🚫 Mijoz bog‘lanmaslikni so‘ragan</div>}
             {c.note && <div className="small">📝 {c.note}</div>}
             <div className="row" style={{ gap: 8 }}>
               {!c.do_not_contact && c.last_order_id && <button className="btn sm" onClick={() => reorder(c)}>Qayta buyurtma</button>}
               {c.last_order_id && <Link className="btn secondary sm" href={`/partner/orders/${c.last_order_id}`}>Oxirgi buyurtma</Link>}
-              <button className="link-btn small" onClick={() => setOpen(open === c.id ? null : c.id)}>{open === c.id ? 'Yopish' : 'Izoh / sozlash'}</button>
+              <button className="link-btn small" onClick={() => setOpen(open === c.id ? null : c.id)}>{open === c.id ? 'Yopish' : 'Izoh yozish'}</button>
             </div>
             {open === c.id && <ContactEdit c={c} onSave={(b) => patch(c.id, b)} />}
-          </article>
+          </details>
         ))}
         {items && items.length > shown && <button className="btn secondary full" onClick={() => setShown(shown + 30)}>Yana ko‘rsatish ({items.length - shown} ta qoldi)</button>}
       </div>

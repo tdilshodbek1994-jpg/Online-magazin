@@ -61,7 +61,7 @@ export default function OpsBoard() {
   };
   return (
     <div className="board">
-      <div className="spread"><h1>Rahbar paneli</h1><Link href="/ops" className="btn secondary sm">← Operator xonasi</Link></div>
+      <div className="spread"><h1>Rahbar paneli</h1><span className="row" style={{ gap: 6 }}><Link href="/ops/templates" className="btn secondary sm">Tayyor javoblar</Link><Link href="/ops" className="btn secondary sm">← Operator xonasi</Link></span></div>
       <p className="muted small">Hisoblangan vaqt: {new Date(d.computed_at).toLocaleTimeString('uz-UZ', { timeZone: 'Asia/Tashkent', hour: '2-digit', minute: '2-digit' })} · har daqiqada yangilanadi</p>
       {oldest && <p className="notice">Eng uzoq kutgan egasiz ish: <b>{oldest.number}</b> — {age(oldest.age_seconds)}</p>}
       {incs.some((i) => i.status === 'open') && (

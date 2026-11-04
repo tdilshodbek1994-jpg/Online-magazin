@@ -1288,3 +1288,4 @@ a.admin-tab { text-decoration: none; color: inherit; }
 .lp-hit img, .lp-hit .ph { width: 40px; height: 40px; border-radius: 8px; object-fit: cover; }
 .lp-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
 .lp-hit b { font-size: 13px; white-space: nowrap; }
+.tpl-form { display: grid; gap: 6px; }

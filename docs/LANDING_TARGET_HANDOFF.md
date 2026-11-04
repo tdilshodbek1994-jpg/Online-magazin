@@ -7,6 +7,6 @@
 - Safety (P2A): `apps/api/src/modules/target/safety.ts` (rules, envelope, kill switch, recommendation; `runAdSafety` in `worker.ts`).
 - A/B (P2B part 1): `apps/api/src/modules/landings/experiments.ts`; web `apps/web/app/admin/ExperimentsCard.tsx`.
 - Domains (P2B part 2): `apps/api/src/modules/landings/domains.ts` (+ staff-session guard in `app.ts`); web `apps/web/app/admin/DomainsAdmin.tsx`.
-- Next single task: close the 9 unmapped P0B cases (LT-003 parallel stock on a landing, 006 expired quote, 007 multi-product landing UI, 009 offline form retry, 017 AI draft, 018 reduced-motion browser check, 019 server-side promo timer block, 024/025 on-behalf verification on landings) — then, with the owner, the real Meta app + reverse-proxy domain wiring.
+- Next single task (owner-dependent): create the Meta app (App ID, pinned Graph version, app review for ads_management/ads_read), then implement `MetaAdsAdapter` + CAPI `TrackingTransport` against it and run the PAUSED-only sandbox check; separately wire the reverse proxy host allowlist + TLS for the first verified custom domain.
 - To go live with CAPI later: owner Meta OAuth (encrypted token in vault, `credentials_ref`), pin `api_version`, implement `TrackingTransport` for Graph API, add Pixel loader with CSP allowlist; the outbox, dedup and consent rules stay unchanged.
 - Owner gates still open: D09 window, D10 Purchase policy, D14 budgets, D18 A/B rules, D19 Meta permissions, D20 legal/cookie/billing.

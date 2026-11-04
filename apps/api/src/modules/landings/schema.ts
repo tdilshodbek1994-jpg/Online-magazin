@@ -17,6 +17,8 @@ const zBlock = z.discriminatedUnion('type', [
   z.object({ id: z.string().min(1).max(40), type: z.literal('delivery_returns'), props: z.object({ note: txt(500).optional() }) }),
   z.object({ id: z.string().min(1).max(40), type: z.literal('order_form'), props: z.object({ cta: txt(40).default('Buyurtma berish'), sticky: z.boolean().default(true) }) }),
   z.object({ id: z.string().min(1).max(40), type: z.literal('contact'), props: z.object({ text: txt(300).optional() }) }),
+  // Promotion timer: the expiry lives in the server-side promotion (refresh never restarts it; expired code is refused at checkout).
+  z.object({ id: z.string().min(1).max(40), type: z.literal('promo_timer'), props: z.object({ code: z.string().regex(/^[A-Z0-9_-]{3,40}$/), label: txt(80).optional() }) }),
   z.object({ id: z.string().min(1).max(40), type: z.literal('footer'), props: z.object({ text: txt(300).optional() }) }),
 ]);
 export const zDefinition = z.object({
@@ -34,7 +36,7 @@ export const digestOf = (d: unknown) => createHash('sha256').update(JSON.stringi
 export function defaultDefinition(template: 'simple' | 'pro' | 'boom' | 'multi'): LandingDefinition {
   const base = { schema_version: 1 as const, template_type: template, locale: 'uz-Latn' as const, seo: {} };
   if (template === 'simple') return { ...base, blocks: [{ id: 'hero', type: 'hero', props: { show_price: true } }, { id: 'form', type: 'order_form', props: { cta: 'Buyurtma berish', sticky: true } }, { id: 'dr', type: 'delivery_returns', props: {} }] };
-  if (template === 'multi') return { ...base, blocks: [{ id: 'hero', type: 'hero', props: { headline: 'Tanlangan mahsulotlar', show_price: true } }, { id: 'form', type: 'order_form', props: { cta: 'Savatga qo‘shish', sticky: false } }, { id: 'dr', type: 'delivery_returns', props: {} }] };
+  if (template === 'multi') return { ...base, blocks: [{ id: 'hero', type: 'hero', props: { headline: 'Tanlangan mahsulotlar', show_price: true } }, { id: 'form', type: 'order_form', props: { cta: 'Buyurtma berish', sticky: false } }, { id: 'dr', type: 'delivery_returns', props: {} }] };
   return { ...base, blocks: [
     { id: 'hero', type: 'hero', props: { show_price: true } }, { id: 'gallery', type: 'gallery', props: { max: 6 } }, { id: 'specs', type: 'specs', props: { from_catalog: true } },
     { id: 'form', type: 'order_form', props: { cta: 'Buyurtma berish', sticky: true } }, { id: 'faq', type: 'faq', props: { items: [] } }, { id: 'dr', type: 'delivery_returns', props: {} }, { id: 'footer', type: 'footer', props: {} },

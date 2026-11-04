@@ -175,12 +175,17 @@ export function registerCheckout(app: FastifyInstance, deps: Deps): void {
    */
   route(app, deps, {
     method: 'POST', url: '/checkout/quick-order', tags: T, summary: 'One-step order: SKU + name + phone; operator collects address by phone (Idempotency-Key required)',
-    body: z.object({ sku_id: z.string().uuid(), qty: z.number().int().min(1).max(20).default(1), name: z.string().trim().min(2).max(120), phone: z.string().min(5).max(32),
+    body: z.object({ sku_id: z.string().uuid().optional(), qty: z.number().int().min(1).max(20).default(1), lines: z.array(z.object({ sku_id: z.string().uuid(), qty: z.number().int().min(1).max(20) })).min(1).max(5).optional(),
+      promo_code: z.string().max(40).optional(), name: z.string().trim().min(2).max(120), phone: z.string().min(5).max(32),
       delivery_zone_id: z.string().uuid().optional(), accept_terms: z.literal(true), referral_code: z.string().max(20).optional(),
       landing: z.object({ landing_id: z.string().uuid(), revision: z.number().int().min(1) }).optional(), tracking: zTrackingInput }),
   }, async ({ actor, db, cfg, body, idempotencyKey, reply }) => {
     const key = requireIdempotencyKey(idempotencyKey);
     if (!actor.userId && !actor.guestToken) throw badRequest('GUEST_TOKEN_REQUIRED');
+    // one SKU (product page / single landing) or several lines (multi-product landing) → one order
+    const lines = body.lines ?? (body.sku_id ? [{ sku_id: body.sku_id, qty: body.qty }] : null);
+    if (!lines) throw badRequest('LINES_REQUIRED', { 'body.sku_id': 'validation.required' });
+    if (new Set(lines.map((l) => l.sku_id)).size !== lines.length) throw badRequest('DUPLICATE_SKU');
     const phone = normalizeUzPhone(body.phone);
     if (!phone) throw badRequest('PHONE_INVALID', { 'body.phone': 'validation.phone' });
     const scope = `quick:${actor.userId ?? 'guest:' + (actor.guestToken ?? '')}`;
@@ -193,7 +198,7 @@ export function registerCheckout(app: FastifyInstance, deps: Deps): void {
           ? await maybeOne<{ id: string; region_code: string; district: string | null }>(tx, `SELECT id, region_code, district FROM delivery_zones WHERE id=$1 AND active`, [body.delivery_zone_id])
           : await maybeOne<{ id: string; region_code: string; district: string | null }>(tx, `SELECT id, region_code, district FROM delivery_zones WHERE active ORDER BY region_code='TAS' DESC, district NULLS FIRST LIMIT 1`);
         if (!zone) throw badRequest('DELIVERY_ZONE_INVALID');
-        const priced = await priceLines(tx, { lines: [{ sku_id: body.sku_id, qty: body.qty }], delivery_zone_id: zone.id, partnerDiscount: body.referral_code ? null : await visitorDiscount(tx, cfg.env, actor) });
+        const priced = await priceLines(tx, { lines, delivery_zone_id: zone.id, promo_code: body.promo_code ?? null, partnerDiscount: body.referral_code || lines.length > 1 ? null : await visitorDiscount(tx, cfg.env, actor) });
         const address = { region_code: zone.region_code, district: zone.district ?? 'Aniqlanadi', street: 'Operator qo‘ng‘iroqda aniqlaydi', house: '-', quick: true };
         const q = await storeQuote(tx, priced, { cartId: null, userId: actor.userId, createdBy: actor.userId, address, contact: { name: body.name, phone }, ttlMinutes: cfg.quoteTtlMinutes });
         const attribution = await attributionForQuote(tx, q.id, await resolveAttribution(tx, cfg.env, { explicitCode: body.referral_code ?? null, guestToken: actor.guestToken, customerUserId: actor.userId }));
@@ -205,7 +210,8 @@ export function registerCheckout(app: FastifyInstance, deps: Deps): void {
           // the revision must be the published one, or the A/B variant this visitor was actually shown
           const asg = await currentAssignment(tx, body.landing.landing_id, actor);
           const lp = await maybeOne<{ digest: string }>(tx, `SELECT r.digest FROM landing_pages l JOIN landing_revisions r ON r.landing_id=l.id AND r.revision=$2
-              WHERE l.id=$1 AND l.status='published' AND (l.published_revision=$2 OR $4::int = $2) AND (SELECT s.product_id FROM skus s WHERE s.id=$3) = ANY(l.product_ids)`, [body.landing.landing_id, body.landing.revision, body.sku_id, asg?.revision ?? null]);
+              WHERE l.id=$1 AND l.status='published' AND (l.published_revision=$2 OR $4::int = $2)
+                AND NOT EXISTS (SELECT 1 FROM skus s WHERE s.id = ANY($3::uuid[]) AND NOT (s.product_id = ANY(l.product_ids)))`, [body.landing.landing_id, body.landing.revision, lines.map((x) => x.sku_id), asg?.revision ?? null]);
           if (lp) await tx.query(`UPDATE orders SET landing_snapshot=$2, experiment_snapshot=$3 WHERE id=$1`, [order.id, JSON.stringify({ landing_id: body.landing.landing_id, revision: body.landing.revision, digest: lp.digest, quote_id: q.id }),
             asg && asg.revision === body.landing.revision ? JSON.stringify(asg) : null]);
         }

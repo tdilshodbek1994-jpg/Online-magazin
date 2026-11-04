@@ -47,6 +47,15 @@ export function registerLandings(app: FastifyInstance, deps: Deps): void {
         availability: anyStock ? 'in_stock' : 'unavailable' }; // trafficback: the page says "not available", no hidden swap (LT-029)
     });
 
+  route(app, deps, { method: 'GET', url: '/landings/promo/:code', tags: ['public'], summary: 'Promotion window for a landing timer (server time; no internal fields)', params: z.object({ code: z.string().regex(/^[A-Z0-9_-]{3,40}$/) }) },
+    async ({ db, params, reply }) => {
+      reply.header('cache-control', 'no-store');
+      const p = await maybeOne<{ ends_at: string; starts_at: string; status: string }>(db, `SELECT ends_at, starts_at, status FROM promotions WHERE code=$1`, [params.code]);
+      if (!p) throw notFound('PROMOTION');
+      const now = new Date();
+      return { code: params.code, ends_at: p.ends_at, server_now: now.toISOString(), active: p.status === 'active' && new Date(p.starts_at) <= now && new Date(p.ends_at) > now };
+    });
+
   // ---------------- Admin ----------------
   route(app, deps, { method: 'GET', url: '/admin/landings', tags: A, summary: 'All landings' }, async ({ actor, db }) => {
     requirePerm(actor, 'catalog.write');

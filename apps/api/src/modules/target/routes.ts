@@ -98,6 +98,15 @@ export async function preflight(q: Queryable, cfg: AppConfig, d: Draft) {
   add('creative_present', texts.every((t) => t.trim().length > 1), 'creative_missing');
   const issues = creativeIssues(texts);
   add('creative_policy', issues.length === 0, issues.length ? `creative_policy:${issues.join('|')}` : undefined);
+  // LT-017: claims the catalog facts don't back (certificate, warranty) are flagged; nothing is published without review.
+  const facts0 = facts as any[];
+  const descr = facts0.map((p) => JSON.stringify(p.description ?? {})).join(' ').toLowerCase();
+  const joined = texts.join(' ').toLowerCase();
+  const unsupported = [
+    /sertifikat|certified|сертификат/.test(joined) && !/sertifikat|certified|сертификат/.test(descr) ? 'certificate' : null,
+    /kafolat|кафолат|garantiya/.test(joined) && !facts0.some((p) => Number(p.warranty_months) > 0) ? 'warranty' : null,
+  ].filter(Boolean);
+  add('creative_claims_supported', unsupported.length === 0, unsupported.length ? `creative_unsupported_claim:${unsupported.join('|')}` : undefined);
   const prices = await offerPrices(q, d.landing_id);
   const wrong = priceClaims(texts.join(' ')).filter((p) => !prices.includes(p));
   add('creative_price_matches_catalog', wrong.length === 0, 'creative_price_mismatch');

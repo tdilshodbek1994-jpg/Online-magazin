@@ -10,7 +10,7 @@ import { ExperimentsCard } from './ExperimentsCard';
 import { DomainsAdmin } from './DomainsAdmin';
 
 const ST: Record<string, string> = { draft: 'Qoralama', review: 'Ko‘rib chiqilmoqda', approved: 'Tasdiqlangan', published: 'Nashrda', archived: 'Arxiv', revoked: 'Bekor qilingan' };
-const ADDABLE: [string, string, any][] = [['benefits', 'Afzalliklar', { items: [] }], ['faq', 'Savollar (FAQ)', { items: [] }], ['gallery', 'Galereya', { max: 6 }], ['specs', 'Tavsif (katalogdan)', { from_catalog: true }], ['video', 'Video (YouTube ID)', { provider: 'youtube', ref: '' }], ['contact', 'Aloqa matni', { text: '' }], ['delivery_returns', 'Yetkazish/qaytarish', {}]];
+const ADDABLE: [string, string, any][] = [['benefits', 'Afzalliklar', { items: [] }], ['faq', 'Savollar (FAQ)', { items: [] }], ['gallery', 'Galereya', { max: 6 }], ['specs', 'Tavsif (katalogdan)', { from_catalog: true }], ['video', 'Video (YouTube ID)', { provider: 'youtube', ref: '' }], ['contact', 'Aloqa matni', { text: '' }], ['delivery_returns', 'Yetkazish/qaytarish', {}], ['promo_timer', 'Aksiya taymeri (promokod)', { code: 'AKSIYA' }]];
 
 /** Admin «Landinglar»: create from template, block editor (allowlisted blocks only), 360/390/430 preview, workflow. */
 export function LandingsAdmin() {
@@ -61,6 +61,7 @@ function Editor({ id, onChanged }: { id: string; onChanged: () => void }) {
           {b.type === 'order_form' && <input aria-label="Tugma matni" value={b.props.cta} onChange={(e) => setBlock(i, { cta: e.target.value.slice(0, 40) })} />}
           {b.type === 'video' && <input aria-label="YouTube ID" placeholder="YouTube video ID" value={b.props.ref} onChange={(e) => setBlock(i, { ref: e.target.value.trim() })} />}
           {(b.type === 'contact' || b.type === 'footer') && <input aria-label="Matn" value={b.props.text ?? ''} onChange={(e) => setBlock(i, { text: e.target.value || undefined })} />}
+          {b.type === 'promo_timer' && <input aria-label="Promokod" placeholder="Promokod (muddat promokoddan olinadi)" value={b.props.code} onChange={(e) => setBlock(i, { code: e.target.value.toUpperCase().replace(/[^A-Z0-9_-]/g, '').slice(0, 40) })} />}
           {b.type === 'delivery_returns' && <input aria-label="Izoh" placeholder="Izoh (ixtiyoriy)" value={b.props.note ?? ''} onChange={(e) => setBlock(i, { note: e.target.value || undefined })} />}
         </div>
       ))}

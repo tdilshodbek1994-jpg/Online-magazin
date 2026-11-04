@@ -1620,3 +1620,4 @@ img.t3-ava { object-fit: cover; display: block; }
 /* LT-093: 320px + 200% text — nothing forces horizontal scroll */
 .foot-grid > *, .lp > * { min-width: 0; overflow-wrap: anywhere; }
 @media (max-width: 360px) { .foot-grid { grid-template-columns: 1fr; } }
+.lp-promo { padding: 10px 12px; border-radius: 12px; background: var(--warn-bg); text-align: center; }

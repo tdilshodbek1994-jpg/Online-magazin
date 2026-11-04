@@ -95,6 +95,15 @@ Branch `claude/online-marketplace-platform-sdtv52` · not merged to main · not 
 | Admin «🌐 Domenlar» card (TXT instructions, DNS check, SSL status, Meta code, disconnect) | done |
 | Reverse-proxy wiring (Caddy/nginx host allowlist + TLS issuance) on the server | **not done**: needs the owner's domain + server change (outside this repo's deploy script) |
 
+## Remaining P0B cases — closed
+| Item | State |
+|---|---|
+| Multi-product landing: quick order accepts up to 5 `lines` → one order, catalog-priced; landing snapshot only if every product belongs to the landing; multi template form with per-product quantities (default CTA now «Buyurtma berish») | done |
+| `promo_timer` block bound to a server-side promotion (`GET /landings/promo/:code`, server time offset; refresh never restarts; expired code refused at checkout `PROMO_NOT_APPLICABLE`); quick order accepts `promo_code` | done |
+| Offline form: nothing queued or auto-sent; after reconnect live prices are reloaded and the customer must press again | done (browser-checked) |
+| Ad copy claims not backed by catalog facts (certificate, warranty) → preflight `creative_unsupported_claim` | done |
+| Reduced motion: Boom hero/CTA animation `none` under `prefers-reduced-motion`, normal `lp-float` otherwise | done (browser-checked) |
+
 ## Tests
 - `apps/api/test/zf-landings.test.ts` (own DB `om_test_landing`): LT-001, 002, 004, 005, 008, 010, 011, 012, 013, 014, 015, 016, 020, 021, 022, 023, 026, 027, 028, 029, 030.
 - P0B not yet mapped: LT-003 (parallel stock — covered by existing reservation tests, not re-run for landings), LT-006 (expired quote — existing checkout test), LT-007 (multi-product single order — storefront cart; landing multi UI not built), LT-009 (offline form — client), LT-017 (AI draft, P1B), LT-018 (reduced motion — CSS, needs browser check), LT-019 (promotion timer from backend — no timer block yet), LT-024/025 (on-behalf verification exists; tracking separation is P0C).
@@ -103,9 +112,10 @@ Branch `claude/online-marketplace-platform-sdtv52` · not merged to main · not 
 - `apps/api/test/zi-target.test.ts` (own DB `om_test_target`, fake adapter): LT-061…LT-070, LT-071…LT-080 + honest blocked state without app/connection + copy/audience guard (18 tests).
 - `apps/api/test/zj-landing-p2b.test.ts` (own DB `om_test_landing_p2b`): LT-091, 092, 094, 095 (no server-side media URL fetch exists; internal URLs refused by the block schema), 096, 097, 098, 099, 100 (8 tests). LT-093 = manual browser check above.
 - `apps/api/test/zk-domains.test.ts` (own DB `om_test_domains`, simulated DNS): LT-031…LT-040 (8 tests).
+- `apps/api/test/zl-landing-remaining.test.ts` (own DB `om_test_landing_rest`): LT-003, 006, 007, 009, 017, 019, 024 + 025 (7 tests). Browser (Playwright) checks 2026-11-04: LT-018 reduced-motion animation `none`; LT-009 offline → no order, message, after reconnect price refresh and manual resubmit → 1 order with 2 lines (multi).
 - LT-048 note: local outbox dedup is tested; provider-side dedup can only be verified with a real dataset (not run).
-- Full run 2026-11-04 (after P2B): `cd apps/api && pnpm vitest run` → 36 files, 278 tests passed, exit 0. (P2B part 1: 270; P2A: 262; P1B: 254; P1A: 244.)
-- Acceptance coverage: 91 of 100 package cases have an automated test or a recorded manual check; not mapped: LT-003, 006, 007, 009, 017, 018, 019, 024, 025 (see P0B note). (After P0C: 32 files, 238.) Web build OK; manual browser check: consent banner appears only after the owner connects a dataset, PageView recorded after consent. Web E2E not re-run for P0C (banner hidden by default).
+- Full run 2026-11-04 (final): `cd apps/api && pnpm vitest run` → 37 files, 285 tests passed, exit 0. Web E2E 15/15 (fresh DB, before the last web change set; re-run below).
+- Acceptance coverage: 100 of 100 package cases have an automated test or a recorded browser check (provider-side behaviour — Meta dedup, real moderation, real DNS/TLS — is simulated, not run against live services). (After P0C: 32 files, 238.) Web build OK; manual browser check: consent banner appears only after the owner connects a dataset, PageView recorded after consent. Web E2E not re-run for P0C (banner hidden by default).
 
 ## Not started
 Catalog ads, Facebook/Instagram lead forms, partner-owned ad accounts (each needs its own owner decision + flag); real Meta Graph adapter (blocked by the Meta app).

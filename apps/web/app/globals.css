@@ -1142,3 +1142,17 @@ a.admin-tab { text-decoration: none; color: inherit; }
 .readback { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: 8px; }
 .readback input { margin-top: 3px; }
 .desk-item .spread > b { white-space: nowrap; } .desk-item .spread { gap: 8px; align-items: flex-start; }
+.desk-ho { display: grid; gap: 8px; padding: 10px; border-radius: 12px; background: #fff4d6; color: #3d2a00; }
+.ho-card { display: grid; gap: 6px; padding: 10px; border-radius: 10px; background: var(--surface); color: var(--text); }
+.ho-pkg { display: grid; gap: 4px; margin: 0; }
+.ho-pkg > div { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 6px; font-size: 14px; }
+.ho-pkg dt { color: var(--muted); }
+.ho-pkg dd { margin: 0; overflow-wrap: anywhere; }
+/* Supervisor board */
+.board { display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr); }
+.board-staff { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 8px; }
+.board-op { display: grid; gap: 2px; padding: 10px; border-radius: 12px; background: var(--surface-2); }
+.board-task { display: grid; gap: 4px; }
+.board-act { display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.board-act select { width: auto; flex: 1 1 180px; min-height: 40px; }
+.warn-t { color: #9b1c1c; }

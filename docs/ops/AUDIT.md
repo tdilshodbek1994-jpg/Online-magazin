@@ -36,9 +36,17 @@ Vertical slice UI → API → DB → tests:
 * **UI** `apps/web/app/ops/WorkDesk.tsx` on `/ops`: shift switch, honest counters (only non-zero warnings), "Keyingi ishni olish", my task list, task card (five answers, `tel:` that only opens the phone app, read-back checkbox before "Tasdiqladi", callback time in Asia/Tashkent, internal note label, history).
 * **Tests** `apps/api/test/q-ops-center.test.ts` on real PostgreSQL: T02, T07, T10/T12, T13, T15, T18, confirm through task, permission denial.
 
+## 2b. Done in P1 (part 1)
+
+* **Handoff** (`migrations/0016_ops_handoff.sql`, `modules/opscenter/handoff.ts`): request with a package (done, customer said, promised, missing, next, deadline) → accept / decline (reason) / cancel; one pending per task; expires after 30 min back to the sender; the sender stays owner until accept (T14). UI: incoming handoffs with the package on "Mening ishim", form in the task card.
+* **Supervisor transfer** `POST /ops/center/tasks/:id/assign` (needs `orders.reassign`, reason required, audited, history kept). UI: `/ops/board` — operators with shift and active load, filters (attention, blocked, unowned, overdue, callbacks, all), oldest unowned item, transfer per row.
+* **Contact hours** 09:00–21:00 Asia/Tashkent: a callback cannot be set outside them (`OUTSIDE_CONTACT_HOURS`, T16); automatic retries move to the next 09:00.
+* Waiting time counts from when the order came in (not from when the task row was created).
+* Tests `r-ops-handoff.test.ts`: T14, handoff expiry, supervisor transfer permission + audit, T16.
+
 ## 3. Not done yet (honest list)
 
-P1: skill/language routing and capacity round-robin, handoff request/accept, SLA clocks with business calendar and pause reasons, partner requests into tasks, customer-safe vs internal message composer, notification outbox per audience, staff layout for `/ops` without shop header.
+P1 (remaining): skill/language routing and capacity round-robin, SLA clocks with business calendar and pause reasons, partner requests into tasks, customer-safe vs internal message composer, notification outbox per audience, staff layout for `/ops` without shop header.
 P2: supervisor dashboard UI (API exists), incident grouping, QA sampling, duplicate review, bulk-safe actions, KB/templates, load and restore tests.
 P3: real telephony adapter, Telegram Business, AI assistant (read-only, human approval).
 
@@ -51,5 +59,7 @@ P3: real telephony adapter, Telegram Business, AI assistant (read-only, human ap
 | Unanswered call attempts before supervisor | 5 | demo default |
 | Default retry after "no answer" | +2 h unless the operator sets a time | demo default |
 | Confirm task due | order created + 30 min | demo default, not shown to customers |
-| Contact hours / quiet hours / opt-out | not enforced yet | **owner decision needed** (P1) |
+| Contact hours | 09:00–21:00 Tashkent | demo default, owner to approve |
+| Handoff expiry | 30 min | demo default |
+| Opt-out / attempt spacing per customer | not enforced yet | **owner decision needed** |
 | 4+ units quantity tier | not invented; manual review | **owner decision needed** |

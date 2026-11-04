@@ -23,7 +23,8 @@ export function WorkDesk({ onChanged }: { onChanged?: () => void }) {
   const [order, setOrder] = useState<any>(null);
   const [busy, setBusy] = useState(false);
   const [denied, setDenied] = useState(false);
-  const load = useCallback(async () => { try { setD(await api('/ops/center')); } catch (e: any) { if (e.status === 403) setDenied(true); else setErr(errText(e)); } }, []);
+  const [ho, setHo] = useState<{ incoming: any[]; outgoing: any[] }>({ incoming: [], outgoing: [] });
+  const load = useCallback(async () => { try { api('/ops/center/handoffs').then(setHo).catch(() => {}); setD(await api('/ops/center')); } catch (e: any) { if (e.status === 403) setDenied(true); else setErr(errText(e)); } }, []);
   useEffect(() => { void load(); const i = setInterval(load, 60_000); return () => clearInterval(i); }, [load]);
   const openTask = useCallback(async (id: string) => {
     setErr(null);
@@ -38,7 +39,7 @@ export function WorkDesk({ onChanged }: { onChanged?: () => void }) {
   const run = async (fn: () => Promise<any>, after?: (r: any) => void) => {
     setBusy(true); setErr(null);
     try { const r = await fn(); after?.(r); await load(); onChanged?.(); } catch (e: any) {
-      setErr(e.code === 'TASK_VERSION_CONFLICT' || e.code === 'TASK_ALREADY_CLAIMED' ? 'Bu ishni boshqa operator oldi yoki u o‘zgardi — ro‘yxat yangilandi.' : e.code === 'SHIFT_NOT_WORKING' ? 'Yangi ish olish uchun avval «Ishdaman» holatini yoqing.' : e.code === 'WORKLOAD_LIMIT' ? `Sizda ${e.details?.max ?? ''} ta faol ish bor — avval ularni tugating.` : e.code === 'NEXT_CONTACT_REQUIRED' ? 'Qayta qo‘ng‘iroq vaqtini kiriting.' : e.code === 'REASON_REQUIRED' ? 'Sababini yozing.' : errText(e));
+      setErr(e.code === 'TASK_VERSION_CONFLICT' || e.code === 'TASK_ALREADY_CLAIMED' ? 'Bu ishni boshqa operator oldi yoki u o‘zgardi — ro‘yxat yangilandi.' : e.code === 'SHIFT_NOT_WORKING' ? 'Yangi ish olish uchun avval «Ishdaman» holatini yoqing.' : e.code === 'WORKLOAD_LIMIT' ? `Sizda ${e.details?.max ?? ''} ta faol ish bor — avval ularni tugating.` : e.code === 'NEXT_CONTACT_REQUIRED' ? 'Qayta qo‘ng‘iroq vaqtini kiriting.' : e.code === 'REASON_REQUIRED' ? 'Sababini yozing.' : e.code === 'OUTSIDE_CONTACT_HOURS' ? `Mijozga faqat ${e.details?.from ?? 9}:00–${e.details?.to ?? 21}:00 oralig‘ida qo‘ng‘iroq qilinadi.` : e.code === 'HANDOFF_ALREADY_PENDING' ? 'Bu ish uchun topshirish so‘rovi allaqachon yuborilgan.' : e.code === 'HANDOFF_NOT_PENDING' ? 'Topshirish so‘rovi endi amal qilmaydi.' : errText(e));
       await load();
     } finally { setBusy(false); }
   };
@@ -65,6 +66,28 @@ export function WorkDesk({ onChanged }: { onChanged?: () => void }) {
       </button>
       {d.shift !== 'working' && <p className="muted small">Yangi ish olish uchun «Ishdaman»ni bosing. Tanaffusda ham boshlagan ishlaringiz sizda qoladi.</p>}
       {err && <div className="notice" role="status">{err}</div>}
+      {ho.incoming.length > 0 && (
+        <div className="desk-ho" role="region" aria-label="Sizga topshirilayotgan ishlar">
+          <b>Sizga topshirilmoqda ({ho.incoming.length})</b>
+          {ho.incoming.map((h: any) => (
+            <div key={h.id} className="ho-card">
+              <div className="spread"><b>{h.number}</b><span className="muted small">{h.from_name} dan</span></div>
+              <dl className="ho-pkg">
+                <div><dt>Nima qilindi</dt><dd>{h.package.done}</dd></div>
+                {h.package.customer_said && <div><dt>Mijoz nima dedi</dt><dd>{h.package.customer_said}</dd></div>}
+                {h.package.promised && <div><dt>Nima va’da qilindi</dt><dd>{h.package.promised}</dd></div>}
+                {h.package.missing && <div><dt>Nima yetishmaydi</dt><dd>{h.package.missing}</dd></div>}
+                <div><dt>Keyingi qadam</dt><dd><b>{h.package.next}</b></dd></div>
+              </dl>
+              <div className="row" style={{ gap: 8 }}>
+                <button className="btn sm" disabled={busy} onClick={() => run(() => api(`/ops/center/handoffs/${h.id}/accept`, { method: 'POST', body: {} }), (r) => r.task_id && openTask(r.task_id))}>Qabul qilish</button>
+                <button className="btn secondary sm" disabled={busy} onClick={() => { const reason = prompt('Nega qabul qilmaysiz?'); if (reason) void run(() => api(`/ops/center/handoffs/${h.id}/decline`, { method: 'POST', body: { reason } })); }}>Rad etish</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      {ho.outgoing.length > 0 && <p className="muted small">⏳ {ho.outgoing.map((h: any) => `${h.number} → ${h.to_name}`).join(', ')}: qabul qilinishi kutilmoqda. Qabul qilinguncha ish sizda.</p>}
       {d.mine.length > 0 && (
         <div className="desk-list">
           {d.mine.map((t: any) => (
@@ -135,6 +158,7 @@ function TaskCard({ task, order, lang, busy, onClose, onAct }: { task: any; orde
               </div>
               <p className="muted small">«Noto‘g‘ri raqam», «Muammo» va «Navbatga qaytarish» uchun izohga sababini yozing.</p>
             </details>
+            <HandoffForm busy={busy} onSend={(to, pkg) => onAct('handoff', { to_user_id: to, package: pkg }, false)} />
           </div>
         )}
         <details className="task-hist">
@@ -146,5 +170,29 @@ function TaskCard({ task, order, lang, busy, onClose, onAct }: { task: any; orde
         </details>
       </section>
     </div>
+  );
+}
+
+function HandoffForm({ busy, onSend }: { busy: boolean; onSend: (to: string, pkg: any) => void }) {
+  const [ops, setOps] = useState<any[] | null>(null);
+  const [to, setTo] = useState('');
+  const [p, setP] = useState({ done: '', customer_said: '', promised: '', missing: '', next: '' });
+  const upd = (k: keyof typeof p) => (e: any) => setP({ ...p, [k]: e.target.value });
+  return (
+    <details className="task-more" onToggle={(e) => { if ((e.target as HTMLDetailsElement).open && !ops) api('/ops/center/operators').then((r) => setOps(r.items)).catch(() => setOps([])); }}>
+      <summary>Boshqa operatorga topshirish</summary>
+      <p className="muted small">Qabul qilinguncha ish sizda qoladi. Yangi operator mijozdan hammasini qayta so‘ramasligi uchun to‘ldiring.</p>
+      <label htmlFor="ho-to">Kimga</label>
+      <select id="ho-to" value={to} onChange={(e) => setTo(e.target.value)}>
+        <option value="">— tanlang —</option>
+        {(ops ?? []).map((o) => <option key={o.id} value={o.id}>{o.display_name}{o.shift === 'working' ? ' (ishda)' : ''}</option>)}
+      </select>
+      <label htmlFor="ho-done">Nima qilindi *</label><textarea id="ho-done" rows={2} value={p.done} onChange={upd('done')} />
+      <label htmlFor="ho-said">Mijoz nima dedi</label><input id="ho-said" value={p.customer_said} onChange={upd('customer_said')} />
+      <label htmlFor="ho-prom">Nima va’da qilindi</label><input id="ho-prom" value={p.promised} onChange={upd('promised')} />
+      <label htmlFor="ho-miss">Nima yetishmaydi</label><input id="ho-miss" value={p.missing} onChange={upd('missing')} />
+      <label htmlFor="ho-next">Keyingi qadam *</label><input id="ho-next" value={p.next} onChange={upd('next')} />
+      <button className="btn secondary full mt8" disabled={busy || !to || p.done.length < 2 || p.next.length < 2} onClick={() => onSend(to, p)}>Topshirish so‘rovini yuborish</button>
+    </details>
   );
 }

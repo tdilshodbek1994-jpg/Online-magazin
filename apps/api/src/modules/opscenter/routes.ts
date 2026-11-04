@@ -18,6 +18,18 @@ const LEASE_MIN = 15;            // claim lease; heartbeat extends it
 const MAX_ACTIVE = 5;            // workload limit per operator (policy register: owner may change)
 const MAX_ATTEMPTS = 5;          // unanswered calls before the task needs a supervisor decision
 const OPEN = `('resolved','closed')`;
+// Contact hours in Asia/Tashkent (UTC+5, no DST): no calls outside them (spec §12, T16). Policy register: owner may change.
+export const CONTACT_FROM_H = 9, CONTACT_TO_H = 21;
+const tashHour = (d: Date) => (d.getUTCHours() + 5) % 24 + d.getUTCMinutes() / 60;
+export const inContactHours = (d: Date) => { const h = tashHour(d); return h >= CONTACT_FROM_H && h < CONTACT_TO_H; };
+/** Moves a time that falls into quiet hours to the next 09:00 Tashkent. */
+export function fitContactHours(d: Date): Date {
+  if (inContactHours(d)) return d;
+  const t = new Date(d.getTime() + 5 * 3600e3);              // shift to Tashkent wall clock
+  if ((t.getUTCHours() + t.getUTCMinutes() / 60) >= CONTACT_TO_H) t.setUTCDate(t.getUTCDate() + 1);
+  t.setUTCHours(CONTACT_FROM_H, 0, 0, 0);
+  return new Date(t.getTime() - 5 * 3600e3);
+}
 
 const OUTCOMES = ['no_answer', 'busy', 'wrong_number', 'callback_requested', 'info_given', 'confirmed', 'rejected', 'problem'] as const;
 type Outcome = typeof OUTCOMES[number];
@@ -25,12 +37,12 @@ type Outcome = typeof OUTCOMES[number];
 /** Creates missing confirm tasks and closes tasks whose order no longer needs them. Idempotent (unique open index). */
 export async function syncTasks(db: any): Promise<void> {
   await db.query(`
-    INSERT INTO ops_tasks (order_id, type, reason, next_action, source, priority, not_before, due_at)
+    INSERT INTO ops_tasks (order_id, type, reason, next_action, source, priority, not_before, due_at, created_at)
     SELECT o.id, 'confirm',
            CASE WHEN o.channel='partner_assisted' THEN 'Hamkor kiritgan buyurtma — mijoz tasdig‘i kerak' ELSE 'Yangi buyurtma — mijoz bilan tasdiqlash kerak' END,
            'Mijozga qo‘ng‘iroq qilib, tarkib va summani tasdiqlash',
            COALESCE(o.channel, 'site'), CASE WHEN o.address_snapshot->>'quick'='true' THEN 1 ELSE 0 END,
-           o.callback_at, o.created_at + interval '30 minutes'
+           o.callback_at, o.created_at + interval '30 minutes', o.created_at -- the customer has been waiting since the order came in
       FROM orders o
      WHERE o.commercial_status='awaiting_confirmation'
        AND NOT EXISTS (SELECT 1 FROM ops_tasks t WHERE t.order_id=o.id AND t.type='confirm' AND t.state NOT IN ${OPEN})
@@ -43,15 +55,15 @@ export async function syncTasks(db: any): Promise<void> {
   for (const r of closed.rows) await db.query(`INSERT INTO ops_task_events (task_id, kind, to_state, data) VALUES ($1,'auto_closed','closed','{"why":"order_moved_on"}')`, [r.id]);
 }
 
-async function event(tx: any, taskId: string, actor: string | null, kind: string, from: string | null, to: string | null, data: Record<string, unknown> = {}) {
+export async function event(tx: any, taskId: string, actor: string | null, kind: string, from: string | null, to: string | null, data: Record<string, unknown> = {}) {
   await tx.query(`INSERT INTO ops_task_events (task_id, actor_id, kind, from_state, to_state, data) VALUES ($1,$2,$3,$4,$5,$6)`, [taskId, actor, kind, from, to, JSON.stringify(data)]);
 }
 
-async function shiftState(db: any, userId: string): Promise<string> {
+export async function shiftState(db: any, userId: string): Promise<string> {
   return (await maybeOne<{ state: string }>(db, `SELECT state FROM staff_shifts WHERE user_id=$1`, [userId]))?.state ?? 'off';
 }
 
-const TASK_COLS = `t.id, t.order_id, t.type, t.state, t.priority, t.reason, t.team, t.assignee_id, t.lease_until, t.due_at, t.not_before, t.next_action, t.blocked_by,
+export const TASK_COLS = `t.id, t.order_id, t.type, t.state, t.priority, t.reason, t.team, t.assignee_id, t.lease_until, t.due_at, t.not_before, t.next_action, t.blocked_by,
   t.source, t.attempts, t.version, t.created_at, t.updated_at, o.number, o.channel, o.payable_minor::text, o.contact_snapshot->>'name' AS customer_name,
   o.address_snapshot->>'district' AS district, u.display_name AS assignee_name,
   (SELECT string_agg((ol.product_snapshot->'name'->>'uz-Latn') || ' × ' || (ol.qty - ol.canceled_qty), ', ') FROM order_lines ol WHERE ol.order_id=o.id AND ol.qty > ol.canceled_qty) AS items_text,
@@ -78,7 +90,7 @@ async function claim(tx: any, actor: any, taskId: string, expected?: number) {
 }
 
 /** Five answers every task card must give (spec §06): what happened, what is missing, who, next action, when. */
-function fiveAnswers(t: any) {
+export function fiveAnswers(t: any) {
   const when = t.not_before ? { kind: 'callback', at: t.not_before } : t.due_at ? { kind: 'due', at: t.due_at } : null;
   return {
     what: t.reason,
@@ -188,6 +200,7 @@ export function registerOperatorCentre(app: FastifyInstance, deps: Deps): void {
       const needsTime = o === 'callback_requested';
       if (needsTime && !body.next_contact_at) throw unprocessable('NEXT_CONTACT_REQUIRED');
       if (body.next_contact_at && new Date(body.next_contact_at) <= new Date()) throw unprocessable('NEXT_CONTACT_IN_PAST');
+      if (body.next_contact_at && !inContactHours(new Date(body.next_contact_at))) throw unprocessable('OUTSIDE_CONTACT_HOURS', { from: CONTACT_FROM_H, to: CONTACT_TO_H });
       if ((o === 'problem' || o === 'wrong_number') && !body.note) throw unprocessable('REASON_REQUIRED');
 
       // Order-level effect goes through the existing, tested path (confirmation evidence, total read-back, cancel).
@@ -203,7 +216,7 @@ export function registerOperatorCentre(app: FastifyInstance, deps: Deps): void {
       else if (o === 'no_answer' || o === 'busy') {
         if (attempts >= MAX_ATTEMPTS) next = { state: 'blocked', next_action: 'Rahbar qarori: yana urinish yoki bekor qilish', blocked_by: `${attempts} marta javob bo‘lmadi` };
         else {
-          const at = body.next_contact_at ?? new Date(Date.now() + 2 * 3600e3).toISOString();
+          const at = body.next_contact_at ?? fitContactHours(new Date(Date.now() + 2 * 3600e3)).toISOString();
           next = { state: 'scheduled', next_action: `Qayta qo‘ng‘iroq (${attempts}-urinishdan keyin)`, not_before: at };
         }
       } else if (o === 'callback_requested') next = { state: 'scheduled', next_action: 'Mijoz so‘ragan vaqtda qayta qo‘ng‘iroq', not_before: body.next_contact_at! };

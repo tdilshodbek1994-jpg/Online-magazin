@@ -32,7 +32,7 @@ export default function Ops() {
   const act = async (fn: () => Promise<any>) => { setMsg(null); try { await fn(); setMsg('OK'); if (sel) await open(sel.id); await load(); } catch (e: any) { setMsg(errText(e)); } };
   return (
     <>
-      <h1>Operator xonasi</h1>
+      <div className="spread"><h1>Operator xonasi</h1><a href="/ops/board" className="btn secondary sm">Rahbar paneli</a></div>
       <WorkDesk onChanged={() => void load()} />
       <h2 className="ops-h2">Barcha navbatlar</h2>
       <div className="chips ops-queues" role="tablist">{QUEUES.map(([k, l]) => <button key={k} role="tab" aria-selected={queue === k} className={`chip ${queue === k ? 'on' : ''}`} onClick={() => setQueue(k)}>{l} <span className="q-count">{counts[k] ?? 0}</span></button>)}</div>

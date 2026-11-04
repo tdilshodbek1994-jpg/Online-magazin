@@ -6,14 +6,14 @@
   --font: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   color-scheme: light;
 }
-@media (prefers-color-scheme: dark) {
-  :root {
+/* dark theme: opt-in only (html.dark); default is light like the big marketplaces */
+html.dark {
     --bg: #1b2026; --surface: #242a31; --surface-2: #2d343c; --text: #eef1f4; --muted: #a9b3bd; --border: #3a424b;
     --primary: #34d399; --primary-600: #10b981; --primary-50: #12302a; --primary-text: #062018;
     --accent: #fb923c; --sale: #f87171; --danger: #ff8b82; --warn-bg: #3b3115; --ok-bg: #16342a; --focus: #8ab4ff;
     --shadow: 0 1px 2px rgba(0,0,0,.4); color-scheme: dark;
   }
-}
+
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
 body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.5 var(--font); }
@@ -329,9 +329,9 @@ header.top { background: var(--surface); border-bottom: 1px solid var(--border);
 .top-list li.me { border-color: var(--primary); background: var(--primary-50); }
 .top-rank { font-size: 22px; font-weight: 800; text-align: center; }
 .top-name { font-weight: 600; }
-@media (prefers-color-scheme: dark) {
-  .b-new, .b-accepted, .b-shipping, .b-delivered, .b-returned, .b-cancelled { background: var(--surface-2); color: var(--text); }
-}
+/* dark theme: opt-in only (html.dark); default is light like the big marketplaces */
+html.dark .b-new, html.dark .b-accepted, html.dark .b-shipping, html.dark .b-delivered, html.dark .b-returned, html.dark .b-cancelled { background: var(--surface-2); color: var(--text); }
+
 @media (max-width: 760px) {
   .ptabs { display: none; }
   .bottom-nav.five { grid-template-columns: repeat(5, 1fr); }
@@ -356,7 +356,9 @@ header.top { background: var(--surface); border-bottom: 1px solid var(--border);
 .quick-form label { margin-top: 6px; }
 .quick-done { border-color: #86efac; background: var(--ok-bg); gap: 8px; }
 .qd-icon { font-size: 32px; }
-@media (prefers-color-scheme: dark) { .quick-form { background: var(--surface-2); } }
+/* dark theme: opt-in only (html.dark); default is light like the big marketplaces */
+html.dark .quick-form { background: var(--surface-2); }
+
 .login-cta { max-width: 480px; margin: 24px auto; text-align: center; display: grid; gap: 10px; justify-items: center; padding: 28px 20px; }
 .login-cta h1 { margin: 0; }
 .lc-icon { font-size: 44px; }
@@ -452,10 +454,9 @@ textarea { resize: vertical; }
 .ops-lines { display: grid; gap: 6px; padding: 10px; border-radius: 12px; background: var(--surface-2); }
 .ops-actions { display: grid; gap: 8px; padding: 12px; border: 1px solid var(--border); border-radius: 14px; }
 .ops-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; }
-@media (prefers-color-scheme: dark) {
-  .b-new { color: #a5b4fc; border-color: #3730a3; } .b-accepted { color: #c4b5fd; border-color: #5b21b6; } .b-shipping { color: #fdba74; border-color: #9a3412; }
-  .b-delivered { color: #6ee7b7; border-color: #065f46; } .b-returned { color: #fca5a5; border-color: #991b1b; } .b-cancelled { color: #d1d5db; border-color: #4b5563; }
-}
+/* dark theme: opt-in only (html.dark); default is light like the big marketplaces */
+html.dark .b-new { color: #a5b4fc; border-color: #3730a3; }html.dark .b-accepted { color: #c4b5fd; border-color: #5b21b6; }html.dark .b-shipping { color: #fdba74; border-color: #9a3412; }html.dark .b-delivered { color: #6ee7b7; border-color: #065f46; }html.dark .b-returned { color: #fca5a5; border-color: #991b1b; }html.dark .b-cancelled { color: #d1d5db; border-color: #4b5563; }
+
 .btn.danger { background: #b42318; border-color: #b42318; color: #fff; }
 .progress { height: 10px; border-radius: 6px; background: var(--surface-2); overflow: hidden; border: 1px solid var(--border); }
 .progress span { display: block; height: 100%; background: linear-gradient(90deg, var(--primary), #14b8a6); }
@@ -613,11 +614,11 @@ a.chip { text-decoration: none; }
    ===================================================================================== */
 :root {
   --deal: #d0101a; --deal-2: #ff4d1f; --deal-bg: #fff1ec; --signal: #ffd60a; --signal-ink: #111827;
-  --hdr-1: #053d2e; --hdr-2: #07614a; --tile: #eef1f4; --ship: #08664a;
+  --hdr-1: #046c4e; --hdr-2: #07855f; --tile: #eef1f4; --ship: #08664a;
 }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) { --deal: #ff6b6b; --deal-bg: #3a1d1a; --tile: #2a3138; --ship: #34d399; --hdr-1: #03241b; --hdr-2: #064e3b; }
-}
+/* dark theme: opt-in only (html.dark); default is light like the big marketplaces */
+html.dark { --deal: #ff6b6b; --deal-bg: #3a1d1a; --tile: #2a3138; --ship: #34d399; --hdr-1: #03241b; --hdr-2: #064e3b; }
+
 
 /* Store header (the partner cabinet keeps its own compact header) */
 header.top:not(.ptop) { background: linear-gradient(90deg, var(--hdr-1), var(--hdr-2)); border-bottom: 0; box-shadow: 0 2px 10px rgba(0,0,0,.18); }
@@ -812,7 +813,9 @@ header.top:not(.ptop) .staff-bar { background: var(--surface); }
 
 /* Ad / commission analytics (series colours validated: light #0b7a55/#c2410c, dark #14a374/#e2701f) */
 :root { --s-comm: #0b7a55; --s-ad: #c2410c; }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --s-comm: #14a374; --s-ad: #e2701f; } }
+/* dark theme: opt-in only (html.dark); default is light like the big marketplaces */
+html.dark { --s-comm: #14a374; --s-ad: #e2701f; }
+
 .an { display: grid; gap: 10px; padding-bottom: 20px; }
 .an h1 { margin: 6px 0; font-size: 24px; font-weight: 900; }
 .an h2 { margin: 6px 0; font-size: 18px; }
@@ -952,7 +955,9 @@ a.m-link { display: grid; gap: 2px; }
 .wl-side { display: grid; justify-items: end; gap: 2px; }
 .wl-side b { font-size: 16px; }
 .wal-hist summary, .wal-help summary { cursor: pointer; min-height: 32px; display: flex; align-items: center; gap: 6px; }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .st-wait { color: #f5c46b; } }
+/* dark theme: opt-in only (html.dark); default is light like the big marketplaces */
+html.dark .st-wait { color: #f5c46b; }
+
 
 /* Cart 2.0 */
 .cart2 h1 { margin: 6px 0 10px; font-size: 24px; font-weight: 900; }

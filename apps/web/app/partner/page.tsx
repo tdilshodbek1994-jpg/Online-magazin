@@ -92,7 +92,7 @@ export default function PartnerDashboard() {
             ) : null}
 
             <div className="big-card bc-blue big-stats">
-              <div className="big-head"><b>Natijalar</b>
+              <div className="big-head"><Link href="/partner/stats" className="big-title-link"><b>Natijalar ›</b></Link>
                 <label className="sr-only" htmlFor="pd-period">Davr</label>
                 <select id="pd-period" className="big-select" value={period} onChange={(e) => setPeriod(e.target.value)}>{PERIODS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>
               </div>
@@ -109,21 +109,14 @@ export default function PartnerDashboard() {
             </div>
           </div>
 
-          {/* Small facts in one row. */}
-          <div className="mini-row">
-            <TelegramConnect compact />
-            <Link href="/partner/top" className="mini-chip">👑 {day ? `Kun admini: ${day.name}${day.me ? ' (siz!)' : ''}` : 'Kun admini: hali yo‘q'}</Link>
-            {d?.month_rank && <Link href="/partner/top" className="mini-chip">🏅 Oydagi o‘rningiz: #{d.month_rank.rank}</Link>}
-          </div>
-
           {/* Small tiles: about a third of a big card. */}
           <div className="mini-tiles">
             {([
               ['/partner/orders', '📋', 'Buyurtmalar', 't1'], ['/partner/market', '🛍️', 'Market', 't2'], ['/partner/streams', '🔗', 'Oqimlar', 't3'], ['/partner/analytics', '📈', 'Reklama', 't4'],
               ['/partner/offers', '🧺', 'Taklif to‘plami', 't5'], ['/partner/contacts', '📒', 'Mijozlar', 't6'], ['/partner/stats', '📊', 'Statistika', 't7'], ['/partner/wallet', '💳', 'Hamyon', 't8'],
               ['/partner/programs#konkurs', '🏆', 'Konkurs', 't1'], ['/partner/programs#bonus', '🎁', 'Bonuslar', 't2'], ['/partner/programs#jarima', '⚠️', 'Jarimalar', 't3'], ['/partner/programs#hayriya', '💝', 'Hayriya', 't4'],
-              ['/partner/top', '🥇', 'TOP', 't5'], ['/partner/notifications', '🔔', 'Xabarlar', 't6'], ['/partner/expenses', '🧾', 'Xarajatlar', 't7'], ['/partner/about', '📘', 'Qoidalar', 't8'],
-            ] as const).map(([href, ico, label, tone]) => (
+              ['/partner/top', '🥇', d?.month_rank ? `TOP · #${d.month_rank.rank}` : 'TOP va holat', 't5'], ['/partner/notifications', '🔔', 'Xabarlar', 't6'], ['/partner/expenses', '🧾', 'Xarajatlar', 't7'], ['/partner/about', '📘', 'Qoidalar', 't8'],
+            ] as [string, string, string, string][]).map(([href, ico, label, tone]) => (
               <Link key={href} href={href} className={`mini-tile ${tone}`}><span aria-hidden>{ico}</span>{label}</Link>
             ))}
           </div>

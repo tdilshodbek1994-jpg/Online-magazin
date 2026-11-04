@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
-import { Chips } from '../shared';
+import { Chips, TelegramConnect } from '../shared';
 import { errText } from '@/lib/errors';
 
 export default function PartnerTop() {
@@ -12,7 +12,9 @@ export default function PartnerTop() {
   const medal = (r: number) => (r === 1 ? '🥇' : r === 2 ? '🥈' : r === 3 ? '🥉' : `#${r}`);
   return (
     <>
-      <h1>TOP hamkorlar</h1>
+      <h1>TOP va holatim</h1>
+      {/* One folder for the 3 small facts that used to sit on the dashboard: Telegram, day admin, month rank. */}
+      <TelegramConnect />
       <Chips items={[['today', 'Bugun'], ['week', 'Hafta'], ['month', 'Shu oy']]} value={period} onChange={setPeriod} label="Davr" />
       {err && <div className="notice" role="alert">{errText(err)}</div>}
       {data?.me && <div className="rank-card"><div className="rank-badge">#{data.me.rank}</div><div><b>Sizning o‘rningiz</b><div className="muted">{data.me.delivered} ta yetkazilgan</div></div></div>}

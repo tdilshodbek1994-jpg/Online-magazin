@@ -10,6 +10,8 @@ import { Gallery } from './Gallery';
 import { QuickOrder } from './QuickOrder';
 import { errText } from '@/lib/errors';
 import { PriceWatch } from './PriceWatch';
+import { FavButton } from '@/components/FavButton';
+import { rememberView } from '@/lib/favs';
 
 export function AddToCart({ product, minPrice }: { product: any; minPrice: string | null }) {
   const { t, lang } = useI18n();
@@ -25,6 +27,7 @@ export function AddToCart({ product, minPrice }: { product: any; minPrice: strin
   const maxQty = Math.max(1, Math.min(99, v?.available ?? 1));
   const [zone, setZone] = useState<any>(null);
   const [quickKey, setQuickKey] = useState(0);
+  useEffect(() => { rememberView({ id: product.id, slug: product.slug }); }, [product.id, product.slug]);
   useEffect(() => { api('/delivery-zones').then((r) => setZone((r.items ?? [])[0] ?? null)).catch(() => {}); }, []);
   const sold = Number(product.sold_30d ?? 0);
   const save = off > 0 && v ? BigInt(v.compare_at_minor) - BigInt(v.price_minor) : 0n;
@@ -48,7 +51,7 @@ export function AddToCart({ product, minPrice }: { product: any; minPrice: strin
         <Gallery media={product.media ?? []} name={name} off={off} slug={product.slug} />
         <div className="buybox">
           {product.brand && <div className="pbrand">{product.brand}{product.model ? ` · ${product.model}` : ''}</div>}
-          <h1>{name}</h1>
+          <div className="ptitle-row"><h1>{name}</h1><FavButton id={product.id} slug={product.slug} name={name} big /></div>
           <div className={`price-block ${off > 0 ? 'deal' : ''}`} aria-live="polite">
             <div className="price-row big">
               <span className={`price ${off > 0 ? 'is-deal' : ''}`}>{v ? som(v.price_minor) : som(minPrice)}</span>

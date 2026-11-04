@@ -1289,3 +1289,12 @@ a.admin-tab { text-decoration: none; color: inherit; }
 .lp-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
 .lp-hit b { font-size: 13px; white-space: nowrap; }
 .tpl-form { display: grid; gap: 6px; }
+/* Favourites */
+.pcard-wrap { position: relative; min-width: 0; display: grid; }
+.pcard-wrap > .pcard { height: 100%; }
+.fav-btn { position: absolute; top: 8px; right: 8px; z-index: 2; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; border: 0; background: rgba(255,255,255,.9); color: #e11d48; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,.12); }
+.fav-btn:not(.on) { color: #475569; }
+.fav-btn.big { position: static; width: 44px; height: 44px; flex: 0 0 auto; }
+.fav-btn:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.ptitle-row { display: flex; align-items: flex-start; gap: 10px; justify-content: space-between; } .ptitle-row h1 { margin: 2px 0 6px; }
+.reorder { display: grid; gap: 4px; margin-top: 12px; }

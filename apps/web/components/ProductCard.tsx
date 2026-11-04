@@ -2,6 +2,7 @@
 import Link from 'next/link';
 import { som } from '@/lib/api';
 import { pick, useI18n } from '@/lib/i18n';
+import { FavButton } from '@/components/FavButton';
 
 export function discountPct(price?: string | null, was?: string | null): number {
   if (!price || !was) return 0;
@@ -26,6 +27,7 @@ export function ProductCard({ p, eta, compact = false }: { p: any; eta?: string 
   const isNew = p.published_at && Date.now() - new Date(p.published_at).getTime() < NEW_DAYS * 86400_000;
   const out = !(p.available > 0);
   return (
+    <div className={`pcard-wrap ${compact ? 'compact' : ''}`}>
     <Link href={`/p/${p.slug}`} className={`pcard ${compact ? 'compact' : ''} ${out ? 'is-out' : ''}`}>
       <div className="pcard-img">
         {p.image ? <img src={p.image} alt={name} loading="lazy" width={320} height={320} /> : <div className="ph" aria-hidden />}
@@ -51,6 +53,8 @@ export function ProductCard({ p, eta, compact = false }: { p: any; eta?: string 
         {!compact && !out && eta && <div className="ship-t">🚚 {eta} {t('deliveryLine')} · {t('codShort')}</div>}
       </div>
     </Link>
+    {p.id && <FavButton id={p.id} slug={p.slug} name={name} />}
+    </div>
   );
 }
 

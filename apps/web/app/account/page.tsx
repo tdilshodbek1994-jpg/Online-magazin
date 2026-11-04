@@ -47,6 +47,7 @@ export default function Account() {
       </Async>
       <section className="acc-links">
         <InstallRow />
+        <Link href="/favorites">❤️ Sevimlilar</Link>
         <Link href="/cart">🛒 Savat</Link>
         <Link href="/legal/returns">↩️ Qaytarish shartlari</Link>
         {roles.includes('partner') ? <Link href="/partner">🤝 Hamkor kabineti</Link> : <Link href="/partner">🤝 Hamkor bo‘lib pul ishlash</Link>}

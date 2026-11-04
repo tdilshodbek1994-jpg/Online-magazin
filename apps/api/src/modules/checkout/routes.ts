@@ -182,7 +182,7 @@ export function registerCheckout(app: FastifyInstance, deps: Deps): void {
     const o = await maybeOne(db, `SELECT id, number, commercial_status, payment_status, fulfillment_status, confirmation_status, payment_method, subtotal_minor::text, discount_minor::text, delivery_minor::text, payable_minor::text, address_snapshot, contact_snapshot, created_at, delivered_at
         FROM orders WHERE id=$1 AND (user_id=$2 OR (user_id IS NULL AND customer_phone=$3))`, [params.id, actor.userId, u.phone_e164]);
     if (!o) throw notFound('ORDER'); // never reveals existence of foreign orders (T005)
-    const lines = await many(db, `SELECT id, product_snapshot, qty, canceled_qty, returned_qty, unit_price_minor::text, line_net_minor::text FROM order_lines WHERE order_id=$1`, [params.id]);
+    const lines = await many(db, `SELECT id, sku_id, product_snapshot, qty, canceled_qty, returned_qty, unit_price_minor::text, line_net_minor::text FROM order_lines WHERE order_id=$1`, [params.id]);
     const timeline = await many(db, `SELECT dimension, to_status, created_at FROM order_status_events WHERE order_id=$1 ORDER BY id`, [params.id]);
     return { ...o, lines, timeline, messages: await customerMessages(db, params.id) };
   });

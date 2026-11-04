@@ -326,6 +326,7 @@ describe('Support tickets and staff invitations', () => {
     const { nextPhone } = await import('./helpers.js');
     const phone = nextPhone();
     const inv = await api(tt, 'POST', '/admin/staff/invitations', { token: owner.token, body: { phone, role: 'operator' } });
+    expect(inv.json.invite_url).toMatch(/\/staff\/join\?token=/);
     expect(inv.status).toBe(200);
     const stranger = await mkUser(tt);
     expect((await api(tt, 'POST', '/staff/invitations/accept', { token: stranger.token, body: { token: inv.json.dev_token } })).json.code).toBe('INVITATION_PHONE_MISMATCH');

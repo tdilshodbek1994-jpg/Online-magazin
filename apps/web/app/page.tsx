@@ -7,6 +7,7 @@ import { discountPct, ProductCard, SkeletonGrid } from '@/components/ProductCard
 import { api, som } from '@/lib/api';
 import { pick, useI18n } from '@/lib/i18n';
 import { errText } from '@/lib/errors';
+import { RecentRail } from '@/components/SavedRails';
 
 /**
  * Home, rebuilt as a marketplace front page (patterns from large marketplaces, our own look):
@@ -194,6 +195,7 @@ export default function Home() {
         <li><IconShield size={20} /><span>{t('bWarranty')}</span></li>
       </ul>
 
+      <RecentRail />
       {tiles.length > 0 && (
         <section className="sec">
           <SectionHead title={t('categories')} href="/catalog" />

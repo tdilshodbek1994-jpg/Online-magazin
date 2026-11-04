@@ -29,7 +29,9 @@ export function registerAdmin(app: FastifyInstance, deps: Deps): void {
       const token = randomBytes(24).toString('base64url');
       const r = await one<{ id: string }>(db, `INSERT INTO staff_invitations (phone_e164, role_code, token_hash, invited_by, expires_at) VALUES ($1,$2,$3,$4, now() + interval '72 hours') RETURNING id`, [phone, body.role, hashToken(token), actor.userId]);
       await audit(db, actor, 'staff.invited', { type: 'staff_invitation', id: r.id }, { after: { phone: maskPhone(phone), role: body.role } });
-      return { id: r.id, ...(cfg.env !== 'production' ? { dev_token: token } : {}) };
+      // The owner gets the link once and shares it (Telegram etc.). It only works for someone who logs in with THIS phone
+      // via SMS code, expires in 72 h and is single-use — the link alone grants nothing.
+      return { id: r.id, invite_url: `${cfg.publicWebUrl}/staff/join?token=${token}`, expires_in_hours: 72, ...(cfg.env !== 'production' ? { dev_token: token } : {}) };
     });
 
   route(app, deps, { method: 'POST', url: '/staff/invitations/accept', tags: T, summary: 'Accept invitation (logged-in user with the invited phone)', body: z.object({ token: z.string().min(20) }) }, async ({ actor, db, body }) => {

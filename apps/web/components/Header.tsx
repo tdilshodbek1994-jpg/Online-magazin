@@ -127,6 +127,7 @@ export function Header() {
         <SearchBox />
         <nav className="head-actions" aria-label="Asosiy">
           <Link href="/reels" className="icon-link"><IconPlay /><span className="icon-label">Video</span></Link>
+          <Link href="/favorites" className="icon-link" aria-label="Sevimlilar"><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.5-9.2C1.1 8.4 3.3 5 6.8 5c2 0 3.4 1.1 4.2 2.4h2c.8-1.3 2.2-2.4 4.2-2.4 3.5 0 5.7 3.4 4.3 6.8C19.5 16.4 12 21 12 21z" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" /></svg><span className="icon-label">Sevimlilar</span></Link>
           <Link href="/cart" className="icon-link" aria-label={`${t('cart')}${count ? ` (${count})` : ''}`}>
             <IconCart /><span className="icon-label">{t('cart')}</span>
             {count > 0 && <span className="count" aria-hidden>{count > 99 ? '99+' : count}</span>}

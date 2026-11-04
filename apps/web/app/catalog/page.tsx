@@ -6,6 +6,7 @@ import { CategoryIcon } from '@/components/Icons';
 import { ProductCard, SkeletonGrid } from '@/components/ProductCard';
 import { api } from '@/lib/api';
 import { pick, useI18n } from '@/lib/i18n';
+import { errText } from '@/lib/errors';
 
 const PAGE = 24;
 const PRICE_CAPS: [string, string][] = [['100000', '100 000 gacha'], ['300000', '300 000 gacha'], ['1000000', '1 mln gacha']];
@@ -98,7 +99,7 @@ function Catalog() {
         </div>
       </div>
       <div className="muted small result-count">{loading ? '…' : `${items.length}${end ? '' : '+'} ${t('results')}`}</div>
-      {error ? <div role="alert" className="notice">{t('error')}: <code>{error.code ?? 'UNKNOWN'}</code> <button className="btn secondary" onClick={load}>{t('retry')}</button></div>
+      {error ? <div role="alert" className="notice">{errText(error)} <button className="btn secondary" onClick={load}>{t('retry')}</button></div>
         : loading ? <SkeletonGrid />
         : items.length === 0 ? <div className="empty"><p>{t('empty')}</p><Link className="btn secondary" href="/catalog">{t('allCategories')}</Link></div>
         : <div className="pgrid">{items.map((p) => <ProductCard key={p.id} p={p} eta={eta} />)}</div>}

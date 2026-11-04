@@ -6,6 +6,7 @@ import { CategoryIcon, IconCash, IconChevron, IconReturn, IconShield, IconTruck 
 import { discountPct, ProductCard, SkeletonGrid } from '@/components/ProductCard';
 import { api, som } from '@/lib/api';
 import { pick, useI18n } from '@/lib/i18n';
+import { errText } from '@/lib/errors';
 
 /**
  * Home, rebuilt as a marketplace front page (patterns from large marketplaces, our own look):
@@ -182,7 +183,7 @@ export default function Home() {
         {roots.map((c) => <Link key={c.id} href={`/catalog?category=${c.slug}`} className="qchip">{pick(c.name, lang)}</Link>)}
       </nav>
 
-      {error && <div role="alert" className="notice">{t('error')}: <code>{error.code ?? 'UNKNOWN'}</code> <button className="btn secondary" onClick={load}>{t('retry')}</button></div>}
+      {error && <div role="alert" className="notice">{errText(error)} <button className="btn secondary" onClick={load}>{t('retry')}</button></div>}
 
       {loading ? <div className="hero2 sk-hero" aria-hidden /> : <Hero deals={deals} fresh={fresh} />}
 

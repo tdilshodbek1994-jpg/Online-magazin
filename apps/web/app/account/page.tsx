@@ -6,6 +6,7 @@ import { IconCart } from '@/components/Icons';
 import { api, som } from '@/lib/api';
 import { pick, useI18n } from '@/lib/i18n';
 import { orderStage, uzDate } from '@/lib/orderStatus';
+import { InstallRow } from '@/components/InstallApp';
 
 /** "Buyurtmalarim": one card per order with a plain status, the first item and the total — no technical codes. */
 export default function Account() {
@@ -45,6 +46,7 @@ export default function Account() {
         )}
       </Async>
       <section className="acc-links">
+        <InstallRow />
         <Link href="/cart">🛒 Savat</Link>
         <Link href="/legal/returns">↩️ Qaytarish shartlari</Link>
         {roles.includes('partner') ? <Link href="/partner">🤝 Hamkor kabineti</Link> : <Link href="/partner">🤝 Hamkor bo‘lib pul ishlash</Link>}

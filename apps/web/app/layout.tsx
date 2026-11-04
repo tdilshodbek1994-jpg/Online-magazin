@@ -3,8 +3,16 @@ import './globals.css';
 import { Header } from '@/components/Header';
 import { BottomNav, Footer } from '@/components/Shell';
 import { I18nProvider } from '@/lib/i18n';
+import { InstallApp } from '@/components/InstallApp';
 
-export const metadata: Metadata = { title: 'UzShop — onlayn do‘kon', description: 'UzShop — elektronika, uy-ro‘zg‘or, kiyim va boshqa mahsulotlar. To‘lov qabul qilganda.' };
+export const metadata: Metadata = {
+  title: 'UzShop — onlayn do‘kon',
+  description: 'UzShop — elektronika, uy-ro‘zg‘or, kiyim va boshqa mahsulotlar. To‘lov qabul qilganda.',
+  applicationName: 'UzShop',
+  appleWebApp: { capable: true, title: 'UzShop', statusBarStyle: 'default' },
+  icons: { icon: [{ url: '/icons/favicon-32.png', sizes: '32x32' }, { url: '/icons/favicon-48.png', sizes: '48x48' }, { url: '/icons/icon-192.png', sizes: '192x192' }], apple: '/icons/apple-touch-icon.png' },
+  formatDetection: { telephone: false },
+};
 export const viewport: Viewport = { width: 'device-width', initialScale: 1, themeColor: '#0b7a55' };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -16,6 +24,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <main className="wrap">{children}</main>
           <Footer />
           <BottomNav />
+          <InstallApp />
         </I18nProvider>
       </body>
     </html>

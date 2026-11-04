@@ -83,7 +83,7 @@ export default function OpsBoard() {
         <h2>Operatorlar</h2>
         <div className="board-staff">
           {d.staff.length === 0 && <p className="muted">Operator roli berilgan xodim yo‘q.</p>}
-          {d.staff.map((s: any) => <button type="button" key={s.id} className={`board-op ${f === `op:${s.id}` ? 'on' : ''}`} aria-pressed={f === `op:${s.id}`} onClick={() => { setF(f === `op:${s.id}` ? 'all' : `op:${s.id}`); setTimeout(() => document.getElementById('board-list')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50); }}><b>{s.display_name}</b><span className="small">{SHIFT_UZ[s.shift] ?? s.shift}</span><span className="small">{s.active} ta faol ish · ko‘rish ›</span></button>)}
+          {d.staff.map((s: any) => <div key={s.id} className="board-op-wrap"><button type="button" className={`board-op ${f === `op:${s.id}` ? 'on' : ''}`} aria-pressed={f === `op:${s.id}`} onClick={() => { setF(f === `op:${s.id}` ? 'all' : `op:${s.id}`); setTimeout(() => document.getElementById('board-list')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50); }}><b>{s.display_name}</b><span className="small">{SHIFT_UZ[s.shift] ?? s.shift}</span><span className="small">{s.active} ta faol ish · ishlari ›</span></button><Link className="btn secondary sm" href={`/admin/operator/${s.id}`}>👁 Kabinetini ko‘rish</Link></div>)}
         </div>
       </section>
       {qual && qual.items.length > 0 && (
@@ -92,7 +92,7 @@ export default function OpsBoard() {
           <div className="table-wrap"><table className="q-table">
             <thead><tr><th>Operator</th><th>Ishlar</th><th>Tasdiq</th><th>Rad</th><th>1-aloqa (median)</th></tr></thead>
             <tbody>{qual.items.map((r: any) => (
-              <tr key={r.id}><td>{r.display_name}{!r.enough_data && <small className="muted"> · ma’lumot kam</small>}</td>
+              <tr key={r.id}><td><Link className="w-link" href={`/admin/operator/${r.id}`}>{r.display_name} ›</Link>{!r.enough_data && <small className="muted"> · ma’lumot kam</small>}</td>
                 <td>{r.tasks_contacted}</td><td>{r.confirm_rate_pct === null ? '—' : `${r.confirmed} (${r.confirm_rate_pct}%)`}</td><td>{r.rejected}</td>
                 <td>{r.median_first_contact_min === null ? '—' : r.median_first_contact_min < 60 ? `${r.median_first_contact_min} daq` : `${Math.round(r.median_first_contact_min / 60)} soat`}</td></tr>
             ))}</tbody>

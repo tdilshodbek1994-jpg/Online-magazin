@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Async } from '@/components/Header';
 import { api, getToken, som } from '@/lib/api';
 import { pick, useI18n } from '@/lib/i18n';
+import { AdminOrderList } from './AdminOrderList';
 import { ProductEditor } from './ProductEditor';
 import { AdminPrograms } from './Programs';
 import { errText, stText } from '@/lib/errors';
@@ -147,50 +148,14 @@ function Products({ act, lang, openNew = 0 }: { act: any; lang: any; openNew?: n
 }
 
 const BUCKET_UZ: Record<string, string> = { new: 'Yangi', accepted: 'Qabul qilindi', shipping: 'Yetkazilmoqda', delivered: 'Yetkazildi', returned: 'Qaytdi', cancelled: 'Bekor qilingan' };
-const BUCKET_KEYS = ['new', 'accepted', 'shipping', 'delivered', 'returned', 'cancelled'];
 const PERIODS_UZ: [string, string][] = [['today', 'Bugun'], ['yesterday', 'Kecha'], ['week', 'Hafta'], ['month', 'Shu oy'], ['all', 'Hammasi']];
 
-function Orders({ lang }: { lang: any }) {
-  const [status, setStatus] = useState('all');
+function Orders({ lang: _lang }: { lang: any }) {
   const [period, setPeriod] = useState('all');
-  const [q, setQ] = useState('');
-  const [query, setQuery] = useState('');
-  const qs = new URLSearchParams({ status, period, ...(query ? { q: query } : {}) });
-  const { data, st, load } = useLoad<any>(`/admin/orders?${qs}`);
-  const c = data?.counts ?? {};
   return (
     <section style={{ marginTop: 12 }}>
-      <form className="search plain" role="search" onSubmit={(e) => { e.preventDefault(); setQuery(q.trim()); }}>
-        <label htmlFor="oq" className="sr-only">Buyurtma qidirish</label>
-        <input id="oq" type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Raqam, telefon, ism yoki mahsulot…" />
-        <button className="search-btn" aria-label="Izlash">Izlash</button>
-      </form>
       <div className="chips" role="group" aria-label="Davr">{PERIODS_UZ.map(([k, l]) => <button key={k} type="button" className={`chip ${period === k ? 'on' : ''}`} aria-pressed={period === k} onClick={() => setPeriod(k)}>{l}</button>)}</div>
-      <div className="stat-grid" style={{ marginBottom: 10 }}>
-        <button type="button" className={`stat s-total ${status === 'all' ? 'sel' : ''}`} onClick={() => setStatus('all')}><b>{c.total ?? 0}</b><span>Barchasi</span></button>
-        {BUCKET_KEYS.map((b) => <button type="button" key={b} className={`stat s-${b} ${status === b ? 'sel' : ''}`} onClick={() => setStatus(b)}><b>{c[b] ?? 0}</b><span>{BUCKET_UZ[b]}</span></button>)}
-      </div>
-      <Async loading={st.loading} error={st.error} onRetry={load}>
-        {data?.items.length === 0 && <div className="empty">Buyurtma topilmadi</div>}
-        <div className="slist">
-          {data?.items.map((o: any) => {
-            const a = o.address_snapshot ?? {};
-            const quick = a.quick && a.house === '-';
-            return (
-              // Compact row (user: "juda bardak"): 4 short lines, the whole card opens the order.
-              <a key={o.id} href={`/ops?order=${o.id}`} className="scard ocard">
-                <div className="spread"><b>{o.number}</b><span className={`pill b-${o.bucket}`}>{BUCKET_UZ[o.bucket]}</span></div>
-                <div className="small">{o.customer_name ?? '—'} · {o.customer_phone}{o.partner_code ? <span className="ocard-partner"> · 🤝 {o.partner_code}</span> : null}</div>
-                <div className="small muted ocard-items">{(o.items ?? []).map((i: any) => `${pick(i.name, lang)}${i.variant && Object.values(i.variant).length ? ` (${Object.values(i.variant).join('/')})` : ''} × ${i.qty}`).join(', ')}</div>
-                <div className="spread small">
-                  <b>{som(o.payable_minor)} <span className="muted">{o.payment_method === 'cod' ? 'naqd' : 'onlayn'}</span></b>
-                  <span className="muted">{quick ? '⚡ manzil yo‘q · ' : ''}{new Date(o.created_at).toLocaleString('uz-UZ', { timeZone: 'Asia/Tashkent', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
-                </div>
-              </a>
-            );
-          })}
-        </div>
-      </Async>
+      <AdminOrderList period={period} />
     </section>
   );
 }
@@ -274,7 +239,7 @@ function Partners({ act }: { act: any }) {
               <div className="spread">
                 <div className="row" style={{ gap: 10 }}>
                   <span className="top-rank">{medal(p.rank)}</span>
-                  <div><h3>{p.display_name}</h3><div className="muted small"><code>{p.code}</code> · {p.streams} ta oqim · {new Date(p.created_at).toLocaleDateString('uz-UZ')} dan</div></div>
+                  <div><h3><a href={`/admin/partner/${p.id}`} className="w-link">{p.display_name} ›</a></h3><div className="muted small"><code>{p.code}</code> · {p.streams} ta oqim · {new Date(p.created_at).toLocaleDateString('uz-UZ')} dan</div></div>
                 </div>
                 <span className={`pill ${p.status === 'active' ? 'b-delivered' : p.status === 'pending' ? 'b-shipping' : 'b-returned'}`}>{PSTATUS_UZ[p.status] ?? p.status}</span>
               </div>
@@ -287,11 +252,12 @@ function Partners({ act }: { act: any }) {
                 <div><span>Komissiya</span><b style={{ fontSize: 16 }}>{som(p.commission_earned_minor)}</b></div>
               </div>
               <div className="pills">
-                {(['new', 'accepted', 'shipping', 'returned', 'cancelled'] as const).map((k) => <span key={k} className={`pill b-${k}`}>{BUCKET_UZ[k]}: {p.orders[k]}</span>)}
+                {(['new', 'accepted', 'shipping', 'delivered', 'returned', 'cancelled'] as const).map((k) => <a key={k} href={`/admin/partner/${p.id}?status=${k}`} className={`pill pill-link b-${k}`}>{BUCKET_UZ[k]}: {p.orders[k]} ›</a>)}
               </div>
               {p.top_products?.length > 0 && <div className="small"><b>Ko‘p sotadi:</b> {p.top_products.map((t: any) => `${pick(t.name, lang)} (${t.orders})`).join(', ')}</div>}
               <div className="muted small">Balans: yechish mumkin {som(p.available_minor)} · kutilmoqda {som(p.pending_minor)} · to‘langan {som(p.paid_minor)}{p.debt_minor && p.debt_minor !== '0' ? ` · qarz ${som(p.debt_minor)}` : ''} · karta: {p.destination ?? '—'} {p.payout_destination_verified_at ? '✓' : ''}</div>
               <div className="row" style={{ gap: 8 }}>
+                <a className="btn sm" href={`/admin/partner/${p.id}`}>👁 Kuzatish</a>
                 {p.status !== 'active' && <button className="btn sm" onClick={() => act(() => api(`/admin/partners/${p.id}/status`, { method: 'POST', body: { status: 'active', reason: 'tasdiqlandi' } }), load)}>Tasdiqlash</button>}
                 {p.status === 'active' && <button className="btn danger sm" onClick={() => { const r = prompt('Sabab'); if (r) act(() => api(`/admin/partners/${p.id}/status`, { method: 'POST', body: { status: 'suspended', reason: r } }), load); }}>To‘xtatish</button>}
                 {p.destination && !p.payout_destination_verified_at && <button className="btn secondary sm" onClick={() => act(() => api(`/admin/partners/${p.id}/verify-destination`, { method: 'POST' }), load)}>Kartani tasdiqlash</button>}

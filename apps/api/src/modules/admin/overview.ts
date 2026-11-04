@@ -1,8 +1,8 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { can, requirePerm } from '../../platform/auth.js';
-import { many } from '../../platform/db.js';
-import { forbidden } from '../../platform/errors.js';
+import { many, maybeOne } from '../../platform/db.js';
+import { forbidden, notFound } from '../../platform/errors.js';
 import { type Deps, route, zIdParam } from '../../platform/http.js';
 import { BUCKET_SQL, BUCKETS, periodSql } from '../partners/cabinet.js';
 
@@ -17,14 +17,19 @@ export function registerAdminOverview(app: FastifyInstance, deps: Deps): void {
 
   route(app, deps, {
     method: 'GET', url: '/admin/orders', tags: T, summary: 'All orders by status bucket with customer, address, items, partner',
-    query: z.object({ status: z.enum(['all', ...BUCKETS]).default('all'), period: zPeriod, q: z.string().max(80).optional(), limit: z.coerce.number().int().min(1).max(100).default(50), offset: z.coerce.number().int().min(0).default(0) }),
+    query: z.object({ status: z.enum(['all', ...BUCKETS]).default('all'), period: zPeriod, q: z.string().max(80).optional(), limit: z.coerce.number().int().min(1).max(100).default(50), offset: z.coerce.number().int().min(0).default(0),
+      partner_id: z.string().uuid().optional(), operator_id: z.string().uuid().optional() }),
   }, async ({ actor, db, query }) => {
     requirePerm(actor, 'orders.read_all');
     const base = [periodSql('o.created_at', query.period)];
     const params: unknown[] = [];
+    // Supervisor drill-down: one partner's or one operator's orders (operator = assigned or ever called).
+    if (query.partner_id) { params.push(query.partner_id); base.push(`o.attributed_partner_id=$${params.length}`); }
+    if (query.operator_id) { params.push(query.operator_id); base.push(`(o.assigned_operator_id=$${params.length} OR EXISTS (SELECT 1 FROM call_logs cl WHERE cl.order_id=o.id AND cl.operator_id=$${params.length}))`); }
     if (query.q) {
       params.push(`%${query.q}%`);
-      base.push(`(o.number ILIKE $1 OR o.customer_phone ILIKE $1 OR o.contact_snapshot->>'name' ILIKE $1 OR EXISTS (SELECT 1 FROM order_lines ol WHERE ol.order_id=o.id AND ol.product_snapshot::text ILIKE $1))`);
+      const n = params.length;
+      base.push(`(o.number ILIKE $${n} OR o.customer_phone ILIKE $${n} OR o.contact_snapshot->>'name' ILIKE $${n} OR EXISTS (SELECT 1 FROM order_lines ol WHERE ol.order_id=o.id AND ol.product_snapshot::text ILIKE $${n}))`);
     }
     const counts = await many<{ bucket: string; n: number }>(db, `SELECT ${BUCKET_SQL} AS bucket, COUNT(*)::int AS n FROM orders o WHERE ${base.join(' AND ')} GROUP BY 1`, params);
     const c: Record<string, number> = Object.fromEntries(BUCKETS.map((b) => [b, 0]));
@@ -80,12 +85,13 @@ export function registerAdminOverview(app: FastifyInstance, deps: Deps): void {
   /** "Who sells my products": every partner with traffic, orders by status, sales value and commission for the period. */
   route(app, deps, {
     method: 'GET', url: '/admin/partners/performance', tags: T, summary: 'Partner leaderboard: clicks, orders by status, delivered sales, commission, balances, top products',
-    query: z.object({ period: zPeriod, q: z.string().max(80).optional() }),
+    query: z.object({ period: zPeriod, q: z.string().max(80).optional(), id: z.string().uuid().optional() }),
   }, async ({ actor, db, query }) => {
     if (!can(actor, 'partners.manage') && !can(actor, 'reports.read')) throw forbidden();
     const params: unknown[] = [];
     let filter = '';
     if (query.q) { params.push(`%${query.q}%`); filter = `WHERE (pa.display_name ILIKE $1 OR pa.code ILIKE $1)`; }
+    else if (query.id) { params.push(query.id); filter = `WHERE pa.id=$1`; }
     const per = periodSql('o.created_at', query.period);
     const rows = await many(db, `
       WITH ord AS (
@@ -121,6 +127,57 @@ export function registerAdminOverview(app: FastifyInstance, deps: Deps): void {
     }).sort((a, b) => b.orders.delivered! - a.orders.delivered! || b.orders.total! - a.orders.total! || b.clicks - a.clicks);
     return { period: query.period, items: items.map((x, i) => ({ rank: i + 1, ...x })) };
   });
+
+  /** One partner's products: what they sell, how much got delivered (supervisor watch page). */
+  route(app, deps, { method: 'GET', url: '/admin/partners/:id/products', tags: T, summary: 'Products a partner sold in the period: orders, delivered, units', params: zIdParam, query: z.object({ period: zPeriod }) },
+    async ({ actor, db, params, query }) => {
+      if (!can(actor, 'partners.manage') && !can(actor, 'reports.read')) throw forbidden();
+      const rows = await many(db, `
+        SELECT p.id, p.name, p.slug, COUNT(DISTINCT o.id)::int AS orders,
+               COUNT(DISTINCT o.id) FILTER (WHERE ${BUCKET_SQL}='delivered')::int AS delivered,
+               COALESCE(SUM(ol.qty - ol.canceled_qty), 0)::int AS units
+          FROM orders o JOIN order_lines ol ON ol.order_id=o.id JOIN skus s ON s.id=ol.sku_id JOIN products p ON p.id=s.product_id
+         WHERE o.attributed_partner_id=$1 AND ${periodSql('o.created_at', query.period)}
+         GROUP BY p.id, p.name, p.slug ORDER BY orders DESC, delivered DESC LIMIT 100`, [params.id]);
+      return { items: rows };
+    });
+
+  /** Operator watch page: when they came to work, how many orders they took, conversion, last actions. */
+  route(app, deps, { method: 'GET', url: '/admin/operators/:id/watch', tags: T, summary: 'Supervisor view of one operator: shift, calls, outcomes, conversion, daily trend', params: zIdParam, query: z.object({ period: zPeriod }) },
+    async ({ actor, db, params, query }) => {
+      if (!can(actor, 'orders.reassign') && !can(actor, 'reports.read')) throw forbidden();
+      const u = await maybeOne<Record<string, unknown>>(db, `
+        SELECT u.id, u.display_name, u.created_at, coalesce(ss.state, 'off') AS shift, ss.changed_at AS shift_changed_at,
+               (SELECT json_agg(m.role_code ORDER BY m.role_code) FROM memberships m WHERE m.user_id=u.id AND m.revoked_at IS NULL) AS roles
+          FROM users u LEFT JOIN staff_shifts ss ON ss.user_id=u.id WHERE u.id=$1`, [params.id]);
+      if (!u) throw notFound('USER');
+      const per = periodSql('c.created_at', query.period);
+      const st = await maybeOne<Record<string, number>>(db, `
+        SELECT COUNT(*)::int AS calls, COUNT(DISTINCT c.order_id)::int AS orders,
+               COUNT(DISTINCT c.order_id) FILTER (WHERE c.outcome='confirmed')::int AS confirmed,
+               COUNT(DISTINCT c.order_id) FILTER (WHERE c.outcome='rejected')::int AS rejected,
+               COUNT(*) FILTER (WHERE c.outcome='no_answer')::int AS no_answer,
+               COUNT(*) FILTER (WHERE c.outcome='call_later')::int AS call_later,
+               COUNT(*) FILTER (WHERE c.outcome='wrong_data')::int AS wrong_data,
+               MIN(c.created_at) AS first_call, MAX(c.created_at) AS last_call
+          FROM call_logs c WHERE c.operator_id=$1 AND ${per}`, [params.id]);
+      const delivered = await maybeOne<{ n: number }>(db, `
+        SELECT COUNT(DISTINCT o.id)::int AS n FROM orders o JOIN call_logs c ON c.order_id=o.id AND c.operator_id=$1 AND c.outcome='confirmed'
+         WHERE ${per} AND ${BUCKET_SQL}='delivered'`, [params.id]);
+      const daily = await many(db, `
+        SELECT to_char(date_trunc('day', c.created_at AT TIME ZONE 'Asia/Tashkent'), 'YYYY-MM-DD') AS day,
+               COUNT(*)::int AS calls, COUNT(DISTINCT c.order_id) FILTER (WHERE c.outcome='confirmed')::int AS confirmed,
+               MIN(c.created_at) AS first_call
+          FROM call_logs c WHERE c.operator_id=$1 AND c.created_at > now() - interval '14 days' GROUP BY 1 ORDER BY 1 DESC`, [params.id]);
+      const shifts = await many(db, `
+        SELECT occurred_at, after->>'state' AS state FROM audit_events
+         WHERE action='shift.changed' AND actor_user_id=$1 ORDER BY id DESC LIMIT 12`, [params.id]);
+      const s0 = st ?? ({} as Record<string, number>);
+      const orders = Number(s0.orders ?? 0);
+      return { user: u, period: query.period,
+        stats: { ...s0, delivered: delivered?.n ?? 0, conversion_pct: orders ? Math.round((Number(s0.confirmed ?? 0) / orders) * 100) : null },
+        daily, shifts };
+    });
 
   route(app, deps, { method: 'GET', url: '/admin/products/:id/sellers', tags: T, summary: 'Which partners sell this product: clicks, orders, delivered qty, commission', params: zIdParam, query: z.object({ period: zPeriod }) },
     async ({ actor, db, params, query }) => {

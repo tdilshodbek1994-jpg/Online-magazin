@@ -31,12 +31,16 @@ function Requests({ embedded = false }: { embedded?: boolean }) {
     <>
       {!embedded && <h1>So‘rovlar</h1>}
       {link && <div className="filter-chip">Faqat oqim: <b>{linkName || 'tanlangan havola'}</b> <button className="link-btn small" onClick={() => setLink('')} aria-label="Oqim filtrini olib tashlash">× Hammasi</button></div>}
-      <form className="search plain" role="search" onSubmit={(e) => { e.preventDefault(); setQuery(q.trim()); }}>
-        <label htmlFor="rq" className="sr-only">Buyurtma qidirish</label>
-        <input id="rq" type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buyurtma raqami yoki mahsulot…" />
-        <button className="search-btn" aria-label="Izlash">Izlash</button>
-      </form>
-      <Chips items={PERIODS} value={period} onChange={setPeriod} label="Davr" />
+      {/* Tidy header (user): search + period in one row, then one row of status chips. */}
+      <div className="req-top">
+        <form className="search plain" role="search" onSubmit={(e) => { e.preventDefault(); setQuery(q.trim()); }}>
+          <label htmlFor="rq" className="sr-only">Buyurtma qidirish</label>
+          <input id="rq" type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Raqam yoki mahsulot…" />
+          <button className="search-btn" aria-label="Izlash">🔍</button>
+        </form>
+        <label htmlFor="rp" className="sr-only">Davr</label>
+        <select id="rp" className="req-period" value={period} onChange={(e) => setPeriod(e.target.value)}>{PERIODS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>
+      </div>
       <Chips items={[['all', `Barchasi (${c.total ?? 0})`], ...BUCKET_ORDER.map((b) => [b, `${BUCKET_LABEL[b]} (${c[b] ?? 0})`] as [string, string]), ['callback', `Qayta qo‘ng‘iroq (${c.callback ?? 0})`], ['duplicate', `Dublikat (${c.duplicate ?? 0})`]]} value={status} onChange={setStatus} label="Holat" />
       {err && <div className="notice" role="alert">{errText(err)}</div>}
       {!data && !err && <div className="loading" role="status"><span className="spinner" aria-hidden />Yuklanmoqda…</div>}

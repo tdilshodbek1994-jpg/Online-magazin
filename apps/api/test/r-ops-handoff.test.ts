@@ -123,3 +123,24 @@ describe('Operator quality (fair, with denominators)', () => {
     expect((await api(t, 'GET', '/ops/center/quality', { token: s.operator.token })).status).toBe(403);
   });
 });
+
+describe('QA sampling', () => {
+  it('a person reviews finished work (not their own); the operator sees it and can object once', async () => {
+    const a = await claimedTask(s.operator.token);
+    const payable = (await t.db.query(`SELECT payable_minor FROM orders WHERE id=$1`, [a.orderId])).rows[0].payable_minor;
+    await api(t, 'POST', `/ops/center/tasks/${a.id}/contact`, { token: s.operator.token, body: { expected_version: a.version, outcome: 'confirmed', confirmed_total_minor: payable } });
+    const sample = await api(t, 'GET', '/ops/center/qa/sample?n=20', { token: s.owner.token });
+    expect(sample.json.items.map((x: any) => x.id)).toContain(a.id);
+    const low = await api(t, 'POST', `/ops/center/qa/${a.id}`, { token: s.owner.token, body: { checks: { correct_outcome: true, data_complete: false, clear_communication: true }, score: 2 } });
+    expect(low.json.code).toBe('REASON_REQUIRED');
+    const ok = await api(t, 'POST', `/ops/center/qa/${a.id}`, { token: s.owner.token, body: { checks: { correct_outcome: true, data_complete: false, clear_communication: true }, score: 3, note: 'Mo‘ljal yozilmagan' } });
+    expect(ok.status).toBe(200);
+    expect((await api(t, 'POST', `/ops/center/qa/${a.id}`, { token: s.owner.token, body: { checks: { correct_outcome: true, data_complete: true, clear_communication: true }, score: 5 } })).json.code).toBe('ALREADY_REVIEWED');
+    const mine = await api(t, 'GET', '/ops/center/qa/mine', { token: s.operator.token });
+    const rev = mine.json.items.find((x: any) => x.note === 'Mo‘ljal yozilmagan');
+    expect(rev).toBeTruthy();
+    expect((await api(t, 'POST', `/ops/center/qa/reviews/${rev.id}/reply`, { token: s.operator2.token, body: { text: 'bu meniki emas' } })).status).toBe(403);
+    expect((await api(t, 'POST', `/ops/center/qa/reviews/${rev.id}/reply`, { token: s.operator.token, body: { text: 'Mijoz mo‘ljalni aytmadi, izohda bor' } })).status).toBe(200);
+    expect((await t.db.query(`SELECT status FROM ops_qa_reviews WHERE id=$1`, [rev.id])).rows[0].status).toBe('disputed');
+  });
+});

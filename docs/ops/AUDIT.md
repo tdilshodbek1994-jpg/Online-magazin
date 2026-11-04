@@ -65,12 +65,14 @@ Vertical slice UI → API → DB → tests:
 * **Bulk-safe transfer** (`bulk.ts`, T53): preview (dry run) → per-item execution, results and summary; only task transfer, no money actions.
 * **Incidents** (`0021_ops_incidents.sql`, `incidents.ts`): one root cause links many tasks (they wait as "ichki muammo"); resolving returns them to the queue with a clear next action and never changes orders.
 * **Operator quality** (`GET /ops/center/quality`): tasks contacted, confirmed (rate with denominator), rejected, median minutes to first contact; "ma'lumot kam" below 20 tasks; no ranking.
-* Tests: `u-reply-templates`, `v-duplicates`, bulk/incident/quality in `r-ops-handoff`.
+* **Product facts** on the task card: stock now, ordered vs current price, warranty ("va'da bermang" when unknown), description.
+* **QA sampling** (`0022_ops_qa.sql`, `qa.ts`): random sample of finished tasks (14 days) for a human reviewer — never your own work (DB check); three checks + 1–5 score, reason required for ≤2; operator sees reviews and may object once (status → disputed); no automatic penalty.
+* Tests: `u-reply-templates`, `v-duplicates`, bulk/incident/quality/QA in `r-ops-handoff`.
 
 ## 3. Not done yet (honest list)
 
 P1 (remaining): skill/language routing and capacity round-robin, business calendar (holidays) for SLA, quiet-hours digest for notifications.
-P2 (remaining): QA sampling with human review and appeal, knowledge-base articles per product, load test (100k orders / 30 operators) and restore drill.
+P2 (remaining): load test (100k orders / 30 operators) and restore drill on a separate environment.
 P3: real telephony adapter, Telegram Business, AI assistant (read-only, human approval).
 
 ## 4. Policy register (owner decisions pending — no hidden production defaults)

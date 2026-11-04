@@ -101,6 +101,7 @@ export function WorkDesk({ onChanged }: { onChanged?: () => void }) {
           ))}
         </div>
       )}
+      <MyReviews />
       {task && <TaskCard task={task} order={order} lang={lang} busy={busy} onClose={() => { setTask(null); setOrder(null); }}
         onAct={(path, body, done) => run(() => api(`/ops/center/tasks/${task.id}/${path}`, { method: 'POST', body: { expected_version: task.version, ...body } }), () => { if (done) { setTask(null); setOrder(null); } else void openTask(task.id); })} />}
     </section>
@@ -336,6 +337,33 @@ function ProductFacts({ taskId, lang }: { taskId: string; lang: any }) {
         );
       })}
       <p className="muted small">Tekshirilgan: {tash(d.checked_at)}</p>
+    </details>
+  );
+}
+
+/** The operator's own QA reviews, with a one-time objection (spec §25). */
+function MyReviews() {
+  const [items, setItems] = useState<any[]>([]);
+  const [reply, setReply] = useState<Record<string, string>>({});
+  const load = useCallback(() => { api('/ops/center/qa/mine').then((r) => setItems(r.items)).catch(() => {}); }, []);
+  useEffect(load, [load]);
+  if (!items.length) return null;
+  return (
+    <details className="task-more">
+      <summary>Mening baholarim ({items.length})</summary>
+      {items.map((q) => (
+        <div key={q.id} className="fact-item small">
+          <div className="spread"><b>{q.number}</b><span>Baho: {q.score}/5</span></div>
+          <span>{q.checks.correct_outcome ? '✓' : '✗'} natija · {q.checks.data_complete ? '✓' : '✗'} ma’lumot · {q.checks.clear_communication ? '✓' : '✗'} muloqot</span>
+          {q.note && <span>Izoh: {q.note}</span>}
+          {q.operator_reply ? <span className="muted">Sizning javobingiz: {q.operator_reply}</span> : (
+            <>
+              <input value={reply[q.id] ?? ''} onChange={(e) => setReply({ ...reply, [q.id]: e.target.value })} placeholder="E’tiroz yoki izoh (bir marta)" aria-label="E’tiroz" />
+              <button className="btn secondary sm" disabled={(reply[q.id] ?? '').trim().length < 3} onClick={async () => { try { await api(`/ops/center/qa/reviews/${q.id}/reply`, { method: 'POST', body: { text: reply[q.id] } }); load(); } catch { /* shown on reload */ } }}>Yuborish</button>
+            </>
+          )}
+        </div>
+      ))}
     </details>
   );
 }

@@ -97,6 +97,7 @@ export default function OpsBoard() {
           <p className="muted small">{qual.note} Kamida {qual.min_sample} ta ish bo‘lmaguncha xulosa chiqarmang. Reyting yo‘q — bu faqat suhbat uchun ma’lumot.</p>
         </details>
       )}
+      <QaSample />
       <div className="chips" role="tablist" aria-label="Filtr">
         {groups.map(([k, l, fn]) => <button key={k} role="tab" aria-selected={f === k} className={`chip ${f === k ? 'on' : ''}`} onClick={() => setF(k)}>{l} <span className="q-count">{items.filter(fn).length}</span></button>)}
       </div>
@@ -155,5 +156,40 @@ export default function OpsBoard() {
         </div>
       )}
     </div>
+  );
+}
+
+const OUT: Record<string, string> = { no_answer: 'javob bermadi', busy: 'band', wrong_number: 'noto‘g‘ri raqam', callback_requested: 'keyin qo‘ng‘iroq', info_given: 'ma’lumot berildi', confirmed: 'tasdiqladi', rejected: 'rad etdi', problem: 'muammo' };
+/** Human QA on a random sample of finished work (spec §25); low scores need a reason, nobody rates their own work. */
+function QaSample() {
+  const [items, setItems] = useState<any[] | null>(null);
+  const [form, setForm] = useState<Record<string, any>>({});
+  const [msg, setMsg] = useState<string | null>(null);
+  const load = () => api('/ops/center/qa/sample?n=5').then((r) => setItems(r.items)).catch(() => setItems([]));
+  return (
+    <details className="card q-box" onToggle={(e) => { if ((e.target as HTMLDetailsElement).open && !items) void load(); }}>
+      <summary><b>Sifat nazorati (tasodifiy 5 ta ish)</b></summary>
+      {items && items.length === 0 && <p className="muted small">Ko‘rib chiqiladigan yakunlangan ish yo‘q.</p>}
+      {items?.map((t) => {
+        const f = form[t.id] ?? { correct_outcome: true, data_complete: true, clear_communication: true, score: 5, note: '' };
+        const set = (k: string, v: any) => setForm({ ...form, [t.id]: { ...f, [k]: v } });
+        return (
+          <div key={t.id} className="inc-item small">
+            <div className="spread"><b>{t.number}</b><span>{t.operator_name}</span></div>
+            <div>Natijalar: {(t.outcomes ?? '').split(' → ').map((o: string) => OUT[o] ?? o).join(' → ') || '—'}</div>
+            {t.notes && <div className="muted">Izoh: {t.notes}</div>}
+            <label className="s-check"><input type="checkbox" checked={f.correct_outcome} onChange={(e) => set('correct_outcome', e.target.checked)} /> Natija to‘g‘ri</label>
+            <label className="s-check"><input type="checkbox" checked={f.data_complete} onChange={(e) => set('data_complete', e.target.checked)} /> Ma’lumot to‘liq</label>
+            <label className="s-check"><input type="checkbox" checked={f.clear_communication} onChange={(e) => set('clear_communication', e.target.checked)} /> Tushunarli muloqot</label>
+            <label htmlFor={`qs-${t.id}`}>Baho: {f.score}</label>
+            <input id={`qs-${t.id}`} type="range" min={1} max={5} value={f.score} onChange={(e) => set('score', Number(e.target.value))} />
+            <input value={f.note} onChange={(e) => set('note', e.target.value)} placeholder={f.score <= 2 ? 'Sabab (2 va undan past baho uchun majburiy)' : 'Izoh (ixtiyoriy)'} aria-label="QA izohi" />
+            <button className="btn secondary sm" disabled={f.score <= 2 && f.note.trim().length < 3} onClick={async () => { try { await api(`/ops/center/qa/${t.id}`, { method: 'POST', body: { checks: { correct_outcome: f.correct_outcome, data_complete: f.data_complete, clear_communication: f.clear_communication }, score: f.score, note: f.note || undefined } }); setMsg('✓ Baholandi — operator ko‘radi va e’tiroz yoza oladi'); setItems(items.filter((x) => x.id !== t.id)); } catch (e: any) { setMsg(errText(e)); } }}>Saqlash</button>
+          </div>
+        );
+      })}
+      {msg && <div className="small" role="status">{msg}</div>}
+      <p className="muted small">Baho avtomatik jarima emas. Operator har bir bahoni ko‘radi va e’tiroz bildira oladi.</p>
+    </details>
   );
 }

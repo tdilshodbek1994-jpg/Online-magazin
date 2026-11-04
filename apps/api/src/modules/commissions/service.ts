@@ -267,6 +267,9 @@ export async function recalcOrder(tx: Tx, orderId: string, reason: string, actor
       await notifyPartner(tx, r.partner_id, 'partner.order_cancelled', { number: maskedNumber(num.rows[0].number) }, `p:rev:${orderId}`);
     }
   }
+  // Returns after coins were issued => visible UzCoin adjustment (never a silent rewrite).
+  const { syncOrderCoins } = await import('../uzcoin/service.js');
+  await syncOrderCoins(tx, orderId);
 }
 
 /**
@@ -316,6 +319,9 @@ export async function releaseMatured(tx: Tx, now: Date = new Date()): Promise<nu
     // Partner's own opt-in charity share of this now-available commission (idempotent; OFF unless the partner consented).
     const { applyCharityAuto } = await import('../charity/service.js');
     await applyCharityAuto(tx, a);
+    // UzCoin: 1 eligible unit = 1 coin, issued when the commission is confirmed and available.
+    const { syncOrderCoins } = await import('../uzcoin/service.js');
+    await syncOrderCoins(tx, a.order_id);
   }
   return acc.rowCount ?? 0;
 }

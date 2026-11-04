@@ -47,7 +47,7 @@ function ContestForm({ f, setF, onDone }: { f: any; setF: (x: any) => void; onDo
       await api('/admin/cc/contests', { method: 'POST', body: {
         title_latn: f.title_latn, description: f.description || undefined, metric: f.metric, starts_at: new Date(`${f.starts}:00+05:00`).toISOString(), ends_at: new Date(`${f.ends}:00+05:00`).toISOString(),
         min_score: Number(f.min_score) || 0, appeal_days: Number(f.appeal_days) || 0, terms: f.terms || undefined,
-        prizes: f.prizes.filter((p: any) => p.title.trim()).map((p: any) => ({ place: Number(p.place) || null, title: p.title, kind: p.kind, value_minor: p.kind === 'money' ? Number(p.value || 0) * 100 : 0, qty: 1 })),
+        prizes: f.prizes.filter((p: any) => p.title.trim()).map((p: any) => ({ place: Number(p.place) || null, title: p.title, kind: p.kind, value_minor: p.kind === 'money' ? Number(p.value || 0) * 100 : p.kind === 'uzcoin' ? Number(p.value || 0) : 0, qty: 1 })),
       } });
       toast('✓ Qoralama saqlandi — endi ko‘rib chiqishga yuboring'); onDone();
     } catch (e: any) { toast(errText(e), 'err'); }
@@ -71,7 +71,8 @@ function ContestForm({ f, setF, onDone }: { f: any; setF: (x: any) => void; onDo
         <div key={i} className="cc-prize">
           <input aria-label="O‘rin" inputMode="numeric" value={p.place} onChange={(e) => { const x = [...f.prizes]; x[i] = { ...p, place: e.target.value }; setF({ ...f, prizes: x }); }} style={{ width: 56 }} />
           <input aria-label="Sovrin nomi" value={p.title} placeholder="Sovrin" onChange={(e) => { const x = [...f.prizes]; x[i] = { ...p, title: e.target.value }; setF({ ...f, prizes: x }); }} />
-          <select aria-label="Turi" value={p.kind} onChange={(e) => { const x = [...f.prizes]; x[i] = { ...p, kind: e.target.value }; setF({ ...f, prizes: x }); }}><option value="money">Pul</option><option value="item">Buyum</option></select>
+          <select aria-label="Turi" value={p.kind} onChange={(e) => { const x = [...f.prizes]; x[i] = { ...p, kind: e.target.value }; setF({ ...f, prizes: x }); }}><option value="money">Pul</option><option value="uzcoin">UzCoin</option><option value="item">Buyum</option></select>
+          {p.kind === 'uzcoin' && <input aria-label="UzCoin soni" inputMode="numeric" value={p.value} placeholder="coin" onChange={(e) => { const x = [...f.prizes]; x[i] = { ...p, value: e.target.value.replace(/\D/g, '') }; setF({ ...f, prizes: x }); }} style={{ width: 90 }} />}
           {p.kind === 'money' && <input aria-label="Summa so‘m" inputMode="numeric" value={p.value} placeholder="so‘m" onChange={(e) => { const x = [...f.prizes]; x[i] = { ...p, value: e.target.value.replace(/\D/g, '') }; setF({ ...f, prizes: x }); }} style={{ width: 110 }} />}
         </div>
       ))}

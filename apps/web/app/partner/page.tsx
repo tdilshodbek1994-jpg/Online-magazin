@@ -126,7 +126,7 @@ export default function PartnerDashboard() {
             {([
               ['/partner/orders', '📋', 'Buyurtmalar', 't1'], ['/partner/market', '🛍️', 'Market', 't2'], ['/partner/streams', '🔗', 'Oqimlar', 't3'], ['/partner/analytics', '📈', 'Reklama', 't4'],
               ['/partner/offers', '🧺', 'Taklif to‘plami', 't5'], ['/partner/contacts', '📒', 'Mijozlar', 't6'], ['/partner/stats', '📊', 'Statistika', 't7'], ['/partner/wallet', '💳', 'Hamyon', 't8'],
-              ['/partner/contests', '🏆', 'Konkurs', 't1'], ['/partner/programs#bonus', '🎁', 'Bonuslar', 't2'], ['/partner/quality', '🛡️', 'Sifat', 't3'], ['/partner/charity', '💝', 'Xayriya', 't4'],
+              ['/partner/contests', '🏆', 'Konkurs', 't1'], ['/partner/uzcoin', '🪙', 'UzCoin', 't2'], ['/partner/quality', '🛡️', 'Sifat', 't3'], ['/partner/charity', '💝', 'Xayriya', 't4'],
               ['/partner/top', '🥇', d?.month_rank ? `TOP · #${d.month_rank.rank}` : 'TOP va holat', 't5'], ['/partner/notifications', '🔔', 'Xabarlar', 't6'], ['/partner/expenses', '🧾', 'Xarajatlar', 't7'], ['/partner/about', '📘', 'Qoidalar', 't8'],
             ] as [string, string, string, string][]).map(([href, ico, label, tone]) => (
               <Link key={href} href={href} className={`mini-tile ${tone}`}><span aria-hidden>{ico}</span>{label}</Link>

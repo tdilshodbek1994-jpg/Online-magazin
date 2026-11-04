@@ -34,6 +34,7 @@ import { registerPartnerPrograms } from './modules/partners/programs.js';
 import { registerContestCenter } from './modules/contests/routes.js';
 import { registerQualityCenter } from './modules/quality/routes.js';
 import { registerCharityCenter } from './modules/charity/routes.js';
+import { registerUzcoin } from './modules/uzcoin/routes.js';
 import { registerReturns } from './modules/returns/routes.js';
 import { registerPayments } from './modules/payments/routes.js';
 import { registerSupport } from './modules/support/routes.js';
@@ -165,6 +166,7 @@ export async function buildApp(cfg: AppConfig, db: Db): Promise<FastifyInstance>
       registerContestCenter(api, deps);
       registerQualityCenter(api, deps);
       registerCharityCenter(api, deps);
+      registerUzcoin(api, deps);
       registerVideos(api, deps);
       registerReturns(api, deps);
       registerPayments(api, deps);

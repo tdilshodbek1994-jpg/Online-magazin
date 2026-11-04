@@ -32,7 +32,7 @@ const zRules = z.object({
   tie_break: z.array(z.enum(['score', 'net_sales', 'refund_ratio', 'reached_at'])).min(1).max(4).default(['score', 'net_sales', 'refund_ratio', 'reached_at']),
   name_privacy: z.enum(['public', 'alias', 'consent']).default('public'), terms: z.string().max(8000).optional(), budget_minor: z.coerce.number().int().min(0).default(0),
 });
-const zPrize = z.object({ place: z.number().int().min(1).max(100).nullable().default(null), nomination: z.string().max(80).optional(), title: z.string().trim().min(2).max(160), kind: z.enum(['money', 'item']), value_minor: z.coerce.number().int().min(0).default(0), qty: z.number().int().min(1).max(1000).default(1), claim_days: z.number().int().min(1).max(365).default(14), image_url: z.string().max(500).optional() });
+const zPrize = z.object({ place: z.number().int().min(1).max(100).nullable().default(null), nomination: z.string().max(80).optional(), title: z.string().trim().min(2).max(160), kind: z.enum(['money', 'item', 'uzcoin']), value_minor: z.coerce.number().int().min(0).default(0), qty: z.number().int().min(1).max(1000).default(1), claim_days: z.number().int().min(1).max(365).default(14), image_url: z.string().max(500).optional() });
 
 async function contestRow(q: Queryable, id: string, lock = false) {
   const c = await maybeOne<any>(q, `SELECT * FROM cc_contests WHERE id=$1 ${lock ? 'FOR UPDATE' : ''}`, [id]);
@@ -427,6 +427,12 @@ async function awardOne(tx: Tx, actor: Actor, p: any, partnerId: string, rank: n
   if (!took.rowCount) return 'no_stock';
   const a = await one<{ id: string }>(tx, `INSERT INTO cc_prize_awards (prize_id, contest_id, partner_id, rank, status, claim_deadline, awarded_by) VALUES ($1,$2,$3,$4,'assigned', now() + make_interval(days => $5), $6) RETURNING id`,
     [p.id, p.contest_id, partnerId, rank, p.claim_days, actor.userId]);
+  if (p.kind === 'uzcoin' && BigInt(p.value_minor) > 0n) {
+    // UzCoin prize: value_minor holds the coin amount; separate ledger source, once per award.
+    const { post } = await import('../uzcoin/service.js');
+    await post(tx, { partnerId, kind: 'contest_prize', available: BigInt(p.value_minor), sourceType: 'cc_award', sourceId: a.id, effectKey: 'prize', reason: `konkurs sovrini: ${p.title}`, actorId: actor.userId });
+    await tx.query(`UPDATE cc_prize_awards SET status='paid' WHERE id=$1`, [a.id]);
+  }
   if (p.kind === 'money' && BigInt(p.value_minor) > 0n) {
     const title = (await one<{ t: string }>(tx, `SELECT title_latn AS t FROM cc_versions WHERE contest_id=$1 AND version=$2`, [p.contest_id, c.current_version])).t;
     const bonusId = await awardBonus(tx, { partnerId, source: 'cc_prize', ccAwardId: a.id, amount: BigInt(p.value_minor), reason: `Konkurs «${title}» — ${p.title}`, actorId: actor.userId });

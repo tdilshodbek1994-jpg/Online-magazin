@@ -36,6 +36,7 @@ import { registerPayments } from './modules/payments/routes.js';
 import { registerSupport } from './modules/support/routes.js';
 import { registerAdmin } from './modules/admin/routes.js';
 import { registerAdminOverview } from './modules/admin/overview.js';
+import { registerStockAlerts } from './modules/admin/stock.js';
 import { registerMessaging } from './modules/notifications/routes.js';
 import { registerAi } from './modules/ai/routes.js';
 import { registerVideos, registerVideoServe, VIDEO_MAX_BYTES } from './modules/catalog/videos.js';
@@ -164,6 +165,7 @@ export async function buildApp(cfg: AppConfig, db: Db): Promise<FastifyInstance>
       registerSupport(api, deps);
       registerAdmin(api, deps);
       registerAdminOverview(api, deps);
+      registerStockAlerts(api, deps);
       registerMessaging(api, deps);
       registerAi(api, deps);
     },

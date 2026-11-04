@@ -1298,3 +1298,8 @@ a.admin-tab { text-decoration: none; color: inherit; }
 .fav-btn:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 .ptitle-row { display: flex; align-items: flex-start; gap: 10px; justify-content: space-between; } .ptitle-row h1 { margin: 2px 0 6px; }
 .reorder { display: grid; gap: 4px; margin-top: 12px; }
+.stock-row { display: grid; grid-template-columns: 52px minmax(0, 1fr) auto; gap: 10px; align-items: center; }
+.stock-row img, .stock-row .ph { width: 52px; height: 52px; border-radius: 10px; object-fit: cover; }
+.stock-info { display: grid; gap: 2px; min-width: 0; }
+.stock-info b { overflow-wrap: anywhere; }
+@media (max-width: 420px) { .stock-row { grid-template-columns: 52px minmax(0, 1fr); } .stock-row .pill { grid-column: 2; justify-self: start; } }

@@ -26,7 +26,7 @@ async function receipt(q: Queryable, draftId: string | null, action: string, rea
 }
 
 /** Send a pause request; the campaign is "pause_requested" until the provider confirms PAUSED (sync). */
-async function requestPause(db: Db, cfg: AppConfig, draftId: string, reason: string, actor: Actor | null) {
+export async function requestPause(db: Db, cfg: AppConfig, draftId: string, reason: string, actor: Actor | null) {
   const ids = await remoteIdsOf(db, draftId);
   if (!ids) return 'no_remote';
   await db.query(`UPDATE campaign_drafts SET status='pause_requested', safety_reason=$2, paused_at=now(), updated_at=now() WHERE id=$1`, [draftId, reason]);

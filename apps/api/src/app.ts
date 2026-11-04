@@ -4,7 +4,7 @@ import swaggerUi from '@fastify/swagger-ui';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { randomUUID } from 'node:crypto';
 import type { AppConfig } from './config.js';
-import { type Actor, loadActor } from './platform/auth.js';
+import { type Actor, anonymous, loadActor } from './platform/auth.js';
 import type { Db } from './platform/db.js';
 import { AppError } from './platform/errors.js';
 import type { Deps } from './platform/http.js';
@@ -41,6 +41,7 @@ import { registerLandingAnalytics } from './modules/landings/analytics.js';
 import { registerTarget } from './modules/target/routes.js';
 import { registerTargetSafety } from './modules/target/safety.js';
 import { registerExperiments } from './modules/landings/experiments.js';
+import { isCustomHost, registerDomains } from './modules/landings/domains.js';
 import { registerReturns } from './modules/returns/routes.js';
 import { registerPayments } from './modules/payments/routes.js';
 import { registerSupport } from './modules/support/routes.js';
@@ -93,6 +94,7 @@ export async function buildApp(cfg: AppConfig, db: Db): Promise<FastifyInstance>
   });
   await app.register(swaggerUi, { routePrefix: '/api/docs' });
 
+  const mainHost = new URL(cfg.publicWebUrl).hostname.toLowerCase();
   app.decorateRequest('actor', null as unknown as Actor);
   app.addHook('onRequest', async (req, reply) => {
     reply.header('x-request-id', req.id);
@@ -103,6 +105,13 @@ export async function buildApp(cfg: AppConfig, db: Db): Promise<FastifyInstance>
     const token = typeof xs === 'string' && xs.length > 0 ? xs : auth?.startsWith('Bearer ') ? auth.slice(7) : null;
     const guest = (req.headers['x-guest-token'] as string | undefined) ?? null;
     req.actor = await loadActor(db, token, req.id, guest && guest.length >= 16 && guest.length <= 200 ? guest : null);
+    // LT-037: a session never acts from a partner/custom landing host — staff rights stay on the main domain.
+    const origin = req.headers.origin;
+    if (req.actor.userId && typeof origin === 'string') {
+      let host: string | null = null;
+      try { host = new URL(origin).hostname.toLowerCase(); } catch { host = null; }
+      if (host && host !== mainHost && (await isCustomHost(db, host))) req.actor = anonymous(req.id, req.actor.guestToken);
+    }
   });
 
   app.setErrorHandler((err, req, reply) => {
@@ -179,6 +188,7 @@ export async function buildApp(cfg: AppConfig, db: Db): Promise<FastifyInstance>
       registerTarget(api, deps);
       registerTargetSafety(api, deps);
       registerExperiments(api, deps);
+      registerDomains(api, deps);
       registerVideos(api, deps);
       registerReturns(api, deps);
       registerPayments(api, deps);

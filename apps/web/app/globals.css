@@ -1370,3 +1370,33 @@ header.top:not(.ptop) .lang { background: rgba(255,255,255,.95); color: #0f2a1d;
 .schip.on { background: var(--primary); color: #fff; border-color: var(--primary); }
 .pd-hero { background: linear-gradient(115deg, #00804a 0%, #00965a 55%, #0a8f86 100%); }
 .balance-card { background: linear-gradient(135deg, #2d3fd6 0%, #4b3bd9 55%, #6d33d6 100%); }
+.acc-logout { display: block; width: 100%; margin-top: 16px; }
+/* Toast on top of everything (also over bottom sheets) */
+.toast { position: fixed; top: calc(10px + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); z-index: 200; max-width: min(92vw, 520px); padding: 12px 18px; border-radius: 14px; font-weight: 700; font-size: 15px; box-shadow: 0 10px 30px rgba(0,0,0,.18); animation: toast-in .2s ease-out; cursor: pointer; text-align: center; }
+.toast-ok { background: #00804a; color: #fff; }
+.toast-err { background: #b42318; color: #fff; }
+.toast-info { background: #1f2937; color: #fff; }
+@keyframes toast-in { from { opacity: 0; transform: translate(-50%, -8px); } to { opacity: 1; transform: translate(-50%, 0); } }
+/* Bottom sheets: scrolling inside never moves the page behind (user: "orqa panel ishlab ketyabdi") */
+.sheet { overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+.sheet-backdrop { overscroll-behavior: contain; touch-action: none; }
+.sheet-backdrop > * { touch-action: pan-y; }
+html:has(.sheet-backdrop), body:has(.sheet-backdrop) { overflow: hidden; }
+/* Supervisor board: operator cards are buttons (filter their work); collapsible boxes show they open */
+button.board-op { text-align: left; font: inherit; color: inherit; cursor: pointer; border: 1px solid transparent; }
+button.board-op.on { border-color: var(--primary); background: var(--primary-50); }
+.pill-link { text-decoration: none; cursor: pointer; }
+details.q-box > summary { cursor: pointer; list-style: none; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+details.q-box > summary::-webkit-details-marker { display: none; }
+details.q-box > summary::after { content: 'Ochish ▾'; font-size: 13px; font-weight: 600; color: var(--primary); white-space: nowrap; }
+details.q-box[open] > summary::after { content: 'Yopish ▴'; }
+.hist-list { padding-left: 18px; display: grid; gap: 4px; }
+.tpl-intro p { margin: 6px 0; }
+.tpl-vars { margin: 4px 0 6px; padding-left: 18px; display: grid; gap: 3px; }
+.tpl-vars code { background: var(--primary-50); color: var(--primary-600); padding: 1px 6px; border-radius: 6px; font-weight: 700; }
+.tpl-preview { margin-top: 10px; padding: 10px 12px; border-radius: 12px; background: var(--surface-2); border-left: 4px solid var(--primary); display: grid; gap: 4px; }
+/* Admin order list: compact clickable cards */
+a.ocard { display: grid; gap: 4px; padding: 12px 14px; color: inherit; text-decoration: none; }
+a.ocard:active { background: var(--surface-2); }
+.ocard-items { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ocard-partner { color: var(--primary-600); font-weight: 600; }

@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { Async } from '@/components/Header';
 import { IconCart } from '@/components/Icons';
-import { api, som } from '@/lib/api';
+import { api, setToken, som } from '@/lib/api';
 import { pick, useI18n } from '@/lib/i18n';
 import { orderStage, uzDate } from '@/lib/orderStatus';
 import { InstallRow } from '@/components/InstallApp';
@@ -52,6 +52,7 @@ export default function Account() {
         <Link href="/legal/returns">↩️ Qaytarish shartlari</Link>
         {roles.includes('partner') ? <Link href="/partner">🤝 Hamkor kabineti</Link> : <Link href="/partner">🤝 Hamkor bo‘lib pul ishlash</Link>}
       </section>
+      <button type="button" className="btn secondary acc-logout" onClick={async () => { await api('/auth/logout', { method: 'POST' }).catch(() => {}); setToken(null); location.href = '/'; }}>{t('logout')}</button>
     </div>
   );
 }

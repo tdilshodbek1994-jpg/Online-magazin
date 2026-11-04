@@ -143,10 +143,11 @@ export function Header() {
           </select>
         </nav>
       </div>
-      {logged && (
+      {/* Customers get no extra bar (user: "Chiqish tepada kerak emas"); logout lives at the bottom of /account. */}
+      {logged && staff.length > 0 && (
         <div className="staff-bar">
           <div className="wrap staff-row">
-            {staff.length > 0 && <span className="muted staff-title">{t('staff')}:</span>}
+            <span className="muted staff-title">{t('staff')}:</span>
             {staff.map(([href, label]) => <Link key={href} href={href} className={path?.startsWith(href) ? 'on' : ''}>{label}</Link>)}
             <button className="link-btn" onClick={logout}>{t('logout')}</button>
           </div>

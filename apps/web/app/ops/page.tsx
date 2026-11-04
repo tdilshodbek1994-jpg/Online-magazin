@@ -4,6 +4,7 @@ import { Async } from '@/components/Header';
 import { api, som } from '@/lib/api';
 import { pick, useI18n } from '@/lib/i18n';
 import { errText } from '@/lib/errors';
+import { toast } from '@/lib/toast';
 import { WorkDesk } from './WorkDesk';
 
 const QUEUES: [string, string][] = [['new', 'Yangi'], ['awaiting_customer', 'Mijoz tasdig‘i'], ['callback', 'Qayta qo‘ng‘iroq'], ['awaiting_payment', 'To‘lov kutilmoqda'], ['ready_to_pick', 'Yig‘ishga tayyor'], ['in_delivery', 'Yetkazishda'], ['problem', 'Muammoli'], ['returns', 'Qaytarish'], ['closed', 'Yopilgan']];
@@ -29,7 +30,8 @@ export default function Ops() {
   const open = async (id: string) => { try { setSel(await api(`/ops/orders/${id}`)); } catch (e: any) { setMsg(errText(e)); } };
   // Deep link from the owner overview: /ops?order=<id> opens that order card.
   useEffect(() => { try { const id = new URLSearchParams(location.search).get('order'); if (id && /^[0-9a-f-]{36}$/.test(id)) void open(id); } catch {} }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  const act = async (fn: () => Promise<any>) => { setMsg(null); try { await fn(); setMsg('OK'); if (sel) await open(sel.id); await load(); } catch (e: any) { setMsg(errText(e)); } };
+  // Every tap answers on top of the screen (the sheet covers the page, so an inline notice would be invisible).
+  const act = async (fn: () => Promise<any>, ok = '✓ Saqlandi') => { setMsg(null); try { await fn(); toast(ok); if (sel) await open(sel.id); await load(); } catch (e: any) { toast(errText(e), 'err'); } };
   return (
     <>
       <div className="spread"><h1>Operator xonasi</h1><a href="/ops/board" className="btn secondary sm">Rahbar paneli</a></div>
@@ -70,20 +72,20 @@ export default function Ops() {
             </div>
             <div className="pills"><span className="pill">{STATUS_UZ[sel.commercial_status] ?? sel.commercial_status}</span><span className="pill">{FUL_UZ[sel.fulfillment_status] ?? sel.fulfillment_status}</span><span className="pill">{sel.payment_method === 'cod' ? 'Naqd' : 'Onlayn'} · {PAY_UZ[sel.payment_status] ?? sel.payment_status}</span></div>
             {sel.address_snapshot?.quick && sel.address_snapshot?.house === '-' && <p className="notice">⚡ Tez buyurtma: qo‘ng‘iroqda aniq manzilni so‘rab, pastda saqlang — manzilsiz tasdiqlab bo‘lmaydi.</p>}
-            {!['shipped', 'delivered', 'returned'].includes(sel.fulfillment_status) && <AddressEditor order={sel} onSave={(address) => act(() => api(`/ops/orders/${sel.id}/address`, { method: 'PATCH', body: { expected_version: sel.version, address, reason: 'operator qo‘ng‘iroq' } }))} />}
+            {!['shipped', 'delivered', 'returned'].includes(sel.fulfillment_status) && <AddressEditor order={sel} onSave={(address) => act(() => api(`/ops/orders/${sel.id}/address`, { method: 'PATCH', body: { expected_version: sel.version, address, reason: 'operator qo‘ng‘iroq' } }), '✓ Manzil saqlandi')} />}
             <div className="ops-lines">
-              {sel.lines.map((l: any) => <div key={l.id} className="spread small"><span>{pick(l.product_snapshot.name, lang)}{l.product_snapshot.variant && Object.values(l.product_snapshot.variant).length ? ` (${Object.values(l.product_snapshot.variant).join('/')})` : ''} × {l.qty - (l.canceled_qty ?? 0)}</span><span>{som(l.line_net_minor)}</span></div>)}
+              {sel.lines.map((l: any) => <div key={l.id} className="spread small"><span>{pick(l.product_snapshot.name, lang)}{l.product_snapshot.variant && Object.values(l.product_snapshot.variant).length ? ` (${Object.values(l.product_snapshot.variant).join('/')})` : ''} × {sel.commercial_status === 'cancelled' ? l.qty : l.qty - (l.canceled_qty ?? 0)}</span><span>{som(l.line_net_minor)}</span></div>)}
               <div className="spread" style={{ fontWeight: 700 }}><span>Jami (yetkazish bilan)</span><span>{som(sel.payable_minor)}</span></div>
             </div>
             {sel.commercial_status === 'awaiting_confirmation' && (
               <div className="ops-actions">
                 <b>Qo‘ng‘iroq natijasi</b>
-                {!sel.assigned_operator_id && <button className="btn secondary" onClick={() => act(() => api(`/ops/orders/${sel.id}/claim`, { method: 'POST' }))}>Buyurtmani olish</button>}
-                <button className="btn big" onClick={() => act(() => api(`/ops/orders/${sel.id}/calls`, { method: 'POST', body: { outcome: 'confirmed', confirmed_total_minor: sel.payable_minor, note: 'telefonda tasdiqladi' } }))}>✅ Tasdiqladi — {som(sel.payable_minor)}</button>
+                {!sel.assigned_operator_id && <button className="btn secondary" onClick={() => act(() => api(`/ops/orders/${sel.id}/claim`, { method: 'POST' }), '✓ Buyurtma sizga olindi')}>Buyurtmani olish</button>}
+                <button className="btn big" onClick={() => act(() => api(`/ops/orders/${sel.id}/calls`, { method: 'POST', body: { outcome: 'confirmed', confirmed_total_minor: sel.payable_minor, note: 'telefonda tasdiqladi' } }), '✅ Tasdiqlandi — buyurtma omborga o‘tdi')}>✅ Tasdiqladi — {som(sel.payable_minor)}</button>
                 <div className="ops-grid">
-                  <button className="btn secondary" onClick={() => act(() => api(`/ops/orders/${sel.id}/calls`, { method: 'POST', body: { outcome: 'no_answer' } }))}>Javob bermadi</button>
-                  <button className="btn secondary" onClick={() => act(() => api(`/ops/orders/${sel.id}/calls`, { method: 'POST', body: { outcome: 'call_later' } }))}>Keyin qo‘ng‘iroq</button>
-                  <button className="btn danger" onClick={() => { if (confirm('Mijoz rad etdimi? Buyurtma bekor qilinadi.')) act(() => api(`/ops/orders/${sel.id}/calls`, { method: 'POST', body: { outcome: 'rejected' } })); }}>Rad etdi</button>
+                  <button className="btn secondary" onClick={() => act(() => api(`/ops/orders/${sel.id}/calls`, { method: 'POST', body: { outcome: 'no_answer' } }), '✓ «Javob bermadi» yozildi')}>Javob bermadi</button>
+                  <button className="btn secondary" onClick={() => act(() => api(`/ops/orders/${sel.id}/calls`, { method: 'POST', body: { outcome: 'call_later' } }), '✓ Keyinroq qo‘ng‘iroq qilish yozildi')}>Keyin qo‘ng‘iroq</button>
+                  <button className="btn danger" onClick={() => { if (confirm('Mijoz rad etdimi? Buyurtma bekor qilinadi.')) act(() => api(`/ops/orders/${sel.id}/calls`, { method: 'POST', body: { outcome: 'rejected' } }), '✓ Rad etildi — buyurtma bekor qilindi'); }}>Rad etdi</button>
                 </div>
               </div>
             )}
@@ -91,12 +93,12 @@ export default function Ops() {
               <div className="ops-actions">
                 <b>Ombor va yetkazish</b>
                 <div className="ops-grid">
-                  <button className="btn secondary" disabled={sel.fulfillment_status !== 'reserved'} onClick={() => act(() => api(`/ops/orders/${sel.id}/pick`, { method: 'POST' }))}>1. Yig‘ishni boshlash</button>
-                  <button className="btn secondary" disabled={sel.fulfillment_status !== 'picking'} onClick={() => act(() => api(`/ops/orders/${sel.id}/pack`, { method: 'POST' }))}>2. Qadoqlandi</button>
+                  <button className="btn secondary" disabled={sel.fulfillment_status !== 'reserved'} onClick={() => act(() => api(`/ops/orders/${sel.id}/pick`, { method: 'POST' }), '✓ Yig‘ish boshlandi')}>1. Yig‘ishni boshlash</button>
+                  <button className="btn secondary" disabled={sel.fulfillment_status !== 'picking'} onClick={() => act(() => api(`/ops/orders/${sel.id}/pack`, { method: 'POST' }), '✓ Qadoqlandi')}>2. Qadoqlandi</button>
                 </div>
                 <label htmlFor="courier-sel">3. Kuryer</label>
                 <select id="courier-sel" value={courier} onChange={(e) => setCourier(e.target.value)}><option value="">— kuryerni tanlang —</option>{couriers.map((c) => <option key={c.id} value={c.id}>{c.display_name ?? c.phone_e164}</option>)}</select>
-                <button className="btn" disabled={!courier || sel.fulfillment_status !== 'packed'} onClick={() => act(() => api(`/ops/orders/${sel.id}/ship`, { method: 'POST', body: { courier_user_id: courier } }))}>🚚 Kuryerga topshirish</button>
+                <button className="btn" disabled={!courier || sel.fulfillment_status !== 'packed'} onClick={() => act(() => api(`/ops/orders/${sel.id}/ship`, { method: 'POST', body: { courier_user_id: courier } }), '🚚 Kuryerga topshirildi')}>🚚 Kuryerga topshirish</button>
               </div>
             )}
             {['awaiting_confirmation', 'confirmed'].includes(sel.commercial_status) && !['shipped', 'delivered'].includes(sel.fulfillment_status) && (
@@ -107,8 +109,8 @@ export default function Ops() {
               </details>
             )}
             <details><summary className="muted small">Tarix ({sel.timeline.length}) va qo‘ng‘iroqlar ({sel.calls.length})</summary>
-              <ul className="small">{sel.timeline.map((e: any) => <li key={e.id}>{new Date(e.created_at).toLocaleString('uz-UZ', { timeZone: 'Asia/Tashkent', dateStyle: 'short', timeStyle: 'short' })} · {e.dimension}: {e.from_status ?? '∅'} → {e.to_status} · {e.actor_name ?? e.actor_kind} {e.reason ? `(${e.reason})` : ''}</li>)}</ul>
-              <ul className="small">{sel.calls.map((c: any) => <li key={c.id}>📞 {c.outcome} · {c.operator_name} {c.note ? `· ${c.note}` : ''}</li>)}</ul>
+              <ul className="small hist-list">{sel.timeline.map((e: any) => <li key={e.id}><span className="muted">{when(e.created_at)}</span> {histText(e)} <span className="muted">· {e.actor_name ?? (e.actor_kind === 'anonymous' ? 'mijoz (sayt)' : e.actor_kind === 'system' ? 'tizim' : e.actor_kind)}</span></li>)}</ul>
+              <ul className="small hist-list">{sel.calls.map((c: any) => <li key={c.id}><span className="muted">{when(c.created_at)}</span> 📞 {CALL_UZ[c.outcome] ?? c.outcome} <span className="muted">· {c.operator_name}</span>{c.note ? ` · ${c.note}` : ''}</li>)}</ul>
             </details>
           </section>
         </div>
@@ -121,6 +123,17 @@ const CHANNEL_UZ: Record<string, string> = { web: 'Sayt', partner_assisted: 'Ham
 const STATUS_UZ: Record<string, string> = { awaiting_confirmation: 'Tasdiq kutilmoqda', confirmed: 'Tasdiqlangan', cancelled: 'Bekor qilingan', completed: 'Yakunlangan', draft: 'Qoralama' };
 const FUL_UZ: Record<string, string> = { unallocated: 'Ajratilmagan', reserved: 'Band qilingan', picking: 'Yig‘ilmoqda', packed: 'Qadoqlangan', shipped: 'Kuryerda', delivered: 'Yetkazildi', failed: 'Yetkazilmadi', returned: 'Qaytdi' };
 const PAY_UZ: Record<string, string> = { unpaid: 'to‘lanmagan', pending: 'kutilmoqda', paid: 'to‘langan', partially_refunded: 'qisman qaytarilgan', refunded: 'qaytarilgan', unknown: 'noma’lum' };
+const CALL_UZ: Record<string, string> = { confirmed: 'Tasdiqladi', no_answer: 'Javob bermadi', call_later: 'Keyin qo‘ng‘iroq', rejected: 'Rad etdi', busy: 'Band', wrong_number: 'Noto‘g‘ri raqam', callback_requested: 'Keyin qo‘ng‘iroq so‘radi', info_given: 'Ma’lumot berildi', problem: 'Muammo' };
+const REASON_UZ: Record<string, string> = { order_created: 'buyurtma tushdi', customer_request: 'mijoz so‘radi', no_contact: 'bog‘lanib bo‘lmadi', duplicate: 'dublikat', out_of_stock: 'mahsulot tugagan', fraud_suspected: 'shubhali', operator_confirmed: 'operator tasdiqladi', customer_rejected: 'mijoz rad etdi' };
+const when = (t: string) => t ? new Date(t).toLocaleString('uz-UZ', { timeZone: 'Asia/Tashkent', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
+/** One history row in plain Uzbek: "Bekor qilindi (bog‘lanib bo‘lmadi)" instead of "commercial: awaiting_confirmation → cancelled (no_contact)". */
+function histText(e: any): string {
+  const map = e.dimension === 'fulfillment' ? FUL_UZ : e.dimension === 'payment' ? PAY_UZ : STATUS_UZ;
+  const to = map[e.to_status] ?? e.to_status;
+  const label = e.dimension === 'payment' ? `To‘lov: ${to}` : e.dimension === 'fulfillment' ? `Ombor: ${to}` : (e.from_status ? to : 'Yangi buyurtma');
+  const r = e.reason ? (REASON_UZ[e.reason] ?? e.reason) : '';
+  return r && !(label === 'Yangi buyurtma' && e.reason === 'order_created') ? `${label} (${r})` : label;
+}
 const age = (s: number) => (s < 3600 ? `${Math.max(1, Math.round(s / 60))} daq` : s < 86400 ? `${Math.round(s / 3600)} soat` : `${Math.round(s / 86400)} kun`);
 
 function AddressEditor({ order, onSave }: { order: any; onSave: (a: Record<string, string>) => void }) {

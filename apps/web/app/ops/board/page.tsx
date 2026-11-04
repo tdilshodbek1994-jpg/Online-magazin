@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { errText } from '@/lib/errors';
+import { toast } from '@/lib/toast';
 
 /**
  * Operator Centre — supervisor board (spec §24): where work stopped, who owns it, what is needed. Every counter is a
@@ -17,6 +18,7 @@ export default function OpsBoard() {
   const [err, setErr] = useState<any>(null);
   const [f, setF] = useState<string>('attention');
   const [msg, setMsg] = useState<string | null>(null);
+  const say = (m: string) => { setMsg(m); toast(m, m.startsWith('✓') ? 'ok' : 'err'); };
   const [picked, setPicked] = useState<string[]>([]);
   const [bulkTo, setBulkTo] = useState('');
   const [bulkReason, setBulkReason] = useState('');
@@ -43,21 +45,22 @@ export default function OpsBoard() {
     ['scheduled', 'Qayta qo‘ng‘iroq', (t) => t.state === 'scheduled'],
     ['all', 'Barcha ochiq', () => true],
   ];
-  const cur = groups.find((g) => g[0] === f)!;
+  const opSel = f.startsWith('op:') ? d.staff.find((s: any) => s.id === f.slice(3)) : null;
+  const cur = groups.find((g) => g[0] === f) ?? (['op', opSel?.display_name ?? 'Operator', (t: any) => t.assignee_id === f.slice(3)] as [string, string, (t: any) => boolean]);
   const list = items.filter(cur[2]).slice(0, 100);
   const oldest = items.filter((t) => !t.assignee_id).sort((a, b) => b.age_seconds - a.age_seconds)[0];
   const transfer = async (taskId: string, to: string | null) => {
     const reason = prompt(to ? 'Nega bu operatorga o‘tkazilyapti?' : 'Nega navbatga qaytarilyapti?');
     if (!reason) return;
     setMsg(null);
-    try { await api(`/ops/center/tasks/${taskId}/assign`, { method: 'POST', body: { to_user_id: to, reason } }); setMsg('✓ O‘tkazildi'); load(); } catch (e: any) { setMsg(errText(e)); }
+    try { await api(`/ops/center/tasks/${taskId}/assign`, { method: 'POST', body: { to_user_id: to, reason } }); say('✓ O‘tkazildi'); load(); } catch (e: any) { say(errText(e)); }
   };
   const bulk = async (dry: boolean) => {
     setMsg(null);
     try {
       const r = await api('/ops/center/bulk/assign', { method: 'POST', body: { task_ids: picked, to_user_id: bulkTo === 'queue' ? null : bulkTo, reason: bulkReason, dry_run: dry } });
-      if (dry) setPreview(r); else { setPreview(null); setPicked([]); setMsg(`✓ Bajarildi: ${r.summary.moved ?? 0} ta o‘tkazildi${r.summary.skipped ? `, ${r.summary.skipped} ta o‘tkazib yuborildi` : ''}${r.summary.failed ? `, ${r.summary.failed} ta xato` : ''}`); load(); }
-    } catch (e: any) { setMsg(errText(e)); }
+      if (dry) setPreview(r); else { setPreview(null); setPicked([]); say(`✓ Bajarildi: ${r.summary.moved ?? 0} ta o‘tkazildi${r.summary.skipped ? `, ${r.summary.skipped} ta o‘tkazib yuborildi` : ''}${r.summary.failed ? `, ${r.summary.failed} ta xato` : ''}`); load(); }
+    } catch (e: any) { say(errText(e)); }
   };
   return (
     <div className="board">
@@ -71,7 +74,7 @@ export default function OpsBoard() {
             <div key={i.id} className="inc-item">
               <div className="spread"><b>{i.title}</b><span className="pill b-returned">{i.kind_uz}</span></div>
               <div className="small muted">{i.open_tasks} ta ish kutyapti · {i.author} · {new Date(i.created_at).toLocaleString('uz-UZ', { timeZone: 'Asia/Tashkent', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</div>
-              <button className="btn secondary sm" onClick={async () => { const resolution = prompt('Muammo qanday hal bo‘ldi?'); if (!resolution) return; try { const r = await api(`/ops/center/incidents/${i.id}/resolve`, { method: 'POST', body: { resolution } }); setMsg(`✓ Yopildi: ${r.returned_to_queue} ta ish navbatga qaytdi — har bir buyurtmani operator yakunlaydi`); load(); loadIncs(); } catch (e: any) { setMsg(errText(e)); } }}>Hal bo‘ldi</button>
+              <button className="btn secondary sm" onClick={async () => { const resolution = prompt('Muammo qanday hal bo‘ldi?'); if (!resolution) return; try { const r = await api(`/ops/center/incidents/${i.id}/resolve`, { method: 'POST', body: { resolution } }); say(`✓ Yopildi: ${r.returned_to_queue} ta ish navbatga qaytdi — har bir buyurtmani operator yakunlaydi`); load(); loadIncs(); } catch (e: any) { say(errText(e)); } }}>Hal bo‘ldi</button>
             </div>
           ))}
         </section>
@@ -80,7 +83,7 @@ export default function OpsBoard() {
         <h2>Operatorlar</h2>
         <div className="board-staff">
           {d.staff.length === 0 && <p className="muted">Operator roli berilgan xodim yo‘q.</p>}
-          {d.staff.map((s: any) => <div key={s.id} className="board-op"><b>{s.display_name}</b><span className="small">{SHIFT_UZ[s.shift] ?? s.shift}</span><span className="small">{s.active} ta faol ish</span></div>)}
+          {d.staff.map((s: any) => <button type="button" key={s.id} className={`board-op ${f === `op:${s.id}` ? 'on' : ''}`} aria-pressed={f === `op:${s.id}`} onClick={() => { setF(f === `op:${s.id}` ? 'all' : `op:${s.id}`); setTimeout(() => document.getElementById('board-list')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50); }}><b>{s.display_name}</b><span className="small">{SHIFT_UZ[s.shift] ?? s.shift}</span><span className="small">{s.active} ta faol ish · ko‘rish ›</span></button>)}
         </div>
       </section>
       {qual && qual.items.length > 0 && (
@@ -101,6 +104,8 @@ export default function OpsBoard() {
       <div className="chips" role="tablist" aria-label="Filtr">
         {groups.map(([k, l, fn]) => <button key={k} role="tab" aria-selected={f === k} className={`chip ${f === k ? 'on' : ''}`} onClick={() => setF(k)}>{l} <span className="q-count">{items.filter(fn).length}</span></button>)}
       </div>
+      {opSel && <div className="cat-current" id="board-list"><button type="button" className="schip on" onClick={() => setF('all')}>👤 {opSel.display_name} ishlari ×</button></div>}
+      {!opSel && <span id="board-list" />}
       {msg && <div className="notice" role="status">{msg}</div>}
       {picked.length > 0 && (
         <section className="card bulk-bar" aria-label="Ommaviy amal">
@@ -127,7 +132,7 @@ export default function OpsBoard() {
                 <option value="delivery">Yetkazish</option><option value="warehouse">Ombor</option><option value="payment">To‘lov</option><option value="provider">Tashqi xizmat</option><option value="other">Boshqa</option>
               </select>
             </div>
-            <button className="btn secondary sm mt8" disabled={incTitle.trim().length < 3} onClick={async () => { try { const r = await api('/ops/center/incidents', { method: 'POST', body: { title: incTitle, kind: incKind, task_ids: picked } }); setMsg(`✓ Muammo ochildi, ${r.linked} ta ish bog‘landi`); setPicked([]); setIncTitle(''); load(); loadIncs(); } catch (e: any) { setMsg(errText(e)); } }}>Bog‘lash ({picked.length})</button>
+            <button className="btn secondary sm mt8" disabled={incTitle.trim().length < 3} onClick={async () => { try { const r = await api('/ops/center/incidents', { method: 'POST', body: { title: incTitle, kind: incKind, task_ids: picked } }); say(`✓ Muammo ochildi, ${r.linked} ta ish bog‘landi`); setPicked([]); setIncTitle(''); load(); loadIncs(); } catch (e: any) { say(errText(e)); } }}>Bog‘lash ({picked.length})</button>
           </details>
           <p className="muted small">Ommaviy amal faqat ishni o‘tkazish uchun. To‘lov, qaytarish va komissiya ommaviy o‘zgartirilmaydi.</p>
         </section>
@@ -136,7 +141,7 @@ export default function OpsBoard() {
         <div className="slist">
           {list.map((t) => (
             <article key={t.id} className="scard board-task">
-              <div className="spread"><label className="s-check"><input type="checkbox" checked={picked.includes(t.id)} onChange={(e) => { setPreview(null); setPicked(e.target.checked ? [...picked, t.id] : picked.filter((x) => x !== t.id)); }} aria-label={`${t.number} ni tanlash`} /><b>{t.number}</b></label><span className={`pill ${t.state === 'blocked' ? 'b-returned' : t.state === 'scheduled' ? 'b-accepted' : 'b-new'}`}>{STATE_UZ[t.state] ?? t.state}</span></div>
+              <div className="spread"><label className="s-check"><input type="checkbox" checked={picked.includes(t.id)} onChange={(e) => { setPreview(null); setPicked(e.target.checked ? [...picked, t.id] : picked.filter((x) => x !== t.id)); }} aria-label={`${t.number} ni tanlash`} /><b>{t.number}</b></label><Link href={`/ops?order=${t.order_id}`} className={`pill pill-link ${t.state === 'blocked' ? 'b-returned' : t.state === 'scheduled' ? 'b-accepted' : 'b-new'}`} title="Buyurtmani ochish">{STATE_UZ[t.state] ?? t.state} ›</Link></div>
               <div className="small">{t.five.what}</div>
               {t.sla === 'critical' && <div className="sla-pill sla-crit">🔥 Muddat 2 soatdan ko‘p o‘tgan</div>}{t.sla === 'late' && <div className="sla-pill sla-late">⚠️ Muddat o‘tgan</div>}
               {t.blocked_by && <div className="small warn-t">⛔ {t.blocked_by}</div>}
@@ -165,6 +170,7 @@ function QaSample() {
   const [items, setItems] = useState<any[] | null>(null);
   const [form, setForm] = useState<Record<string, any>>({});
   const [msg, setMsg] = useState<string | null>(null);
+  const say = (m: string) => { setMsg(m); toast(m, m.startsWith('✓') ? 'ok' : 'err'); };
   const load = () => api('/ops/center/qa/sample?n=5').then((r) => setItems(r.items)).catch(() => setItems([]));
   return (
     <details className="card q-box" onToggle={(e) => { if ((e.target as HTMLDetailsElement).open && !items) void load(); }}>
@@ -184,7 +190,7 @@ function QaSample() {
             <label htmlFor={`qs-${t.id}`}>Baho: {f.score}</label>
             <input id={`qs-${t.id}`} type="range" min={1} max={5} value={f.score} onChange={(e) => set('score', Number(e.target.value))} />
             <input value={f.note} onChange={(e) => set('note', e.target.value)} placeholder={f.score <= 2 ? 'Sabab (2 va undan past baho uchun majburiy)' : 'Izoh (ixtiyoriy)'} aria-label="QA izohi" />
-            <button className="btn secondary sm" disabled={f.score <= 2 && f.note.trim().length < 3} onClick={async () => { try { await api(`/ops/center/qa/${t.id}`, { method: 'POST', body: { checks: { correct_outcome: f.correct_outcome, data_complete: f.data_complete, clear_communication: f.clear_communication }, score: f.score, note: f.note || undefined } }); setMsg('✓ Baholandi — operator ko‘radi va e’tiroz yoza oladi'); setItems(items.filter((x) => x.id !== t.id)); } catch (e: any) { setMsg(errText(e)); } }}>Saqlash</button>
+            <button className="btn secondary sm" disabled={f.score <= 2 && f.note.trim().length < 3} onClick={async () => { try { await api(`/ops/center/qa/${t.id}`, { method: 'POST', body: { checks: { correct_outcome: f.correct_outcome, data_complete: f.data_complete, clear_communication: f.clear_communication }, score: f.score, note: f.note || undefined } }); say('✓ Baholandi — operator ko‘radi va e’tiroz yoza oladi'); setItems(items.filter((x) => x.id !== t.id)); } catch (e: any) { say(errText(e)); } }}>Saqlash</button>
           </div>
         );
       })}

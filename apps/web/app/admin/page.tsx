@@ -177,23 +177,16 @@ function Orders({ lang }: { lang: any }) {
             const a = o.address_snapshot ?? {};
             const quick = a.quick && a.house === '-';
             return (
-              <article key={o.id} className="scard">
-                <div className="spread">
-                  <b>{o.number}</b>
-                  <span className={`pill b-${o.bucket}`}>{BUCKET_UZ[o.bucket]}</span>
+              // Compact row (user: "juda bardak"): 4 short lines, the whole card opens the order.
+              <a key={o.id} href={`/ops?order=${o.id}`} className="scard ocard">
+                <div className="spread"><b>{o.number}</b><span className={`pill b-${o.bucket}`}>{BUCKET_UZ[o.bucket]}</span></div>
+                <div className="small">{o.customer_name ?? '—'} · {o.customer_phone}{o.partner_code ? <span className="ocard-partner"> · 🤝 {o.partner_code}</span> : null}</div>
+                <div className="small muted ocard-items">{(o.items ?? []).map((i: any) => `${pick(i.name, lang)}${i.variant && Object.values(i.variant).length ? ` (${Object.values(i.variant).join('/')})` : ''} × ${i.qty}`).join(', ')}</div>
+                <div className="spread small">
+                  <b>{som(o.payable_minor)} <span className="muted">{o.payment_method === 'cod' ? 'naqd' : 'onlayn'}</span></b>
+                  <span className="muted">{quick ? '⚡ manzil yo‘q · ' : ''}{new Date(o.created_at).toLocaleString('uz-UZ', { timeZone: 'Asia/Tashkent', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
                 </div>
-                <div className="req-grid">
-                  <div><span>Mijoz</span>{o.customer_name ?? '—'} · <a href={`tel:${o.customer_phone}`}>{o.customer_phone}</a></div>
-                  <div><span>Summa</span><b>{som(o.payable_minor)}</b> <span className="muted small">{o.payment_method === 'cod' ? 'naqd' : 'onlayn'}</span></div>
-                  <div><span>Manzil</span>{quick ? <span className="no-t">⚡ Tez buyurtma — manzil so‘ralmagan</span> : [a.district, a.street, a.house].filter(Boolean).join(', ')}</div>
-                  <div><span>Hamkor</span>{o.partner_code ? `${o.partner_name} (${o.partner_code})${o.stream_name ? ` · ${o.stream_name}` : ''}` : '—'}</div>
-                </div>
-                <div className="small">{(o.items ?? []).map((i: any, k: number) => <div key={k}>• {pick(i.name, lang)}{i.variant && Object.values(i.variant).length ? ` (${Object.values(i.variant).join('/')})` : ''} × <b>{i.qty}</b></div>)}</div>
-                <div className="spread muted small">
-                  <span>🕒 {new Date(o.created_at).toLocaleString('uz-UZ', { dateStyle: 'short', timeStyle: 'short' })}{o.operator_name ? ` · operator: ${o.operator_name}` : ''}</span>
-                  <a href={`/ops?order=${o.id}`}>Kartochka →</a>
-                </div>
-              </article>
+              </a>
             );
           })}
         </div>

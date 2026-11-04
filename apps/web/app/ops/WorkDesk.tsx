@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api, som } from '@/lib/api';
 import { errText } from '@/lib/errors';
+import { toast } from '@/lib/toast';
 import { pick, useI18n } from '@/lib/i18n';
 
 /**
@@ -12,6 +13,14 @@ import { pick, useI18n } from '@/lib/i18n';
 const SHIFT: [string, string][] = [['working', '🟢 Ishdaman'], ['break', '☕ Tanaffus'], ['busy', '⏳ Band'], ['off', '⏹ Smena tugadi']];
 const STATE_UZ: Record<string, string> = { queued: 'Navbatda', assigned: 'Menda', in_progress: 'Ishlanmoqda', scheduled: 'Qayta qo‘ng‘iroq', waiting_customer: 'Mijozni kutyapmiz', waiting_internal: 'Ichki muammo', blocked: 'To‘xtagan', resolved: 'Hal qilindi', closed: 'Yopildi' };
 const EVENT_UZ: Record<string, string> = { sla_escalated: 'Muddat jiddiy o‘tdi — rahbarga ko‘tarildi', handoff_requested: 'Topshirish so‘raldi', handoff_accepted: 'Topshirish qabul qilindi', handoff_declined: 'Topshirish rad etildi', handoff_expired: 'Topshirish muddati o‘tdi', handoff_cancelled: 'Topshirish bekor qilindi', supervisor_transfer: 'Rahbar o‘tkazdi', partner_request: 'Hamkor so‘rovi', partner_answered: 'Hamkorga javob berildi', claimed: 'Ishni oldi', reclaimed_after_lease: 'Ishni qayta oldi (oldingi egasi javob bermadi)', released: 'Navbatga qaytardi', contact: 'Aloqa natijasi', auto_closed: 'Avtomatik yopildi' };
+/** What the operator sees on top after a successful tap. */
+function okText(path: string, body: any): string {
+  if (path === 'claim') return '✓ Ish sizga olindi';
+  if (path === 'release') return '✓ Navbatga qaytarildi';
+  if (path === 'handoff') return '✓ Topshirish so‘rovi yuborildi';
+  const o = body?.outcome;
+  return o === 'confirmed' ? '✅ Tasdiqlandi — buyurtma omborga o‘tdi' : o === 'rejected' ? '✓ Rad etildi — buyurtma bekor qilindi' : o === 'info_given' ? '✓ Ma’lumot berildi deb yozildi' : o ? `✓ Saqlandi: ${OUT_UZ[o] ?? o}` : '✓ Saqlandi';
+}
 const OUT_UZ: Record<string, string> = { no_answer: 'Javob bermadi', busy: 'Band', wrong_number: 'Noto‘g‘ri raqam', callback_requested: 'Keyin qo‘ng‘iroq qilishni so‘radi', info_given: 'Ma’lumot berildi', confirmed: 'Tasdiqladi', rejected: 'Rad etdi', problem: 'Muammo' };
 const SLA_UZ: Record<string, [string, string]> = { soon: ['⏰ Muddat yaqin', 'sla-soon'], late: ['⚠️ Kechikdi', 'sla-late'], critical: ['🔥 Jiddiy kechikdi', 'sla-crit'] };
 const tash = (v: string) => new Date(v).toLocaleString('uz-UZ', { timeZone: 'Asia/Tashkent', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
@@ -37,10 +46,11 @@ export function WorkDesk({ onChanged }: { onChanged?: () => void }) {
     const i = setInterval(() => { api(`/ops/center/tasks/${task.id}/heartbeat`, { method: 'POST' }).catch(() => setErr('Bu ish endi sizda emas — yangilang.')); }, 5 * 60_000);
     return () => clearInterval(i);
   }, [task?.id, task?.mine]);
-  const run = async (fn: () => Promise<any>, after?: (r: any) => void) => {
+  const run = async (fn: () => Promise<any>, after?: (r: any) => void, okMsg?: string) => {
     setBusy(true); setErr(null);
-    try { const r = await fn(); after?.(r); await load(); onChanged?.(); } catch (e: any) {
-      setErr(e.code === 'TASK_VERSION_CONFLICT' || e.code === 'TASK_ALREADY_CLAIMED' ? 'Bu ishni boshqa operator oldi yoki u o‘zgardi — ro‘yxat yangilandi.' : e.code === 'SHIFT_NOT_WORKING' ? 'Yangi ish olish uchun avval «Ishdaman» holatini yoqing.' : e.code === 'WORKLOAD_LIMIT' ? `Sizda ${e.details?.max ?? ''} ta faol ish bor — avval ularni tugating.` : e.code === 'NEXT_CONTACT_REQUIRED' ? 'Qayta qo‘ng‘iroq vaqtini kiriting.' : e.code === 'REASON_REQUIRED' ? 'Sababini yozing.' : e.code === 'OUTSIDE_CONTACT_HOURS' ? `Mijozga faqat ${e.details?.from ?? 9}:00–${e.details?.to ?? 21}:00 oralig‘ida qo‘ng‘iroq qilinadi.` : e.code === 'HANDOFF_ALREADY_PENDING' ? 'Bu ish uchun topshirish so‘rovi allaqachon yuborilgan.' : e.code === 'HANDOFF_NOT_PENDING' ? 'Topshirish so‘rovi endi amal qilmaydi.' : errText(e));
+    try { const r = await fn(); if (okMsg) toast(okMsg); after?.(r); await load(); onChanged?.(); } catch (e: any) {
+      const m = (e.code === 'TASK_VERSION_CONFLICT' || e.code === 'TASK_ALREADY_CLAIMED' ? 'Bu ishni boshqa operator oldi yoki u o‘zgardi — ro‘yxat yangilandi.' : e.code === 'SHIFT_NOT_WORKING' ? 'Yangi ish olish uchun avval «Ishdaman» holatini yoqing.' : e.code === 'WORKLOAD_LIMIT' ? `Sizda ${e.details?.max ?? ''} ta faol ish bor — avval ularni tugating.` : e.code === 'NEXT_CONTACT_REQUIRED' ? 'Qayta qo‘ng‘iroq vaqtini kiriting.' : e.code === 'REASON_REQUIRED' ? 'Sababini yozing.' : e.code === 'OUTSIDE_CONTACT_HOURS' ? `Mijozga faqat ${e.details?.from ?? 9}:00–${e.details?.to ?? 21}:00 oralig‘ida qo‘ng‘iroq qilinadi.` : e.code === 'HANDOFF_ALREADY_PENDING' ? 'Bu ish uchun topshirish so‘rovi allaqachon yuborilgan.' : e.code === 'HANDOFF_NOT_PENDING' ? 'Topshirish so‘rovi endi amal qilmaydi.' : errText(e));
+      setErr(m); toast(m, 'err');
       await load();
     } finally { setBusy(false); }
   };
@@ -52,7 +62,7 @@ export function WorkDesk({ onChanged }: { onChanged?: () => void }) {
       <div className="desk-top">
         <h2 id="desk-h">Mening ishim</h2>
         <div className="seg desk-shift" role="radiogroup" aria-label="Smena holati">
-          {SHIFT.map(([k, l]) => <button key={k} type="button" role="radio" aria-checked={d.shift === k} className={d.shift === k ? 'on' : ''} onClick={() => run(() => api('/ops/center/shift', { method: 'PUT', body: { state: k } }))}>{l}</button>)}
+          {SHIFT.map(([k, l]) => <button key={k} type="button" role="radio" aria-checked={d.shift === k} className={d.shift === k ? 'on' : ''} onClick={() => run(() => api('/ops/center/shift', { method: 'PUT', body: { state: k } }), undefined, `✓ Holat: ${l}`)}>{l}</button>)}
         </div>
       </div>
       <div className="desk-stats">
@@ -103,7 +113,7 @@ export function WorkDesk({ onChanged }: { onChanged?: () => void }) {
       )}
       <MyReviews />
       {task && <TaskCard task={task} order={order} lang={lang} busy={busy} onClose={() => { setTask(null); setOrder(null); }}
-        onAct={(path, body, done) => run(() => api(`/ops/center/tasks/${task.id}/${path}`, { method: 'POST', body: { expected_version: task.version, ...body } }), () => { if (done) { setTask(null); setOrder(null); } else void openTask(task.id); })} />}
+        onAct={(path, body, done) => run(() => api(`/ops/center/tasks/${task.id}/${path}`, { method: 'POST', body: { expected_version: task.version, ...body } }), () => { if (done) { setTask(null); setOrder(null); } else void openTask(task.id); }, okText(path, body))} />}
     </section>
   );
 }
@@ -131,7 +141,7 @@ function TaskCard({ task, order, lang, busy, onClose, onAct }: { task: any; orde
             <div className="spread"><span>{order.contact_snapshot?.name ?? 'Mijoz'}</span><a className="btn sm" href={`tel:${order.customer_phone}`}>📞 Qo‘ng‘iroq</a></div>
             <p className="muted small">Tugma faqat telefonni ochadi — natijani pastda o‘zingiz belgilaysiz.</p>
             {order.partner_name && <p className="small">🤝 Manba: hamkor {order.partner_name} ({order.partner_code}) — siz olganingiz manbani o‘zgartirmaydi.</p>}
-            {order.lines?.map((l: any) => <div key={l.id} className="spread small"><span>{pick(l.product_snapshot.name, lang)} × {l.qty - (l.canceled_qty ?? 0)}</span><span>{som(l.line_net_minor)}</span></div>)}
+            {order.lines?.map((l: any) => <div key={l.id} className="spread small"><span>{pick(l.product_snapshot.name, lang)} × {order.commercial_status === 'cancelled' ? l.qty : l.qty - (l.canceled_qty ?? 0)}</span><span>{som(l.line_net_minor)}</span></div>)}
             <div className="spread"><b>Jami (yetkazish bilan)</b><b>{som(order.payable_minor)}</b></div>
             <div className="small muted">{[order.address_snapshot?.district, order.address_snapshot?.street, order.address_snapshot?.house].filter((x: any) => x && x !== '-').join(', ') || 'Manzil hali yo‘q'}</div>
           </div>

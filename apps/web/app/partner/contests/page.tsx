@@ -9,10 +9,13 @@ import { dt, METRIC_UZ, STATUS_UZ } from './shared';
 export default function ContestCenter() {
   const [items, setItems] = useState<any[] | null>(null);
   const [prizes, setPrizes] = useState<any[]>([]);
+  const [legacy, setLegacy] = useState<any[]>([]);
   const [err, setErr] = useState<any>(null);
   useEffect(() => {
     api('/partner/cc/contests').then((r) => setItems(r.items)).catch(setErr);
     api('/partner/cc/prizes').then((r) => setPrizes(r.items)).catch(() => {});
+    // Contests made in the earlier simple section are shown here too, so nothing gets lost.
+    api('/partner/programs').then((r) => setLegacy(r.contests ?? [])).catch(() => {});
   }, []);
   const groups: [string, string[]][] = [['Davom etmoqda', ['active']], ['Tez orada', ['scheduled']], ['Natija kutilmoqda', ['calculating', 'provisional', 'appeal_window', 'paused']], ['Yakunlangan', ['finalized', 'awarded', 'canceled']]];
   return (
@@ -21,7 +24,22 @@ export default function ContestCenter() {
       <p className="muted small">Qatnashish bepul va ixtiyoriy. Natija faqat yetkazilgan va to‘lovi tasdiqlangan haqiqiy buyurtmalardan hisoblanadi. Qatnashmasangiz ham oddiy komissiyangiz o‘zgarmaydi.</p>
       {err && <div className="notice" role="alert">{errText(err)}</div>}
       {items === null && !err && <div className="loading" role="status"><span className="spinner" aria-hidden />Yuklanmoqda…</div>}
-      {items?.length === 0 && <div className="empty">Hozircha konkurs yo‘q.</div>}
+      {items?.length === 0 && legacy.length === 0 && <div className="empty">Hozircha konkurs yo‘q.</div>}
+      {legacy.length > 0 && (
+        <section>
+          <h2 className="an-h2">Konkurslar</h2>
+          <div className="slist">
+            {legacy.map((c) => (
+              <Link key={c.id} href="/partner/programs#konkurs" className="scard cc-card">
+                <div className="spread"><b>{c.title}</b><span className={`pill ${c.status === 'active' ? 'b-new' : 'b-delivered'}`}>{c.status === 'active' ? 'Davom etmoqda' : 'Yakunlandi'}</span></div>
+                <div className="small muted">{dt(c.starts_at)} — {dt(c.ends_at)} · yetkazilgan buyurtmalar bo‘yicha</div>
+                {Array.isArray(c.prizes) && c.prizes.length > 0 && <div className="small">🏆 {c.prizes.slice(0, 3).map((p: any) => `${p.place}-o‘rin: ${p.text ?? (p.amount_minor ? som(p.amount_minor) : '')}`).join(' · ')}</div>}
+                <div className="small">{c.me?.rank ? <span className="ok-t">Sizning o‘rningiz: #{c.me.rank}</span> : <span className="w-link">Batafsil va reyting ›</span>}</div>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
       {groups.map(([title, sts]) => {
         const list = (items ?? []).filter((c) => sts.includes(c.status));
         if (!list.length) return null;

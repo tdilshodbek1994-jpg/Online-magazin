@@ -7,6 +7,11 @@ import { badRequest, notFound } from '../../platform/errors.js';
 import { estimateCommission } from '../commissions/service.js';
 import { type Deps, route, zIdParam } from '../../platform/http.js';
 import { myPartner } from './routes.js';
+import { createHash } from 'node:crypto';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import sharp from 'sharp';
+import { sniff } from '../catalog/media.js';
 
 /**
  * Partner cabinet v2 read models: dashboard, market, streams ("oqim"), statistics, requests, leaderboard.
@@ -146,6 +151,29 @@ export function registerPartnerCabinet(app: FastifyInstance, deps: Deps): void {
     const max = commission < price ? commission : price - 100n;
     return { price_minor: price.toString(), commission_minor: commission.toString(), max_discount_minor: (max > 0n ? max : 0n).toString() };
   }
+
+  route(app, deps, { method: 'POST', url: '/partner/avatar', tags: T, summary: 'Set my profile photo (JPEG/PNG/WEBP ≤3MB; re-encoded 256px square WEBP)',
+    body: z.object({ content_base64: z.string().max(4_400_000) }) },
+  async ({ actor, db, cfg, body }) => {
+    const p = await myPartner(db, actor, false);
+    const buf = Buffer.from(body.content_base64, 'base64');
+    if (!buf.length || buf.length > 3 * 1024 * 1024) throw badRequest('MEDIA_SIZE_INVALID');
+    if (!sniff(buf)) throw badRequest('MEDIA_TYPE_NOT_ALLOWED');
+    let out: Buffer;
+    try { out = await sharp(buf, { limitInputPixels: 6000 * 6000 }).rotate().resize(256, 256, { fit: 'cover' }).webp({ quality: 82 }).toBuffer(); } catch { throw badRequest('MEDIA_CORRUPT'); }
+    const key = `avatar-${createHash('sha256').update(out).digest('hex').slice(0, 24)}.webp`;
+    await mkdir(join(cfg.mediaDir, 'public'), { recursive: true });
+    await writeFile(join(cfg.mediaDir, 'public', key), out);
+    await db.query(`UPDATE partners SET avatar_key=$2 WHERE id=$1`, [p.id, key]);
+    await audit(db, actor, 'partner.avatar_set', { type: 'partner', id: p.id }, {});
+    return { avatar_url: `/media/${key}` };
+  });
+
+  route(app, deps, { method: 'DELETE', url: '/partner/avatar', tags: T, summary: 'Remove my profile photo' }, async ({ actor, db }) => {
+    const p = await myPartner(db, actor, false);
+    await db.query(`UPDATE partners SET avatar_key=NULL WHERE id=$1`, [p.id]);
+    return { ok: true };
+  });
 
   route(app, deps, { method: 'GET', url: '/partner/streams/discount-limit', tags: T, summary: 'Max customer discount a partner can give on a product (from their commission)', query: z.object({ product_id: z.string().uuid() }) },
     async ({ actor, db, query }) => {

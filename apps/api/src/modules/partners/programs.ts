@@ -90,8 +90,9 @@ export function registerPartnerPrograms(app: FastifyInstance, deps: Deps): void 
     for (const c of contests) {
       const board = c.status === 'finished' && c.results ? (c.results as any[]) : await contestBoard(db, c);
       const mine = board.find((r: any) => r.pid === me.id);
+      const avatars = new Map((await many<{ id: string; k: string | null }>(db, `SELECT id, avatar_key AS k FROM partners WHERE id = ANY($1::uuid[])`, [board.slice(0, 10).map((r: any) => r.pid)])).filter((x) => x.k).map((x) => [x.id, `/media/${x.k}`]));
       outContests.push({ id: c.id, title: c.title, description: c.description, starts_at: c.starts_at, ends_at: c.ends_at, metric: c.metric, min_delivered: c.min_delivered, prizes: c.prizes, status: c.status,
-        top: board.slice(0, 10).map((r: any) => ({ rank: r.rank, name: r.pid === me.id ? r.display_name : mask(r.display_name), score: r.score, delivered: r.delivered, me: r.pid === me.id })),
+        top: board.slice(0, 10).map((r: any) => ({ rank: r.rank, name: r.display_name, avatar: avatars.get(r.pid) ?? null, score: r.score, delivered: r.delivered, me: r.pid === me.id })),
         me: mine ? { rank: mine.rank, score: mine.score, delivered: mine.delivered } : null });
     }
     const rules = await many<any>(db, `SELECT id, name, period, threshold_delivered, amount_minor::text FROM bonus_rules WHERE active ORDER BY period, threshold_delivered`);

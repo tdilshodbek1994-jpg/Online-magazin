@@ -93,7 +93,7 @@ export function registerPartners(app: FastifyInstance, deps: Deps): void {
     const p = await myPartner(db, actor, false);
     const bal = await maybeOne(db, `SELECT estimated_minor::text, pending_minor::text, available_minor::text, reserved_minor::text, paid_minor::text, debt_minor::text FROM partner_balances WHERE partner_id=$1`, [p.id]);
     const dest = p.payout_destination as { type?: string; masked?: string } | null;
-    return { id: p.id, code: p.code, display_name: p.display_name, status: p.status, balances: bal ?? { estimated_minor: '0', pending_minor: '0', available_minor: '0', reserved_minor: '0', paid_minor: '0', debt_minor: '0' },
+    return { id: p.id, code: p.code, display_name: p.display_name, status: p.status, avatar_url: (p as any).avatar_key ? `/media/${(p as any).avatar_key}` : null, balances: bal ?? { estimated_minor: '0', pending_minor: '0', available_minor: '0', reserved_minor: '0', paid_minor: '0', debt_minor: '0' },
       payout_destination: dest ? { type: dest.type, masked: dest.masked, verified: !!p.payout_destination_verified_at } : null };
   });
 

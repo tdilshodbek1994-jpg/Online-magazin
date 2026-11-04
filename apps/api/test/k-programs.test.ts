@@ -57,7 +57,7 @@ describe('Partner programs', () => {
     const lc = live.json.contests.find((x: any) => x.id === c.json.id);
     expect(lc.me.delivered).toBe(1);
     expect(lc.me.rank).toBeGreaterThan(1);
-    expect(lc.top[0].name).toMatch(/\*/); // other partners masked
+    expect(lc.top[0].name).not.toMatch(/\*/); // owner decision: real names on contest boards (photo or UzShop mark)
     const fin = await api(t, 'POST', `/admin/contests/${c.json.id}/finish`, { token: s.owner.token });
     expect(fin.json.winners[0]).toMatchObject({ pid: winner.partnerId, rank: 1 });
     const b1 = await balances(t, winner.partnerId);

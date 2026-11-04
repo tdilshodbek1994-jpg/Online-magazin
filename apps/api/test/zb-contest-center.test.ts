@@ -129,6 +129,7 @@ describe('Contest Center P0', () => {
     const a = await mkPartner(t), b = await mkPartner(t);
     const prod = await mkProduct(t, { prices: [50_000], stock: [20], rule: { kind: 'fixed_per_unit', fixed: 5_000 } });
     const id = await liveContest('settled_orders');
+    await t.db.query(`UPDATE cc_versions SET name_privacy='alias' WHERE contest_id=$1`, [id]); // contest-level privacy option
     await join(a, id); await join(b, id);
     const ob = await referralOrder(b, prod.skuIds[0]!, 1);
     await settle(ob); await recompute(id);

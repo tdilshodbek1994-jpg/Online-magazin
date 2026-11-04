@@ -1517,3 +1517,54 @@ button.cc-card, a.cc-card { display: grid; gap: 4px; text-align: left; font: inh
 .pr-rank { color: var(--muted); font-weight: 800; }
 .pr-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 @media (max-width: 360px) { .pod-ava { width: 44px; height: 44px; font-size: 15px; } .pod-1 .pod-ava { width: 54px; height: 54px; } }
+/* ===== TOP 3 (dark stage, glass cards) ===== */
+.t3 { display: grid; gap: 10px; }
+.t3-stage { position: relative; display: grid; gap: 14px; padding: 18px 12px 14px; border-radius: 22px; overflow: hidden; color: #fff;
+  background: radial-gradient(circle at 50% 18%, rgba(255,196,0,.22) 0, transparent 45%), radial-gradient(1px 1px at 12% 20%, #fff8 50%, transparent 51%), radial-gradient(1px 1px at 80% 12%, #fff9 50%, transparent 51%), radial-gradient(1.5px 1.5px at 66% 70%, #ffd56b 50%, transparent 51%), radial-gradient(1px 1px at 30% 80%, #fff7 50%, transparent 51%), linear-gradient(180deg, #121a33 0%, #0b1022 100%); }
+.t3-title { display: flex; justify-content: center; align-items: center; gap: 10px; font-size: 30px; font-weight: 900; letter-spacing: .04em;
+  background: linear-gradient(180deg, #fff2b3 0%, #f7c948 45%, #c98a10 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.t3-laurel { font-size: 24px; color: #f2b90c; -webkit-text-fill-color: #f2b90c; transform: scaleX(-1); }
+.t3-laurel.r { transform: none; }
+.t3-cards { display: grid; grid-template-columns: 1fr 1.12fr 1fr; align-items: end; gap: 8px; }
+.t3-card { position: relative; display: grid; justify-items: center; gap: 6px; padding: 14px 8px 10px; border-radius: 22px 22px 18px 18px; min-width: 0; text-align: center;
+  border: 1px solid rgba(255,255,255,.18); box-shadow: inset 0 1px 0 rgba(255,255,255,.25), 0 10px 28px rgba(0,0,0,.35); backdrop-filter: blur(4px); }
+.t3-silver { background: linear-gradient(180deg, rgba(148,170,210,.45) 0%, rgba(60,80,120,.55) 100%); }
+.t3-gold { padding-top: 24px; background: linear-gradient(180deg, #ffd84d 0%, #f2b90c 55%, #d99a06 100%); color: #2b1d00; border-color: #ffe9a3; box-shadow: 0 0 0 1px rgba(255,214,77,.4), 0 14px 36px rgba(242,185,12,.35); }
+.t3-bronze { background: linear-gradient(180deg, rgba(214,130,90,.6) 0%, rgba(120,60,40,.7) 100%); }
+.t3-empty { min-height: 120px; background: rgba(255,255,255,.05); }
+.t3-crown { position: absolute; top: -18px; font-size: 28px; filter: drop-shadow(0 4px 6px rgba(0,0,0,.35)); }
+.t3-ring { position: relative; width: 66px; height: 66px; border-radius: 50%; padding: 4px; display: grid; place-items: center; }
+.t3-silver .t3-ring { background: linear-gradient(135deg, #f1f5ff, #8fa3c7); box-shadow: 0 0 18px rgba(170,200,255,.6); }
+.t3-gold .t3-ring { width: 82px; height: 82px; background: linear-gradient(135deg, #fff3b0, #e0a106); box-shadow: 0 0 22px rgba(255,214,77,.8); }
+.t3-bronze .t3-ring { background: linear-gradient(135deg, #ffd0b0, #b8643c); box-shadow: 0 0 16px rgba(230,140,90,.55); }
+.t3-ava { width: 100%; height: 100%; border-radius: 50%; display: grid; place-items: center; font-weight: 900; font-size: 20px; color: #fff; background: linear-gradient(135deg, #1f2a4d, #0f1630); }
+.t3-gold .t3-ava { font-size: 24px; }
+.t3-ava.sm { width: 40px; height: 40px; font-size: 14px; border: 2px solid #c98a10; }
+.t3-badge { position: absolute; bottom: -10px; left: 50%; transform: translateX(-50%); width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-weight: 900; font-size: 15px; border: 2px solid rgba(255,255,255,.85); }
+.t3-silver .t3-badge { background: linear-gradient(135deg, #f8f9fa, #adb5bd); color: #343a40; }
+.t3-gold .t3-badge { width: 32px; height: 32px; background: linear-gradient(135deg, #ffe066, #f08c00); color: #3b2500; }
+.t3-bronze .t3-badge { background: linear-gradient(135deg, #ffc9a0, #c0622f); color: #3b1a08; }
+.t3-name { margin-top: 10px; font-size: 13px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.t3-sub { font-size: 12px; opacity: .85; margin-top: -4px; }
+.t3-box { width: 100%; display: grid; gap: 2px; padding: 8px 4px; border-radius: 14px; background: rgba(255,255,255,.18); border: 1px solid rgba(255,255,255,.25); box-shadow: inset 0 1px 0 rgba(255,255,255,.3); }
+.t3-gold .t3-box { background: rgba(255,240,170,.55); border-color: rgba(255,255,255,.6); }
+.t3-box span { font-size: 11px; opacity: .85; }
+.t3-box b { font-size: 15px; overflow-wrap: anywhere; }
+.t3-gold .t3-box b { font-size: 17px; }
+.t3-me .t3-ring { outline: 3px solid #69db7c; outline-offset: 2px; }
+.t3-mine { display: grid; grid-template-columns: auto auto 1fr auto; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 16px; background: rgba(255,255,255,.06); border: 1px solid rgba(242,185,12,.45); box-shadow: 0 0 18px rgba(242,185,12,.15) inset; }
+.t3-mine-rank { display: grid; justify-items: center; width: 44px; height: 44px; border-radius: 50%; place-content: center; font-weight: 900; font-size: 18px; color: #3b2500; background: radial-gradient(circle, #ffe066, #e0a106); border: 2px solid #fff3b0; line-height: 1; }
+.t3-mine-rank span { font-size: 12px; margin-bottom: -2px; }
+.t3-mine-mid { display: grid; gap: 6px; min-width: 0; }
+.t3-bar { height: 8px; border-radius: 99px; background: rgba(255,255,255,.15); overflow: hidden; }
+.t3-bar i { display: block; height: 100%; border-radius: 99px; background: linear-gradient(90deg, #ffd43b, #f59f00); }
+.t3-mine-val { font-size: 18px; }
+@media (max-width: 360px) { .t3-title { font-size: 24px; } .t3-ring { width: 54px; height: 54px; } .t3-gold .t3-ring { width: 66px; height: 66px; } .t3-box b { font-size: 13px; } }
+img.t3-ava { object-fit: cover; display: block; }
+.t3-ava-def { background: linear-gradient(135deg, #0b7a55, #04563b); }
+.t3-ava-def img { width: 62%; height: 62%; object-fit: contain; border-radius: 22%; }
+.pd-avatar-up { position: relative; cursor: pointer; overflow: visible; }
+.pd-avatar-up img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
+.pd-cam { position: absolute; right: -4px; bottom: -4px; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; background: #fff; box-shadow: 0 2px 6px rgba(0,0,0,.25); }
+.t3-name { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.25; overflow-wrap: anywhere; min-height: 2.5em; }
+.t3-laurel { transform: none; font-size: 22px; filter: drop-shadow(0 0 6px rgba(255,214,77,.7)); }

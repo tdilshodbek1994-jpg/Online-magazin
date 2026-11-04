@@ -83,7 +83,7 @@ export default function ContestDetail({ params }: { params: Promise<{ id: string
         <section className="card">
           <div className="spread"><b>Reyting</b><span className="small muted">{lb.kind === 'final' ? 'Yakuniy' : lb.kind === 'provisional' ? 'Dastlabki' : 'Jonli'} · {dt(lb.as_of)}</span></div>
           {lb.warning && <p className="small muted">⚠️ {lb.warning}</p>}
-          <Podium rows={lb.items.map((x: any) => ({ rank: x.rank, name: x.name, value: fmtScore(r.metric, x.score), me: x.me }))} />
+          <Podium boxLabel="Natija" rows={lb.items.map((x: any) => ({ rank: x.rank, name: x.name, value: fmtScore(r.metric, x.score), num: Number(x.score), me: x.me, avatar: x.avatar }))} />
         </section>
       )}
 

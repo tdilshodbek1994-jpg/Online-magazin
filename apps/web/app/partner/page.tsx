@@ -5,6 +5,7 @@ import { Async } from '@/components/Header';
 import { api, som } from '@/lib/api';
 import { BUCKET_LABEL, Chips, PERIODS, TelegramConnect, usePartnerMe } from './shared';
 import { errText, stText } from '@/lib/errors';
+import { toast } from '@/lib/toast';
 
 function ApplyForm({ onDone }: { onDone: () => void }) {
   const [apply, setApply] = useState({ name: '', channels: '' });
@@ -25,6 +26,7 @@ function ApplyForm({ onDone }: { onDone: () => void }) {
 export default function PartnerDashboard() {
   const { me, error, reload } = usePartnerMe();
   const [period, setPeriod] = useState('today');
+  const [avatar, setAvatar] = useState<string | null>(null);
   const [d, setD] = useState<any>(null);
   const [err, setErr] = useState<any>(null);
   const [day, setDay] = useState<any>(null);
@@ -46,7 +48,17 @@ export default function PartnerDashboard() {
       ) : me && (
         <>
           <section className="pd-hero pd-hero2">
-            <div className="pd-avatar" aria-hidden>{(me.display_name || '?').slice(0, 2).toUpperCase()}</div>
+            {/* Profile photo (shown on contest boards). Tap to change; without a photo the UzShop mark is used there. */}
+            <label className="pd-avatar pd-avatar-up" title="Profil rasmini qo‘yish">
+              {avatar || me.avatar_url ? <img src={avatar ?? me.avatar_url} alt="Profil rasmi" /> : (me.display_name || '?').slice(0, 2).toUpperCase()}
+              <span className="pd-cam" aria-hidden>📷</span>
+              <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" aria-label="Profil rasmini yuklash" onChange={async (e) => {
+                const f = e.target.files?.[0]; e.target.value = ''; if (!f) return;
+                if (f.size > 3 * 1024 * 1024) { toast('Rasm 3 MB dan kichik bo‘lsin', 'err'); return; }
+                const b64 = await new Promise<string>((res) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1] ?? ''); r.readAsDataURL(f); });
+                try { const r = await api('/partner/avatar', { method: 'POST', body: { content_base64: b64 } }); setAvatar(r.avatar_url); toast('✓ Profil rasmi saqlandi'); } catch (er: any) { toast(errText(er), 'err'); }
+              }} />
+            </label>
             <div className="pd-who">
               <h1>{me.display_name}</h1>
               <div className="muted-inv">Kod: <code>{me.code}</code>{me.status !== 'active' && <span className="badge"> {stText(me.status)}</span>}</div>

@@ -30,7 +30,7 @@ const zRules = z.object({
   eligibility: z.object({ product_ids: z.array(z.string().uuid()).max(200).optional(), category_ids: z.array(z.string().uuid()).max(50).optional(), partners_joined_after: z.string().datetime({ offset: true }).optional() }).default({}),
   min_score: z.coerce.number().int().min(0).default(1), appeal_days: z.number().int().min(0).max(30).default(3),
   tie_break: z.array(z.enum(['score', 'net_sales', 'refund_ratio', 'reached_at'])).min(1).max(4).default(['score', 'net_sales', 'refund_ratio', 'reached_at']),
-  name_privacy: z.enum(['alias', 'consent']).default('alias'), terms: z.string().max(8000).optional(), budget_minor: z.coerce.number().int().min(0).default(0),
+  name_privacy: z.enum(['public', 'alias', 'consent']).default('public'), terms: z.string().max(8000).optional(), budget_minor: z.coerce.number().int().min(0).default(0),
 });
 const zPrize = z.object({ place: z.number().int().min(1).max(100).nullable().default(null), nomination: z.string().max(80).optional(), title: z.string().trim().min(2).max(160), kind: z.enum(['money', 'item']), value_minor: z.coerce.number().int().min(0).default(0), qty: z.number().int().min(1).max(1000).default(1), claim_days: z.number().int().min(1).max(365).default(14), image_url: z.string().max(500).optional() });
 
@@ -55,8 +55,9 @@ async function insertVersion(tx: Tx, contestId: string, version: number, b: z.in
 }
 
 async function nameMap(q: Queryable, contestId: string, privacy: string, ids: string[]) {
-  const rows = (await q.query(`SELECT p.id, p.display_name, en.display_consent FROM partners p LEFT JOIN cc_enrollments en ON en.partner_id=p.id AND en.contest_id=$1 WHERE p.id = ANY($2::uuid[])`, [contestId, ids])).rows;
-  return new Map(rows.map((r) => [r.id as string, privacy === 'consent' && r.display_consent ? (r.display_name as string) : alias(r.id)]));
+  const rows = (await q.query(`SELECT p.id, p.display_name, p.avatar_key, en.display_consent FROM partners p LEFT JOIN cc_enrollments en ON en.partner_id=p.id AND en.contest_id=$1 WHERE p.id = ANY($2::uuid[])`, [contestId, ids])).rows;
+  const show = (r: any) => privacy === 'public' || (privacy === 'consent' && r.display_consent);
+  return new Map(rows.map((r) => [r.id as string, { name: show(r) ? (r.display_name as string) : alias(r.id), avatar: show(r) && r.avatar_key ? `/media/${r.avatar_key}` : null }]));
 }
 
 export function registerContestCenter(app: FastifyInstance, deps: Deps): void {
@@ -372,7 +373,7 @@ export function registerContestCenter(app: FastifyInstance, deps: Deps): void {
     const me = rows.find((x) => x.partner_id === p.id) ?? null;
     return { kind, as_of: snap?.computed_at ?? new Date().toISOString(), total: ranked.length, next_offset: query.offset + query.limit < ranked.length ? query.offset + query.limit : null,
       warning: kind === 'final' ? null : 'Reyting o‘zgaruvchan: yetkazilmagan yoki to‘lovi tasdiqlanmagan buyurtmalar yakuniy hisobga kirmasligi mumkin.',
-      items: page.map((x) => ({ rank: x.rank, name: x.partner_id === p.id ? 'Siz' : names.get(x.partner_id), score: x.score, me: x.partner_id === p.id })),
+      items: page.map((x) => ({ rank: x.rank, name: names.get(x.partner_id)?.name, avatar: names.get(x.partner_id)?.avatar ?? null, score: x.score, me: x.partner_id === p.id })),
       me: me ? { rank: me.rank, score: me.score, qualified: me.qualified } : null };
   });
 

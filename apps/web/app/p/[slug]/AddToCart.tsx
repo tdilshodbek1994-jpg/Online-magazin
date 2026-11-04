@@ -28,6 +28,10 @@ export function AddToCart({ product, minPrice }: { product: any; minPrice: strin
   const [zone, setZone] = useState<any>(null);
   const [quickKey, setQuickKey] = useState(0);
   useEffect(() => { rememberView({ id: product.id, slug: product.slug }); }, [product.id, product.slug]);
+  // Came through a partner's discount link? Show the price the customer will actually pay.
+  const [pdisc, setPdisc] = useState<string | null>(null);
+  const shown = (pm: string | null | undefined) => { if (!pm) return pm as any; if (!pdisc) return pm; const x = BigInt(pm) - BigInt(pdisc); return (x > 0n ? x : BigInt(pm)).toString(); };
+  useEffect(() => { api(`/referral/discount?product_id=${product.id}`).then((r) => setPdisc(r.unit?.amount_minor ?? null)).catch(() => {}); }, [product.id]);
   useEffect(() => { api('/delivery-zones').then((r) => setZone((r.items ?? [])[0] ?? null)).catch(() => {}); }, []);
   const sold = Number(product.sold_30d ?? 0);
   const save = off > 0 && v ? BigInt(v.compare_at_minor) - BigInt(v.price_minor) : 0n;
@@ -54,10 +58,11 @@ export function AddToCart({ product, minPrice }: { product: any; minPrice: strin
           <div className="ptitle-row"><h1>{name}</h1><FavButton id={product.id} slug={product.slug} name={name} big /></div>
           <div className={`price-block ${off > 0 ? 'deal' : ''}`} aria-live="polite">
             <div className="price-row big">
-              <span className={`price ${off > 0 ? 'is-deal' : ''}`}>{v ? som(v.price_minor) : som(minPrice)}</span>
-              {off > 0 && <><s className="was">{som(v.compare_at_minor)}</s><span className="b-off pdp-off">−{off}%</span></>}
+              <span className={`price ${off > 0 || pdisc ? 'is-deal' : ''}`}>{som(shown(v ? v.price_minor : minPrice))}</span>
+              {pdisc ? <s className="was">{som(v ? v.price_minor : minPrice)}</s> : off > 0 && <><s className="was">{som(v.compare_at_minor)}</s><span className="b-off pdp-off">−{off}%</span></>}
             </div>
             {save > 0n && <div className="save-t">Tejaysiz: <b>{som(save.toString())}</b></div>}
+            {pdisc && <div className="pd-price" role="note">🎁 Sotuvchi siz uchun <b>−{som(pdisc)}</b> chegirma berdi — buyurtmada shu narx hisoblanadi.</div>}
             <PriceWatch productId={product.id} />
             <div className="pmeta">
               {sold > 0 && <span className="sold-chip">🔥 30 kunda {sold} {t('sold')}</span>}
@@ -110,7 +115,7 @@ export function AddToCart({ product, minPrice }: { product: any; minPrice: strin
       {/* Mobile sticky buy bar: the price and both actions are always one tap away while reading. */}
       {msg === 'ok' && <div className="bb-toast" role="status">✓ {t('added')} · <Link href="/cart">Savatni ochish</Link></div>}
       <div className="buy-bar" aria-label="Xarid paneli">
-        <div className="bb-price"><b className={off > 0 ? 'is-deal' : ''}>{v ? som(v.price_minor) : som(minPrice)}</b>{off > 0 && <s>{som(v.compare_at_minor)}</s>}</div>
+        <div className="bb-price"><b className={off > 0 || pdisc ? 'is-deal' : ''}>{som(shown(v ? v.price_minor : minPrice))}</b>{pdisc ? <s>{som(v ? v.price_minor : minPrice)}</s> : off > 0 && <s>{som(v.compare_at_minor)}</s>}</div>
         <button className="btn secondary" disabled={!inStock || busy} onClick={add}>🛒 Savatga</button>
         <button className="btn bb-now" disabled={!inStock} onClick={() => { setQuickKey((k) => k + 1); setTimeout(() => document.getElementById('quick-order')?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 50); }}>Hozir olish</button>
       </div>

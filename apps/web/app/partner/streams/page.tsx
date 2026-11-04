@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { api, som } from '@/lib/api';
 import { pick, useI18n } from '@/lib/i18n';
 import { BucketPills, Chips, LinkBox, PERIODS } from '../shared';
+import { DiscountMaker } from './DiscountMaker';
 import { errText } from '@/lib/errors';
 
 const PAGE = 20;
@@ -65,13 +66,14 @@ export default function PartnerStreams() {
                 <div className="s2-info">
                   <h3>{name}</h3>
                   <div className="s2-meta">
-                    {s.price_minor && <b className="ok-t">{som(s.price_minor)}</b>}
+                    {s.price_minor && (BigInt(s.customer_discount_minor ?? '0') > 0n ? <><b className="ok-t">{som((BigInt(s.price_minor) - BigInt(s.customer_discount_minor)).toString())}</b><s className="muted small">{som(s.price_minor)}</s></> : <b className="ok-t">{som(s.price_minor)}</b>)}
                     <span className="pill">{s.name ?? s.code}</span>
                     {s.product_name && (Number(s.stock) <= 0 ? <span className="pill st-off">Tugagan</span> : Number(s.stock) <= 5 ? <span className="pill b-returned">Kam qoldi: {s.stock} dona</span> : null)}
                   </div>
                 </div>
               </div>
-              <LinkBox url={s.url} shareText={`${name}${s.price_minor ? ` — ${som(s.price_minor)}` : ''}`} />
+              <LinkBox url={s.url} shareText={`${name}${s.price_minor ? ` — ${som((BigInt(s.price_minor) - BigInt(s.customer_discount_minor ?? '0')).toString())}` : ''}`} />
+              <DiscountMaker s={s} onMade={load} />
               <div className="s2-stats">
                 <Link href={`/partner/analytics/link/${s.id}`}><small>Daromad</small><b className="ok-t">{som(s.earned_minor)}</b></Link>
                 <Link href={ordersHref('all')}><small>Kutilmoqda</small><b>{som(s.pending_minor)}</b></Link>

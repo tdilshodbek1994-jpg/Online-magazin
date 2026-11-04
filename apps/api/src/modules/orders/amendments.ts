@@ -11,7 +11,7 @@ import { type Deps, route, zIdParam } from '../../platform/http.js';
 import { accrueForOrder, recalcOrder, ruleForProduct } from '../commissions/service.js';
 import { releaseReservation, reserveForOrder } from '../inventory/service.js';
 import { queueNotification } from '../notifications/service.js';
-import { priceLines, pricedToJson, statusEvent, storeQuote } from './service.js';
+import { partnerDiscountForLink, priceLines, pricedToJson, statusEvent, storeQuote } from './service.js';
 
 export const confirmCodeHash = (id: string, code: string) => createHash('sha256').update(`confirm:${id}:${code}`).digest();
 
@@ -30,7 +30,9 @@ export function registerAmendments(app: FastifyInstance, deps: Deps): void {
       if (!o) throw notFound('ORDER');
       if (o.commercial_status !== 'confirmed' || !['reserved', 'unallocated'].includes(o.fulfillment_status)) throw conflict('ORDER_NOT_AMENDABLE');
       if (!['unpaid', 'pending'].includes(o.payment_status) || o.payment_status === 'pending') throw conflict('AMENDMENT_REQUIRES_REFUND_FLOW');
-      const priced = await priceLines(tx, { lines: body.lines, delivery_zone_id: o.delivery_method.replace('zone:', '') });
+      // Keep the partner's customer discount the order was sold with.
+      const pdLink = (await maybeOne<{ l: string | null }>(tx, `SELECT q.partner_discount_link_id AS l FROM orders o JOIN checkout_quotes q ON q.id=o.quote_id WHERE o.id=$1`, [params.id]))?.l ?? null;
+      const priced = await priceLines(tx, { lines: body.lines, delivery_zone_id: o.delivery_method.replace('zone:', ''), partnerDiscount: await partnerDiscountForLink(tx, pdLink) });
       const q = await storeQuote(tx, priced, { cartId: null, userId: null, createdBy: actor.userId, address: o.address_snapshot, contact: o.contact_snapshot, ttlMinutes: 24 * 60 });
       const conf = await one<{ id: string }>(tx, `INSERT INTO order_confirmations (order_id, method, status, expires_at, shown_total_minor, shown_quote_hash) VALUES ($1,'customer_otp','pending', now() + interval '24 hours', $2, $3) RETURNING id`, [params.id, priced.payable.toString(), priced.hash]);
       const token = randomBytes(24).toString('base64url');

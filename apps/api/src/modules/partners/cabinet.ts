@@ -3,7 +3,8 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { audit } from '../../platform/audit.js';
 import { many, maybeOne, one } from '../../platform/db.js';
-import { notFound } from '../../platform/errors.js';
+import { badRequest, notFound } from '../../platform/errors.js';
+import { estimateCommission } from '../commissions/service.js';
 import { type Deps, route, zIdParam } from '../../platform/http.js';
 import { myPartner } from './routes.js';
 
@@ -135,14 +136,40 @@ export function registerPartnerCabinet(app: FastifyInstance, deps: Deps): void {
     };
   });
 
-  route(app, deps, { method: 'POST', url: '/partner/streams', tags: T, summary: 'Create a named stream (referral link) for a product', body: z.object({ product_id: z.string().uuid(), name: z.string().trim().min(1).max(80) }) },
+  // How much of their own commission a partner may give the customer on one unit (never more than they earn).
+  async function discountLimit(db: any, productId: string) {
+    const pr = await maybeOne<{ price: string | null }>(db, `SELECT (SELECT MIN(o.price_minor) FROM skus s JOIN offers o ON o.sku_id=s.id AND o.status='active' WHERE s.product_id=p.id AND s.status='active')::text AS price FROM products p WHERE p.id=$1 AND p.status='published'`, [productId]);
+    if (!pr?.price) return null;
+    const price = BigInt(pr.price);
+    const est = await estimateCommission(db, [{ key: 'u', productId, qty: 1, lineNet: price }]);
+    const commission = est.total;
+    const max = commission < price ? commission : price - 100n;
+    return { price_minor: price.toString(), commission_minor: commission.toString(), max_discount_minor: (max > 0n ? max : 0n).toString() };
+  }
+
+  route(app, deps, { method: 'GET', url: '/partner/streams/discount-limit', tags: T, summary: 'Max customer discount a partner can give on a product (from their commission)', query: z.object({ product_id: z.string().uuid() }) },
+    async ({ actor, db, query }) => {
+      await myPartner(db, actor, false);
+      const lim = await discountLimit(db, query.product_id);
+      if (!lim) throw notFound('PRODUCT');
+      return lim;
+    });
+
+  route(app, deps, { method: 'POST', url: '/partner/streams', tags: T, summary: 'Create a named stream (referral link) for a product, optionally with a customer discount paid from the commission',
+    body: z.object({ product_id: z.string().uuid(), name: z.string().trim().min(1).max(80), customer_discount_minor: z.coerce.bigint().min(0n).optional() }) },
     async ({ actor, db, cfg, body }) => {
       const p = await myPartner(db, actor);
       const pr = await maybeOne<{ slug: string }>(db, `SELECT slug FROM products WHERE id=$1 AND status='published'`, [body.product_id]);
       if (!pr) throw notFound('PRODUCT');
+      const discount = body.customer_discount_minor ?? 0n;
+      if (discount > 0n) {
+        const lim = await discountLimit(db, body.product_id);
+        if (!lim || discount > BigInt(lim.max_discount_minor)) throw badRequest('DISCOUNT_TOO_BIG', { max_discount_minor: lim?.max_discount_minor ?? '0' });
+      }
       const code = randomBytes(9).toString('base64url').replace(/[^A-Za-z0-9]/g, 'x').slice(0, 12);
-      const l = await one<{ id: string }>(db, `INSERT INTO referral_links (partner_id, product_id, code, name) VALUES ($1,$2,$3,$4) RETURNING id`, [p.id, body.product_id, code, body.name]);
-      return { id: l.id, code, name: body.name, url: `${cfg.publicWebUrl}/r/${code}` };
+      const l = await one<{ id: string }>(db, `INSERT INTO referral_links (partner_id, product_id, code, name, customer_discount_minor) VALUES ($1,$2,$3,$4,$5) RETURNING id`, [p.id, body.product_id, code, body.name, discount.toString()]);
+      if (discount > 0n) await audit(db, actor, 'partner.discount_stream_created', { type: 'referral_link', id: l.id }, { after: { product_id: body.product_id, customer_discount_minor: discount.toString() } });
+      return { id: l.id, code, name: body.name, customer_discount_minor: discount.toString(), url: `${cfg.publicWebUrl}/r/${code}` };
     });
 
   route(app, deps, { method: 'GET', url: '/partner/streams', tags: T, summary: 'My streams with clicks, orders by status and earnings', query: z.object({ q: z.string().max(100).optional(), period: zPeriod }) },
@@ -152,7 +179,7 @@ export function registerPartnerCabinet(app: FastifyInstance, deps: Deps): void {
       let filter = '';
       if (query.q) { params.push(`%${query.q.toLowerCase()}%`); filter = `AND (lower(coalesce(l.name,'')) LIKE $2 OR lower(pr.name::text) LIKE $2 OR lower(l.code) LIKE $2)`; }
       const rows = await many(db, `
-        SELECT l.id, l.code, l.name, l.status, l.created_at, pr.id AS product_id, pr.slug, pr.name AS product_name,
+        SELECT l.id, l.code, l.name, l.status, l.created_at, l.customer_discount_minor::text, pr.id AS product_id, pr.slug, pr.name AS product_name,
                (SELECT MIN(o.price_minor) FROM skus s JOIN offers o ON o.sku_id=s.id AND o.status='active' WHERE s.product_id=pr.id AND s.status='active')::text AS price_minor,
                (SELECT COALESCE(SUM(GREATEST(0, sb.on_hand_sellable - sb.reserved - sb.safety_buffer)),0) FROM skus s JOIN stock_balances sb ON sb.sku_id=s.id WHERE s.product_id=pr.id AND s.status='active')::int AS stock,
                (SELECT '/media/' || ma.storage_key FROM media_assets ma WHERE ma.product_id=pr.id AND ma.status='approved' ORDER BY ma.sort LIMIT 1) AS image,

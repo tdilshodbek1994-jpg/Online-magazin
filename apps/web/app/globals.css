@@ -1472,3 +1472,11 @@ button.pill-btn.sel { outline: 2px solid var(--primary); }
 .watch > .spread { flex-wrap: wrap; align-items: flex-start; }
 .w-prod { flex-wrap: wrap; }
 .w-prod > span:last-child { color: var(--muted); }
+/* Partner discount links */
+.disc-badge { padding: 8px 12px; border-radius: 12px; background: #fff4e5; color: #7a3e00; font-size: 14px; }
+.disc-maker { margin-top: 2px; }
+.disc-form { display: grid; gap: 6px; padding: 12px; border-radius: 12px; background: var(--surface-2); }
+.disc-form p { margin: 0; }
+.pd-warn { padding: 10px 12px; border-radius: 12px; background: #fff4e5; border: 1px solid #f5c27a; color: #6b3600; font-size: 14px; }
+.pd-price { display: grid; gap: 2px; padding: 10px 12px; border-radius: 12px; background: #fff4e5; color: #6b3600; }
+.pd-price b { color: #b42318; }

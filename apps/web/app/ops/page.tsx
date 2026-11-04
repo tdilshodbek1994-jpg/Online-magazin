@@ -6,6 +6,7 @@ import { pick, useI18n } from '@/lib/i18n';
 import { errText } from '@/lib/errors';
 import { toast } from '@/lib/toast';
 import { WorkDesk } from './WorkDesk';
+import { PartnerDiscountWarn } from '@/components/PartnerDiscountWarn';
 
 const QUEUES: [string, string][] = [['new', 'Yangi'], ['awaiting_customer', 'Mijoz tasdig‘i'], ['callback', 'Qayta qo‘ng‘iroq'], ['awaiting_payment', 'To‘lov kutilmoqda'], ['ready_to_pick', 'Yig‘ishga tayyor'], ['in_delivery', 'Yetkazishda'], ['problem', 'Muammoli'], ['returns', 'Qaytarish'], ['closed', 'Yopilgan']];
 
@@ -48,6 +49,7 @@ export default function Ops() {
                 <b>{o.number}</b>
                 <span className="row" style={{ gap: 6 }}>
                   {o.quick_pending && <span className="pill b-shipping">⚡ manzil yo‘q</span>}
+                  {o.partner_discount_minor && o.partner_discount_minor !== '0' && <span className="pill b-returned">🎁 chegirma −{som(o.partner_discount_minor)}</span>}
                   {o.duplicate_signal && <span className="pill b-returned">⚠️ dublikat</span>}
                   {o.callback_at && <span className="pill b-accepted">📞 {new Date(o.callback_at).toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tashkent' })}</span>}
                   <span className="pill">{CHANNEL_UZ[o.channel] ?? o.channel}</span>
@@ -73,6 +75,7 @@ export default function Ops() {
             <div className="pills"><span className="pill">{STATUS_UZ[sel.commercial_status] ?? sel.commercial_status}</span><span className="pill">{FUL_UZ[sel.fulfillment_status] ?? sel.fulfillment_status}</span><span className="pill">{sel.payment_method === 'cod' ? 'Naqd' : 'Onlayn'} · {PAY_UZ[sel.payment_status] ?? sel.payment_status}</span></div>
             {sel.address_snapshot?.quick && sel.address_snapshot?.house === '-' && <p className="notice">⚡ Tez buyurtma: qo‘ng‘iroqda aniq manzilni so‘rab, pastda saqlang — manzilsiz tasdiqlab bo‘lmaydi.</p>}
             {!['shipped', 'delivered', 'returned'].includes(sel.fulfillment_status) && <AddressEditor order={sel} onSave={(address) => act(() => api(`/ops/orders/${sel.id}/address`, { method: 'PATCH', body: { expected_version: sel.version, address, reason: 'operator qo‘ng‘iroq' } }), '✓ Manzil saqlandi')} />}
+            <PartnerDiscountWarn lines={sel.lines} lang={lang} />
             <div className="ops-lines">
               {sel.lines.map((l: any) => <div key={l.id} className="spread small"><span>{pick(l.product_snapshot.name, lang)}{l.product_snapshot.variant && Object.values(l.product_snapshot.variant).length ? ` (${Object.values(l.product_snapshot.variant).join('/')})` : ''} × {sel.commercial_status === 'cancelled' ? l.qty : l.qty - (l.canceled_qty ?? 0)}</span><span>{som(l.line_net_minor)}</span></div>)}
               <div className="spread" style={{ fontWeight: 700 }}><span>Jami (yetkazish bilan)</span><span>{som(sel.payable_minor)}</span></div>

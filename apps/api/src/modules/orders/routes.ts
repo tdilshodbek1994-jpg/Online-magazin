@@ -45,6 +45,7 @@ export function registerOrders(app: FastifyInstance, deps: Deps): void {
                o.customer_phone, o.assigned_operator_id, o.callback_at, o.contact_time_note, o.problem_reason, o.duplicate_signal, o.created_at, o.version,
                EXTRACT(EPOCH FROM now()-o.created_at)::int AS age_seconds, u.display_name AS operator_name,
                o.contact_snapshot->>'name' AS customer_name, o.address_snapshot->>'district' AS district, (o.address_snapshot->>'quick'='true' AND o.address_snapshot->>'house'='-') AS quick_pending,
+               (SELECT MAX(ol.partner_discount_minor) FROM order_lines ol WHERE ol.order_id=o.id)::text AS partner_discount_minor,
                (SELECT string_agg((ol.product_snapshot->'name'->>'uz-Latn') || ' × ' || (ol.qty - ol.canceled_qty), ', ') FROM order_lines ol WHERE ol.order_id=o.id AND ol.qty > ol.canceled_qty) AS items_text
           FROM orders o LEFT JOIN users u ON u.id=o.assigned_operator_id WHERE ${QUEUES[query.queue]} ORDER BY o.callback_at NULLS LAST, o.created_at LIMIT $1`, [query.limit]);
       return { items: rows };

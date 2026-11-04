@@ -9,7 +9,22 @@ import { customerMessages } from '../opscenter/messages.js';
 import { type Deps, requireIdempotencyKey, route, zIdParam } from '../../platform/http.js';
 import type { Actor } from '../../platform/auth.js';
 import { resolveAttribution } from '../partners/attribution.js';
-import { createOrder, m, priceLines, pricedToJson, storeQuote } from '../orders/service.js';
+import { type Attribution, createOrder, m, partnerDiscountForLink, priceLines, pricedToJson, storeQuote } from '../orders/service.js';
+
+/** Discount stream the visitor came through (last eligible click): the shown price is price − the partner's discount. */
+async function visitorDiscount(tx: Tx, env: string, actor: Actor) {
+  const a = await resolveAttribution(tx, env, { explicitCode: null, guestToken: actor.guestToken, customerUserId: actor.userId }).catch(() => null);
+  if (!a?.eligible || !a.link_id) return null;
+  return partnerDiscountForLink(tx, a.link_id);
+}
+
+/** An order priced with a partner's discount always belongs to that discount link — the discount is that partner's money. */
+async function attributionForQuote(tx: Tx, quoteId: string, a: Attribution | null): Promise<Attribution | null> {
+  const q = await maybeOne<{ link_id: string | null; partner_id: string | null }>(tx,
+    `SELECT q.partner_discount_link_id AS link_id, l.partner_id FROM checkout_quotes q LEFT JOIN referral_links l ON l.id=q.partner_discount_link_id WHERE q.id=$1`, [quoteId]);
+  if (!q?.link_id || !q.partner_id || (a?.eligible && a.link_id === q.link_id)) return a;
+  return { partner_id: q.partner_id, campaign_id: null, touch_id: null, link_id: q.link_id, rule_version: a?.rule_version ?? 0, reason: 'last_eligible_click', attributed_at: new Date().toISOString(), eligible: true, placement_id: null, source_channel: 'unknown' };
+}
 
 export const zDeliveryAddress = z.object({
   region_code: z.string().min(2).max(10),
@@ -73,6 +88,13 @@ export function registerCheckout(app: FastifyInstance, deps: Deps): void {
       return cartView(tx, c.id);
     }));
 
+  route(app, deps, { method: 'GET', url: '/referral/discount', tags: T, summary: 'Partner discount this visitor gets on a product (from the stream they came through)',
+    query: z.object({ product_id: z.string().uuid() }) }, async ({ actor, db, cfg, query }) =>
+    withTx(db, async (tx) => {
+      const d = await visitorDiscount(tx, cfg.env, actor);
+      return d && d.productId === query.product_id ? { unit: m(d.unitMinor), partner_code: d.partnerCode } : { unit: null };
+    }));
+
   route(app, deps, { method: 'GET', url: '/delivery-zones', tags: T, summary: 'Active delivery zones and tariffs' }, async ({ db }) => ({
     items: (await many(db, `SELECT id, region_code, district, name, tariff_minor::text, free_from_minor::text, eta_min_days, eta_max_days, cod_allowed FROM delivery_zones WHERE active ORDER BY region_code, district NULLS FIRST`)),
   }));
@@ -87,7 +109,7 @@ export function registerCheckout(app: FastifyInstance, deps: Deps): void {
       const phone = normalizeUzPhone(body.contact.phone);
       if (!phone) throw badRequest('PHONE_INVALID', { 'body.contact.phone': 'validation.phone' });
       const lines = await many<{ sku_id: string; qty: number }>(tx, `SELECT o.sku_id, cl.qty FROM cart_lines cl JOIN offers o ON o.id=cl.offer_id WHERE cl.cart_id=$1`, [c.id]);
-      const priced = await priceLines(tx, { lines, delivery_zone_id: body.delivery_zone_id, promo_code: body.promo_code });
+      const priced = await priceLines(tx, { lines, delivery_zone_id: body.delivery_zone_id, promo_code: body.promo_code, partnerDiscount: await visitorDiscount(tx, cfg.env, actor) });
       const q = await storeQuote(tx, priced, { cartId: c.id, userId: actor.userId, createdBy: actor.userId, address: body.address, contact: { ...body.contact, phone }, ttlMinutes: cfg.quoteTtlMinutes });
       return { quote_id: q.id, expires_at: q.expires_at, ...pricedToJson(priced) };
     }));
@@ -111,7 +133,7 @@ export function registerCheckout(app: FastifyInstance, deps: Deps): void {
           const u = await one<{ phone_e164: string | null }>(tx, `SELECT phone_e164 FROM users WHERE id=$1`, [actor.userId]);
           verified = u.phone_e164 === phone;
         }
-        const attribution = await resolveAttribution(tx, cfg.env, { explicitCode: body.referral_code ?? null, guestToken: actor.guestToken, customerUserId: actor.userId });
+        const attribution = await attributionForQuote(tx, body.quote_id, await resolveAttribution(tx, cfg.env, { explicitCode: body.referral_code ?? null, guestToken: actor.guestToken, customerUserId: actor.userId }));
         const order = await createOrder(tx, cfg, actor, {
           quoteId: body.quote_id, quoteHash: body.quote_hash, paymentMethod: body.payment_method, channel: 'web', customerUserId: actor.userId, customerPhone: phone,
           createdBy: actor.userId, confirmation: verified ? 'checkout_verified_session' : 'pending', attribution, acceptedTerms: body.accept_terms,
@@ -149,10 +171,10 @@ export function registerCheckout(app: FastifyInstance, deps: Deps): void {
           ? await maybeOne<{ id: string; region_code: string; district: string | null }>(tx, `SELECT id, region_code, district FROM delivery_zones WHERE id=$1 AND active`, [body.delivery_zone_id])
           : await maybeOne<{ id: string; region_code: string; district: string | null }>(tx, `SELECT id, region_code, district FROM delivery_zones WHERE active ORDER BY region_code='TAS' DESC, district NULLS FIRST LIMIT 1`);
         if (!zone) throw badRequest('DELIVERY_ZONE_INVALID');
-        const priced = await priceLines(tx, { lines: [{ sku_id: body.sku_id, qty: body.qty }], delivery_zone_id: zone.id });
+        const priced = await priceLines(tx, { lines: [{ sku_id: body.sku_id, qty: body.qty }], delivery_zone_id: zone.id, partnerDiscount: body.referral_code ? null : await visitorDiscount(tx, cfg.env, actor) });
         const address = { region_code: zone.region_code, district: zone.district ?? 'Aniqlanadi', street: 'Operator qo‘ng‘iroqda aniqlaydi', house: '-', quick: true };
         const q = await storeQuote(tx, priced, { cartId: null, userId: actor.userId, createdBy: actor.userId, address, contact: { name: body.name, phone }, ttlMinutes: cfg.quoteTtlMinutes });
-        const attribution = await resolveAttribution(tx, cfg.env, { explicitCode: body.referral_code ?? null, guestToken: actor.guestToken, customerUserId: actor.userId });
+        const attribution = await attributionForQuote(tx, q.id, await resolveAttribution(tx, cfg.env, { explicitCode: body.referral_code ?? null, guestToken: actor.guestToken, customerUserId: actor.userId }));
         const order = await createOrder(tx, cfg, actor, {
           quoteId: q.id, quoteHash: priced.hash, paymentMethod: 'cod', channel: 'web', customerUserId: actor.userId, customerPhone: phone,
           createdBy: actor.userId, confirmation: 'pending', attribution, acceptedTerms: body.accept_terms,

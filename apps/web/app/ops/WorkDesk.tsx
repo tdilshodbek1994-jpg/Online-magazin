@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { api, som } from '@/lib/api';
 import { errText } from '@/lib/errors';
 import { toast } from '@/lib/toast';
+import { PartnerDiscountWarn } from '@/components/PartnerDiscountWarn';
 import { pick, useI18n } from '@/lib/i18n';
 
 /**
@@ -135,6 +136,7 @@ function TaskCard({ task, order, lang, busy, onClose, onAct }: { task: any; orde
             <div className="spread"><span>{order.contact_snapshot?.name ?? 'Mijoz'}</span><a className="btn sm" href={`tel:${order.customer_phone}`}>📞 Qo‘ng‘iroq</a></div>
             <p className="muted small">Tugma faqat telefonni ochadi — natijani pastda o‘zingiz belgilaysiz.</p>
             {order.partner_name && <p className="small">🤝 Manba: hamkor {order.partner_name} ({order.partner_code}) — siz olganingiz manbani o‘zgartirmaydi.</p>}
+            <PartnerDiscountWarn lines={order.lines} lang={lang} />
             {order.lines?.map((l: any) => <div key={l.id} className="spread small"><span>{pick(l.product_snapshot.name, lang)} × {order.commercial_status === 'cancelled' ? l.qty : l.qty - (l.canceled_qty ?? 0)}</span><span>{som(l.line_net_minor)}</span></div>)}
             <div className="spread"><b>Jami (yetkazish bilan)</b><b>{som(order.payable_minor)}</b></div>
             <div className="small muted">{[order.address_snapshot?.district, order.address_snapshot?.street, order.address_snapshot?.house].filter((x: any) => x && x !== '-').join(', ') || 'Manzil hali yo‘q'}</div>

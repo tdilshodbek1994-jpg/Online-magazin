@@ -124,7 +124,7 @@ export function matrixPreview(rule: Pick<RuleSnapshot, 'fixed_minor' | 'quantity
   });
 }
 
-export interface OrderLineFacts extends LineFacts { id: string; rule: RuleSnapshot | null }
+export interface OrderLineFacts extends LineFacts { id: string; rule: RuleSnapshot | null; /** per-unit discount the partner gave the customer (paid from their commission) */ partnerDiscountUnit?: bigint }
 export interface LineTarget { target: bigint; group: string | null; groupQty: number | null; review: string | null }
 
 /**
@@ -135,7 +135,21 @@ export interface LineTarget { target: bigint; group: string | null; groupQty: nu
  * recompute_retained_qty: 3→2 units = 52 500 → 37 500). Unit amounts are assigned to lines by position in line order.
  * A money-only refund does not change matrix commission (goodwill ≠ quantity return, T14).
  */
-export function computeOrderTargets(lines: OrderLineFacts[]): Map<string, LineTarget> {
+export function computeOrderTargets(input: OrderLineFacts[]): Map<string, LineTarget> {
+  const raw = computeOrderTargetsRaw(input.map((l) => (l.partnerDiscountUnit ? { ...l, lineNet: l.lineNet + l.partnerDiscountUnit * BigInt(l.qty) } : l)));
+  // Partner-funded customer discount comes out of the partner's commission, never below zero.
+  for (const l of input) {
+    const d = l.partnerDiscountUnit ?? 0n;
+    if (d <= 0n) continue;
+    const t = raw.get(l.id)!;
+    const retained = BigInt(Math.max(0, l.qty - l.canceledQty - l.returnedQty));
+    const left = t.target - d * retained;
+    raw.set(l.id, { ...t, target: left > 0n ? left : 0n });
+  }
+  return raw;
+}
+
+function computeOrderTargetsRaw(lines: OrderLineFacts[]): Map<string, LineTarget> {
   const out = new Map<string, LineTarget>();
   const groups = new Map<string, OrderLineFacts[]>();
   for (const l of lines) {
@@ -160,9 +174,9 @@ export function computeOrderTargets(lines: OrderLineFacts[]): Map<string, LineTa
 }
 
 /** Estimate for quotes/drafts/simulation (same function as real orders). */
-export async function estimateCommission(q: Queryable, lines: { key: string; productId: string; qty: number; lineNet: bigint }[]): Promise<{ total: bigint; lines: { key: string; rule: RuleSnapshot | null; amount_minor: string; review: string | null }[]; review: boolean }> {
+export async function estimateCommission(q: Queryable, lines: { key: string; productId: string; qty: number; lineNet: bigint; partnerDiscountUnit?: bigint }[]): Promise<{ total: bigint; lines: { key: string; rule: RuleSnapshot | null; amount_minor: string; review: string | null }[]; review: boolean }> {
   const facts: OrderLineFacts[] = [];
-  for (const l of lines) facts.push({ id: l.key, rule: await ruleForProduct(q, l.productId), qty: l.qty, canceledQty: 0, returnedQty: 0, lineNet: l.lineNet, refundedProduct: 0n });
+  for (const l of lines) facts.push({ id: l.key, rule: await ruleForProduct(q, l.productId), partnerDiscountUnit: l.partnerDiscountUnit, qty: l.qty, canceledQty: 0, returnedQty: 0, lineNet: l.lineNet, refundedProduct: 0n });
   const m = computeOrderTargets(facts);
   let total = 0n, review = false;
   const res = facts.map((f) => { const t = m.get(f.id)!; total += t.target; if (t.review) review = true; return { key: f.id, rule: f.rule, amount_minor: t.target.toString(), review: t.review }; });
@@ -171,8 +185,8 @@ export async function estimateCommission(q: Queryable, lines: { key: string; pro
 
 /** Create the accrual at order creation (state estimated). No rule => no commission promised. */
 export async function accrueForOrder(tx: Tx, orderId: string, partnerId: string): Promise<void> {
-  const lines = await tx.query(`SELECT id, qty, line_net_minor, commission_rule_snapshot FROM order_lines WHERE order_id=$1 ORDER BY id`, [orderId]);
-  const targets = computeOrderTargets(lines.rows.map((l) => ({ id: l.id, rule: l.commission_rule_snapshot as RuleSnapshot | null, qty: l.qty, canceledQty: 0, returnedQty: 0, lineNet: BigInt(l.line_net_minor), refundedProduct: 0n })));
+  const lines = await tx.query(`SELECT id, qty, line_net_minor, commission_rule_snapshot, partner_discount_minor FROM order_lines WHERE order_id=$1 ORDER BY id`, [orderId]);
+  const targets = computeOrderTargets(lines.rows.map((l) => ({ id: l.id, rule: l.commission_rule_snapshot as RuleSnapshot | null, partnerDiscountUnit: BigInt(l.partner_discount_minor ?? 0), qty: l.qty, canceledQty: 0, returnedQty: 0, lineNet: BigInt(l.line_net_minor), refundedProduct: 0n })));
   for (const l of lines.rows) {
     const rule = l.commission_rule_snapshot as RuleSnapshot | null;
     if (!rule) continue;
@@ -202,14 +216,14 @@ export async function accrueForOrder(tx: Tx, orderId: string, partnerId: string)
  */
 export async function recalcOrder(tx: Tx, orderId: string, reason: string, actorId: string | null = null): Promise<void> {
   const rows = await tx.query(
-    `SELECT a.*, ol.qty, ol.canceled_qty, ol.returned_qty, ol.line_net_minor, ol.refunded_product_minor
+    `SELECT a.*, ol.qty, ol.canceled_qty, ol.returned_qty, ol.line_net_minor, ol.refunded_product_minor, ol.partner_discount_minor
        FROM commission_accruals a JOIN order_lines ol ON ol.id = a.order_line_id
       WHERE a.order_id=$1 AND a.state <> 'superseded' ORDER BY ol.id FOR UPDATE OF a`,
     [orderId],
   );
   const order = await tx.query(`SELECT commercial_status FROM orders WHERE id=$1`, [orderId]);
   const cancelled = order.rows[0]?.commercial_status === 'cancelled';
-  const targets = computeOrderTargets(rows.rows.map((a) => ({ id: a.id, rule: a.rule_snapshot as RuleSnapshot, qty: a.qty, canceledQty: a.canceled_qty, returnedQty: a.returned_qty, lineNet: BigInt(a.line_net_minor), refundedProduct: BigInt(a.refunded_product_minor) })));
+  const targets = computeOrderTargets(rows.rows.map((a) => ({ id: a.id, rule: a.rule_snapshot as RuleSnapshot, partnerDiscountUnit: BigInt(a.partner_discount_minor ?? 0), qty: a.qty, canceledQty: a.canceled_qty, returnedQty: a.returned_qty, lineNet: BigInt(a.line_net_minor), refundedProduct: BigInt(a.refunded_product_minor) })));
   for (const a of rows.rows) {
     const tg = targets.get(a.id)!;
     const newTarget = cancelled ? 0n : tg.target;

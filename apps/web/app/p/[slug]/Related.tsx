@@ -11,7 +11,7 @@ export function Related({ category, exclude }: { category: string; exclude: stri
   const [hits, setHits] = useState<any[]>([]);
   useEffect(() => {
     const c = encodeURIComponent(category);
-    api(`/products?limit=9&category=${c}`).then((r) => setItems(r.items.filter((p: any) => p.slug !== exclude).slice(0, 8))).catch(() => {});
+    api(`/products?limit=9&in_stock=true&category=${c}`).then((r) => setItems(r.items.filter((p: any) => p.slug !== exclude).slice(0, 8))).catch(() => {});
     api(`/products?limit=12&sort=popular&in_stock=true&category=${c}`).then((r) => setHits(r.items.filter((p: any) => p.slug !== exclude && Number(p.sold_30d) > 0))).catch(() => {});
   }, [category, exclude]);
   return (

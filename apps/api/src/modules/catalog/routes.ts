@@ -43,7 +43,7 @@ export function registerCatalog(app: FastifyInstance, deps: Deps): void {
 
   route(app, deps, {
     method: 'GET', url: '/products', tags: T, summary: 'Catalog list / search (cyrillic+latin, SKU)',
-    query: z.object({ q: z.string().max(200).optional(), category: z.string().max(120).optional(), sort: z.enum(['new', 'price_asc', 'price_desc', 'popular', 'discount']).default('new'), in_stock: z.coerce.boolean().optional(), max_price: z.coerce.number().int().min(1).optional(), limit: z.coerce.number().int().min(1).max(60).default(24), offset: z.coerce.number().int().min(0).max(10000).default(0) }),
+    query: z.object({ q: z.string().max(200).optional(), category: z.string().max(120).optional(), sort: z.enum(['new', 'price_asc', 'price_desc', 'popular', 'discount']).default('new'), in_stock: z.coerce.boolean().optional(), max_price: z.coerce.number().int().min(1).optional(), fuzzy: z.coerce.boolean().optional(), limit: z.coerce.number().int().min(1).max(60).default(24), offset: z.coerce.number().int().min(0).max(10000).default(0) }),
   }, async ({ db, query }) => {
     const params: unknown[] = [];
     const where = [`p.status='published'`];
@@ -51,6 +51,7 @@ export function registerCatalog(app: FastifyInstance, deps: Deps): void {
       params.push(query.category);
       where.push(`c.id IN (WITH RECURSIVE t AS (SELECT id FROM categories WHERE slug=$${params.length} UNION ALL SELECT c2.id FROM categories c2 JOIN t ON c2.parent_id=t.id) SELECT id FROM t)`);
     }
+    const baseWhere = [...where], baseParams = [...params]; // without the text search: used by the typo fallback
     if (query.q) {
       const tokens = tokenize(query.q).slice(0, 8);
       // Synonyms resolved once; each token becomes LIKE (trigram-indexable) + boundary regex recheck (T095).
@@ -73,14 +74,18 @@ export function registerCatalog(app: FastifyInstance, deps: Deps): void {
       where.push(conds.length ? `((${conds.join(' AND ')}) OR ${skuExact})` : skuExact);
     }
     // Aggregates are computed set-wise (GROUP BY) and, for the default "new" sort, only for the requested page (T095).
-    const limitFirst = query.sort === 'new' && !query.in_stock && !query.max_price;
+    // In-stock products always come first (a shopper should not scroll past "Tugagan" cards), so availability is
+    // needed before paging; aggregates stay set-wise (GROUP BY), which is cheap at catalog scale.
+    const limitFirst = false;
+  const listQuery = async (where: string[], params: unknown[]) => {
     params.push(query.limit, query.offset);
     const L = params.length - 1, O = params.length;
-    const order = query.sort === 'price_asc' ? 'min_price ASC NULLS LAST, published_at DESC' : query.sort === 'price_desc' ? 'min_price DESC NULLS LAST, published_at DESC'
+    const base = query.sort === 'price_asc' ? 'min_price ASC NULLS LAST, published_at DESC' : query.sort === 'price_desc' ? 'min_price DESC NULLS LAST, published_at DESC'
       : query.sort === 'popular' ? 'sold_30d DESC, published_at DESC NULLS LAST, id'
       : query.sort === 'discount' ? 'COALESCE(1 - min_price::numeric / NULLIF(compare_at, 0), 0) DESC, published_at DESC NULLS LAST, id'
       : 'published_at DESC NULLS LAST, id';
-    const rows = await many(db, `
+    const order = `(available > 0) DESC, ${base}`;
+    return many(db, `
       WITH cand AS (
         SELECT p.id, p.slug, p.name, p.brand_id, p.published_at FROM products p JOIN categories c ON c.id=p.category_id
          WHERE ${where.join(' AND ')}
@@ -91,14 +96,28 @@ export function registerCatalog(app: FastifyInstance, deps: Deps): void {
       sold AS (SELECT s.product_id, SUM(ol.qty)::int AS sold_30d FROM order_lines ol JOIN skus s ON s.id=ol.sku_id JOIN orders o ON o.id=ol.order_id
                 WHERE o.created_at > now() - interval '30 days' AND o.commercial_status <> 'cancelled' AND o.confirmation_status = 'verified' AND s.product_id IN (SELECT id FROM cand) GROUP BY s.product_id),
       page AS (
-        SELECT cand.*, price.min_price, price.compare_at, COALESCE(avail.available, 0) AS available, COALESCE(sold.sold_30d, 0) AS sold_30d
+        SELECT cand.*, price.min_price, price.compare_at, COALESCE(avail.available, 0) AS available, COALESCE(sold.sold_30d, 0) AS sold_30d, COUNT(*) OVER () AS total
           FROM cand LEFT JOIN price ON price.product_id=cand.id LEFT JOIN avail ON avail.product_id=cand.id LEFT JOIN sold ON sold.product_id=cand.id
          WHERE TRUE ${query.in_stock ? 'AND COALESCE(avail.available,0) > 0' : ''} ${query.sort === 'discount' ? 'AND price.compare_at IS NOT NULL' : ''} ${query.max_price ? `AND price.min_price <= ${Number(query.max_price) * 100}` : ''}
          ORDER BY ${order} ${limitFirst ? '' : `LIMIT $${L} OFFSET $${O}`})
-      SELECT page.id, page.slug, page.name, b.name AS brand, page.published_at, page.min_price, page.compare_at, page.available, page.sold_30d,
+      SELECT page.id, page.slug, page.name, b.name AS brand, page.published_at, page.min_price, page.compare_at, page.available, page.sold_30d, page.total,
              (SELECT '/media/' || storage_key FROM media_assets ma WHERE ma.product_id=page.id AND ma.status='approved' ORDER BY sort LIMIT 1) AS image
         FROM page LEFT JOIN brands b ON b.id=page.brand_id ORDER BY ${order}`, params);
-    return { items: rows.map((r) => ({ ...r, min_price: r.min_price ? m(r.min_price as string) : null, compare_at: r.compare_at ? m(r.compare_at as string) : null, available: Number(r.available) })) };
+  };
+    let rows = await listQuery(where, params);
+    let fuzzy = false;
+    // Typo fallback ("kuloqchin", "krasovka"): nothing matched exactly -> trigram word similarity per token, shown
+    // to the shopper as "o'xshash natijalar" so a wrong letter never ends in an empty page.
+    if (query.q && rows.length === 0 && (query.offset === 0 || query.fuzzy)) {
+      const toks = tokenize(query.q).filter((x) => x.length >= 3).slice(0, 5);
+      if (toks.length) {
+        const sim = toks.map((_, i) => `word_similarity($${i + 1}, p.search_doc)`);
+        const ids = await many<{ id: string }>(db, `SELECT p.id FROM products p WHERE p.status='published' AND ${sim.map((x) => `${x} >= 0.45`).join(' AND ')} ORDER BY ${sim.join(' + ')} DESC LIMIT 60`, toks);
+        if (ids.length) { rows = await listQuery([...baseWhere, `p.id = ANY($${baseParams.length + 1}::uuid[])`], [...baseParams, ids.map((x) => x.id)]); fuzzy = rows.length > 0; }
+      }
+    }
+    const total = rows.length ? Number(rows[0]!.total) : null; // null: page past the end, count unknown
+    return { total, fuzzy, items: rows.map(({ total: _t, ...r }) => ({ ...r, min_price: r.min_price ? m(r.min_price as string) : null, compare_at: r.compare_at ? m(r.compare_at as string) : null, available: Number(r.available) })) };
   });
 
   // "Bular bilan birga olishadi": products that really appeared in the same orders as the given products (no invented

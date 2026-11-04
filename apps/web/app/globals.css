@@ -1093,3 +1093,4 @@ a.admin-tab { text-decoration: none; color: inherit; }
 .ib-close { background: none; border: 0; font-size: 24px; line-height: 1; color: var(--muted); cursor: pointer; min-width: 32px; min-height: 32px; }
 @media (min-width: 861px) { .install-bar { bottom: 16px; } }
 .link-row { display: block; width: 100%; text-align: left; padding: 12px 4px; background: none; border: 0; border-bottom: 1px solid var(--border); font: inherit; font-weight: 600; color: var(--text); cursor: pointer; }
+.fuzzy-note { margin: 6px 0; }

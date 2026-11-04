@@ -28,6 +28,8 @@ function Catalog() {
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [more, setMore] = useState(false);
+  const [total, setTotal] = useState<number | null>(null);
+  const [fuzzy, setFuzzy] = useState(false);
   const [end, setEnd] = useState(false);
   const [error, setError] = useState<any>(null);
   const [eta, setEta] = useState<string | null>(null);
@@ -38,8 +40,9 @@ function Catalog() {
     api('/categories').then((c) => setCats(c.items)).catch(() => {});
     api('/delivery-zones').then((r) => { const z = r.items ?? []; if (z.length) { const a = Math.min(...z.map((x: any) => x.eta_min_days)), b = Math.max(...z.map((x: any) => x.eta_max_days)); setEta(a === b ? `${a}` : `${a}–${b}`); } }).catch(() => {});
   }, []);
-  const qs = useCallback((offset: number) => {
+  const qs = useCallback((offset: number, fz = false) => {
     const p = new URLSearchParams({ limit: String(PAGE), offset: String(offset), sort });
+    if (fz) p.set('fuzzy', 'true');
     if (q) p.set('q', q);
     if (category) p.set('category', category);
     if (inStock) p.set('in_stock', 'true');
@@ -48,18 +51,18 @@ function Catalog() {
   }, [q, category, sort, inStock, maxPrice]);
   const load = () => {
     setLoading(true); setError(null); setEnd(false);
-    api(`/products?${qs(0)}`).then((r) => { setItems(r.items); setEnd(r.items.length < PAGE); }).catch(setError).finally(() => setLoading(false));
+    api(`/products?${qs(0)}`).then((r) => { setItems(r.items); setTotal(r.total ?? null); setFuzzy(!!r.fuzzy); setEnd(r.items.length < PAGE); }).catch(setError).finally(() => setLoading(false));
   };
   useEffect(load, [qs]); // eslint-disable-line react-hooks/exhaustive-deps
   const next = useCallback(async () => {
     if (busy.current || end || loading) return;
     busy.current = true; setMore(true);
     try {
-      const r = await api(`/products?${qs(items.length)}`);
+      const r = await api(`/products?${qs(items.length, fuzzy)}`);
       setItems((x) => { const seen = new Set(x.map((i) => i.id)); return [...x, ...r.items.filter((i: any) => !seen.has(i.id))]; });
       if (r.items.length < PAGE) setEnd(true);
     } catch { setEnd(true); } finally { busy.current = false; setMore(false); }
-  }, [qs, items.length, end, loading]);
+  }, [qs, items.length, end, loading, fuzzy]);
   useEffect(() => {
     const el = sentinel.current;
     if (!el) return;
@@ -98,10 +101,11 @@ function Catalog() {
           <button className={`schip ${inStock ? 'on' : ''}`} aria-pressed={inStock} onClick={() => go({ in_stock: inStock ? null : '1' })}>✓ {t('inStockOnly')}</button>
         </div>
       </div>
-      <div className="muted small result-count">{loading ? '…' : `${items.length}${end ? '' : '+'} ${t('results')}`}</div>
+      {fuzzy && !loading && <div className="notice fuzzy-note" role="status">“{q}” bo‘yicha aniq topilmadi — shunga o‘xshash mahsulotlar ko‘rsatilmoqda.</div>}
+      <div className="muted small result-count">{loading ? '…' : `${total ?? items.length}${total === null && !end ? '+' : ''} ${t('results')}`}</div>
       {error ? <div role="alert" className="notice">{errText(error)} <button className="btn secondary" onClick={load}>{t('retry')}</button></div>
         : loading ? <SkeletonGrid />
-        : items.length === 0 ? <div className="empty"><p>{t('empty')}</p><Link className="btn secondary" href="/catalog">{t('allCategories')}</Link></div>
+        : items.length === 0 ? <div className="empty"><p>{q ? `“${q}” bo‘yicha hech narsa topilmadi. Boshqa so‘z bilan yozib ko‘ring yoki toifani tanlang.` : t('empty')}</p><Link className="btn secondary" href="/catalog">{t('allCategories')}</Link></div>
         : <div className="pgrid">{items.map((p) => <ProductCard key={p.id} p={p} eta={eta} />)}</div>}
       {!loading && items.length > 0 && <div ref={sentinel} className="feed-end" role="status">{more ? t('loadingMore') : end ? t('endOfFeed') : ''}</div>}
     </div>

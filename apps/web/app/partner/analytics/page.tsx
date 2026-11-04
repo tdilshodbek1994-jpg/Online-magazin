@@ -126,35 +126,30 @@ export default function PartnerAnalytics() {
             </ul>
           </details>
 
-          <section className="card an-sec">
-            <h2>Buyurtmalar</h2>
-            <div className="funnel">
-              <Link href="/partner/orders?status=all"><b>{d.counts.orders}</b><span>ta buyurtma keldi ›</span></Link>
-              <Link href="/partner/orders?status=accepted"><b>{d.counts.confirmed}</b><span>tasini mijoz tasdiqladi ›</span><small>{pct(d.ratios.confirmation)}</small></Link>
-              <Link href="/partner/orders?status=delivered"><b>{d.counts.delivered}</b><span>tasi yetkazildi ›</span><small>{pct(d.ratios.delivery_total)}</small></Link>
-              <div><b>{d.counts.units}</b><span>dona sotildi</span></div>
-            </div>
-          </section>
+          {/* Compact (user: "pasti bardak"): one row of 4 numbers, then one short line per link. */}
+          <div className="an-mini">
+            <Link href="/partner/orders?status=all"><b>{d.counts.orders}</b><span>keldi</span></Link>
+            <Link href="/partner/orders?status=accepted"><b>{d.counts.confirmed}</b><span>tasdiqlandi</span></Link>
+            <Link href="/partner/orders?status=delivered"><b>{d.counts.delivered}</b><span>yetkazildi</span></Link>
+            <div><b>{d.counts.units}</b><span>dona</span></div>
+          </div>
 
-          <h2>Qaysi havola qancha olib keldi?</h2>
+          <h2 className="an-h2">Havolalar bo‘yicha</h2>
           <div className="slist">
             {d.links.filter((l: any) => l.orders > 0 || BigInt(l.commission) !== 0n || (l.ad && l.ad !== '0') || BigInt(l.expected) > 0n).slice(0, shown).map((l: any) => {
               const v = verdict(l);
+              const href = l.link_id ? `/partner/analytics/link/${l.link_id}?period=${period}` : '/partner/orders?status=all';
               return (
-                <article key={l.link_id ?? 'none'} className={`scard an-link2 ${v.cls}`}>
-                  <div className="spread"><b>{l.link_id ? l.name : 'O‘zingiz kiritgan buyurtmalar'}{l.archived ? ' · arxiv' : ''}</b><span className={`verdict ${v.cls}`}>{v.text}</span></div>
-                  {l.product && <div className="small muted">{pick(l.product, lang)}</div>}
-                  <div className="eq-mini">
-                    <span>Topdingiz <b>{money(l.commission)}</b></span>
-                    <span>Reklama <b>{l.ad === null ? '?' : money(l.ad)}</b></span>
-                    <span>Qoldi <b className={l.result && BigInt(l.result) < 0n ? 'no-t' : 'ok-t'}>{l.result === null ? '?' : money(l.result)}</b></span>
+                <Link key={l.link_id ?? 'none'} href={href} className={`scard an-row ${v.cls}`}>
+                  <div className="an-row-main">
+                    <b>{l.link_id ? l.name : 'O‘zingiz kiritganlar'}{l.archived ? ' · arxiv' : ''}</b>
+                    <small className="muted">{l.product ? `${pick(l.product, lang)} · ` : ''}{l.orders} buyurtma{l.ad && l.ad !== '0' ? ` · reklama ${money(l.ad)}` : ''}</small>
                   </div>
-                  {l.link_id ? <Link className="small" href={`/partner/orders?link=${l.link_id}&link_name=${encodeURIComponent(l.name)}&status=all`}>{l.orders} buyurtma · {l.delivered} yetkazildi{BigInt(l.expected) > 0n ? ` · yana ${money(l.expected)} kutilmoqda` : ''} ›</Link> : <div className="small muted">{l.orders} buyurtma · {l.delivered} yetkazildi</div>}
-                  {l.link_id && <div className="row" style={{ gap: 8 }}><Link className="btn secondary sm" href={`/partner/analytics/link/${l.link_id}?period=${period}`}>Batafsil</Link><Link className="btn secondary sm" href={`/partner/expenses?link=${l.link_id}`}>Reklama xarajati qo‘shish</Link></div>}
-                </article>
+                  <b className={`an-row-sum ${l.result && BigInt(l.result) < 0n ? 'no-t' : 'ok-t'}`}>{l.result === null ? money(l.commission) : money(l.result)} ›</b>
+                </Link>
               );
             })}
-            {d.links.length > shown && <button className="btn secondary full" onClick={() => setShown(shown + 20)}>Yana ko‘rsatish</button>}
+            {d.links.length > shown && <button className="btn secondary full" onClick={() => setShown(shown + 10)}>Yana 10 ta</button>}
             {(d.unallocated.ad !== '0' || d.unallocated.other !== '0') && <p className="small muted">Yana {money((BigInt(d.unallocated.ad) + BigInt(d.unallocated.other)).toString())} reklama xarajati hech qaysi havolaga biriktirilmagan — u yuqoridagi umumiy hisobga kirgan.</p>}
           </div>
 

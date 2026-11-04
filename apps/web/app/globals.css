@@ -1410,3 +1410,15 @@ details.pp-more > summary { cursor: pointer; font-weight: 700; padding: 2px 0; }
 details.pp-more[open] > summary { margin-bottom: 8px; }
 .pp-ask .card { box-shadow: none; border: 0; padding: 0; margin: 0; background: transparent; }
 .pp-ask .card > h2 { display: none; }
+/* Partner analytics: compact numbers + one-line link rows */
+.an-mini { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 12px 0; }
+.an-mini > * { display: grid; justify-items: center; gap: 2px; padding: 10px 4px; border-radius: 12px; background: var(--surface-2); color: inherit; text-decoration: none; }
+.an-mini b { font-size: 20px; }
+.an-mini span { font-size: 12px; color: var(--muted); }
+.an-h2 { font-size: 18px; margin: 14px 0 8px; }
+a.an-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 14px; color: inherit; text-decoration: none; border-left: 4px solid var(--border); }
+a.an-row.v-good { border-left-color: var(--primary); }
+a.an-row.v-bad { border-left-color: #d92d20; }
+.an-row-main { display: grid; gap: 2px; min-width: 0; }
+.an-row-main b, .an-row-main small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.an-row-sum { white-space: nowrap; font-size: 16px; }

@@ -12,6 +12,7 @@ import { errText } from '@/lib/errors';
 import { PriceWatch } from './PriceWatch';
 import { FavButton } from '@/components/FavButton';
 import { rememberView } from '@/lib/favs';
+import { trackEvent } from '@/lib/tracking';
 
 export function AddToCart({ product, minPrice }: { product: any; minPrice: string | null }) {
   const { t, lang } = useI18n();
@@ -27,7 +28,7 @@ export function AddToCart({ product, minPrice }: { product: any; minPrice: strin
   const maxQty = Math.max(1, Math.min(99, v?.available ?? 1));
   const [zone, setZone] = useState<any>(null);
   const [quickKey, setQuickKey] = useState(0);
-  useEffect(() => { rememberView({ id: product.id, slug: product.slug }); }, [product.id, product.slug]);
+  useEffect(() => { rememberView({ id: product.id, slug: product.slug }); void trackEvent('product.viewed', { product_id: product.id }); }, [product.id, product.slug]);
   // Came through a partner's discount link? Show the price the customer will actually pay.
   const [pdisc, setPdisc] = useState<string | null>(null);
   const shown = (pm: string | null | undefined) => { if (!pm) return pm as any; if (!pdisc) return pm; const x = BigInt(pm) - BigInt(pdisc); return (x > 0n ? x : BigInt(pm)).toString(); };

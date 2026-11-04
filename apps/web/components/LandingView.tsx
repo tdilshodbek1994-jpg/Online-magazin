@@ -1,9 +1,10 @@
 'use client';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api, som } from '@/lib/api';
 import { pick, useI18n } from '@/lib/i18n';
 import { errText } from '@/lib/errors';
+import { browserContext, trackEvent } from '@/lib/tracking';
 
 /**
  * Landing renderer for all templates (simple / pro / boom / multi) from the allowlisted block schema. Text is rendered
@@ -23,10 +24,12 @@ export function LandingView({ data }: { data: any }) {
   const [err, setErr] = useState<string | null>(null);
   const cur = (p?.skus ?? []).find((s: any) => s.sku_id === skuId) ?? sku;
   const unavailable = data.availability === 'unavailable';
+  // Measurement only for the real published page (never preview) and only with consent — see lib/tracking.
+  useEffect(() => { if (!data.preview && data.id) void trackEvent('landing.rendered', { landing_id: data.id }); }, [data.preview, data.id]);
   const order = async () => {
     if (data.preview) { setErr('Ko‘rib chiqish rejimi — buyurtma yuborilmaydi.'); return; }
     setBusy(true); setErr(null);
-    try { setDone(await api('/checkout/quick-order', { method: 'POST', idem: crypto.randomUUID(), body: { sku_id: skuId, qty, name, phone, accept_terms: true, landing: { landing_id: data.id, revision: data.revision } } })); }
+    try { setDone(await api('/checkout/quick-order', { method: 'POST', idem: crypto.randomUUID(), body: { sku_id: skuId, qty, name, phone, accept_terms: true, landing: { landing_id: data.id, revision: data.revision }, tracking: browserContext() } })); }
     catch (e: any) { setErr(errText(e)); } finally { setBusy(false); }
   };
   const blocks = data.definition?.blocks ?? [];

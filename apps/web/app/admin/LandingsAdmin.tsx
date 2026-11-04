@@ -4,6 +4,7 @@ import { api } from '@/lib/api';
 import { errText } from '@/lib/errors';
 import { toast } from '@/lib/toast';
 import { LandingView } from '@/components/LandingView';
+import { TrackingAdmin } from './TrackingAdmin';
 
 const ST: Record<string, string> = { draft: 'Qoralama', review: 'Ko‘rib chiqilmoqda', approved: 'Tasdiqlangan', published: 'Nashrda', archived: 'Arxiv', revoked: 'Bekor qilingan' };
 const ADDABLE: [string, string, any][] = [['benefits', 'Afzalliklar', { items: [] }], ['faq', 'Savollar (FAQ)', { items: [] }], ['gallery', 'Galereya', { max: 6 }], ['specs', 'Tavsif (katalogdan)', { from_catalog: true }], ['video', 'Video (YouTube ID)', { provider: 'youtube', ref: '' }], ['contact', 'Aloqa matni', { text: '' }], ['delivery_returns', 'Yetkazish/qaytarish', {}]];
@@ -29,6 +30,7 @@ export function LandingsAdmin() {
       </details>
       <div className="slist">{list?.map((l) => <button key={l.id} type="button" className={`scard cc-card ${sel === l.id ? 'sel' : ''}`} onClick={() => setSel(sel === l.id ? null : l.id)}><div className="spread"><b>{l.title}</b><span className="pill">{ST[l.status]}</span></div><div className="small muted">/l/{l.slug} · {l.template} · qoralama v{l.draft_revision}{l.published_revision ? ` · nashrda v${l.published_revision}` : ''} · {l.flows} oqim</div></button>)}</div>
       {sel && <Editor id={sel} onChanged={load} />}
+      <TrackingAdmin />
     </section>
   );
 }

@@ -6,6 +6,7 @@ import { ScrollRestorer } from '@/components/ScrollRestorer';
 import { BottomNav, Footer } from '@/components/Shell';
 import { I18nProvider } from '@/lib/i18n';
 import { InstallApp } from '@/components/InstallApp';
+import { ConsentBanner } from '@/components/ConsentBanner';
 
 export const metadata: Metadata = {
   title: 'UzShop — onlayn do‘kon',
@@ -27,6 +28,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <Footer />
           <BottomNav />
           <InstallApp />
+          <ConsentBanner />
           <Toaster />
           <ScrollRestorer />
         </I18nProvider>

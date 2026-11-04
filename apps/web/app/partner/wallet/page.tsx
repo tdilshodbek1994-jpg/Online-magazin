@@ -76,6 +76,8 @@ export default function Wallet() {
   if (!w) return <div className="loading" role="status"><span className="spinner" aria-hidden />Yuklanmoqda…</div>;
   const b = w.balances;
   const groups: any[] = (w.groups ?? []).filter((g: any) => g.reason !== 'superseded').sort((a: any, c: any) => ORDER.indexOf(a.reason) - ORDER.indexOf(c.reason));
+  const goTo = (id: string) => setTimeout(() => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60);
+  const goLines = (r: string) => { setFilter(r); setShown(8); goTo('lines'); };
   const lines = (w.lines ?? []).filter((l: any) => filter === 'all' || l.reason === filter);
   const dest = me?.payout_destination;
   const canWithdraw = BigInt(b.available_minor) > 0n && dest?.verified;
@@ -87,10 +89,11 @@ export default function Wallet() {
         <span>Yechib olishingiz mumkin</span>
         <b>{som(b.available_minor)}</b>
         <div className="wal-sub">
-          <button type="button" onClick={() => setFilter('not_delivered')}>🚚 Yo‘lda: <b>{som(b.estimated_minor)}</b></button>
-          <button type="button" onClick={() => setFilter('hold')}>⏳ Kutilmoqda: <b>{som(b.pending_minor)}</b></button>
-          {BigInt(b.reserved_minor) > 0n && <span>📤 So‘rovda: <b>{som(b.reserved_minor)}</b></span>}
-          <span>✅ To‘langan: <b>{som(b.paid_minor)}</b></span>
+          {/* Each pill opens its list below (user: "ustiga bosib ko‘rish bo‘lsin"). */}
+          <button type="button" onClick={() => goLines('not_delivered')}>🚚 Yo‘lda: <b>{som(b.estimated_minor)}</b> ›</button>
+          <button type="button" onClick={() => goLines('hold')}>⏳ Kutilmoqda: <b>{som(b.pending_minor)}</b> ›</button>
+          {BigInt(b.reserved_minor) > 0n && <button type="button" onClick={() => goTo('pay-hist')}>📤 So‘rovda: <b>{som(b.reserved_minor)}</b> ›</button>}
+          <button type="button" onClick={() => goTo('pay-hist')}>✅ To‘langan: <b>{som(b.paid_minor)}</b> ›</button>
         </div>
         {w.debt && <div className="wal-debt">Tuzatish (qarz): {som(w.debt.amount_minor)} — keyingi komissiyalardan avtomatik yopiladi.</div>}
       </section>
@@ -123,7 +126,7 @@ export default function Wallet() {
           {!canWithdraw && <p className="muted small">{!dest ? 'Avval karta qo‘shing.' : !dest.verified ? 'Karta tasdiqlanishini kuting.' : 'Hozircha yechish mumkin bo‘lgan pul yo‘q.'}</p>}
         </div>
         {payouts.length > 0 && (
-          <div className="wal-payouts">
+          <div className="wal-payouts" id="pay-hist">
             <h3>So‘rovlarim</h3>
             {payouts.slice(0, 5).map((p) => <div key={p.id} className="wal-row"><span>{new Date(p.created_at).toLocaleDateString('uz-UZ')}</span><b>{som(p.amount_minor)}</b><span className={`wal-st ${p.status === 'paid' ? 'st-ok' : p.status === 'rejected' ? 'st-off' : 'st-wait'}`}>{PAYOUT[p.status] ?? p.status}</span></div>)}
           </div>

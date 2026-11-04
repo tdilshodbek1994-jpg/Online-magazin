@@ -225,7 +225,8 @@ await step('E2E-14/V2-T01..T12', 'partner Order Studio: autosaved draft → orde
   await page.getByRole('button', { name: 'Buyurtmani yuborish' }).click();
   await page.getByText('Buyurtma yaratildi').waitFor();
   await page.getByRole('link', { name: 'Sotuv pasporti' }).click();
-  await page.getByText('Kimniki va nega').waitFor();
+  await page.getByText('Sizning bonusingiz').waitFor();
+  await page.getByText('Batafsil: manba va bonus hisobi').click();
   await page.getByText('Buyurtmani o‘zingiz kiritdingiz').waitFor();
   await page.getByText('Kechqurun 18:00 dan keyin').waitFor();
   await page.goto(BASE + '/partner/wallet');

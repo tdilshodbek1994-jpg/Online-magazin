@@ -1400,3 +1400,13 @@ a.ocard { display: grid; gap: 4px; padding: 12px 14px; color: inherit; text-deco
 a.ocard:active { background: var(--surface-2); }
 .ocard-items { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ocard-partner { color: var(--primary-600); font-weight: 600; }
+/* Sales passport: short summary + folded details */
+.pp-sum { display: grid; gap: 8px; }
+.pp-prod { font-weight: 700; font-size: 17px; }
+.pp-bonus { display: flex; justify-content: space-between; align-items: baseline; padding: 10px 12px; border-radius: 12px; background: var(--primary-50); }
+.pp-bonus b { font-size: 20px; }
+.pp-now { margin: 0; }
+details.pp-more > summary { cursor: pointer; font-weight: 700; padding: 2px 0; }
+details.pp-more[open] > summary { margin-bottom: 8px; }
+.pp-ask .card { box-shadow: none; border: 0; padding: 0; margin: 0; background: transparent; }
+.pp-ask .card > h2 { display: none; }

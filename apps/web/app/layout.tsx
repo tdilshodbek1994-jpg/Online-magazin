@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { Header } from '@/components/Header';
 import { Toaster } from '@/components/Toaster';
+import { ScrollRestorer } from '@/components/ScrollRestorer';
 import { BottomNav, Footer } from '@/components/Shell';
 import { I18nProvider } from '@/lib/i18n';
 import { InstallApp } from '@/components/InstallApp';
@@ -27,6 +28,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <BottomNav />
           <InstallApp />
           <Toaster />
+          <ScrollRestorer />
         </I18nProvider>
       </body>
     </html>

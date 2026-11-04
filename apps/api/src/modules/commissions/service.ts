@@ -313,6 +313,9 @@ export async function releaseMatured(tx: Tx, now: Date = new Date()): Promise<nu
     await postJournal(tx, `commission:${a.id}:v${v}`, 'commission_available', [{ account: 'commission_expense', debit: amt }, { account: 'partner_payable', credit: amt }]);
     await tx.query(`UPDATE commission_accruals SET state='available', available_at=now(), version=$2 WHERE id=$1`, [a.id, v]);
     await notifyPartner(tx, a.partner_id, 'partner.commission_available', { amount_minor: amt.toString() }, `p:avail:${a.id}`);
+    // Partner's own opt-in charity share of this now-available commission (idempotent; OFF unless the partner consented).
+    const { applyCharityAuto } = await import('../charity/service.js');
+    await applyCharityAuto(tx, a);
   }
   return acc.rowCount ?? 0;
 }

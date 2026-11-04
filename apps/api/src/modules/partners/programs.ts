@@ -115,16 +115,18 @@ export function registerPartnerPrograms(app: FastifyInstance, deps: Deps): void 
     return { contests: outContests, bonus_rules: outRules, bonuses, penalties, penalty_reasons: reasons, charity: { ...charity, handovers } };
   });
 
-  route(app, deps, { method: 'POST', url: '/partner/charity', tags: P, summary: 'Donate from my available balance to the charity box', body: z.object({ amount_minor: zMinor }) }, async ({ actor, db, body, idempotencyKey }) => {
+  route(app, deps, { method: 'POST', url: '/partner/charity', tags: P, summary: 'One-time gift from my available balance to the charity fund (idempotent)', body: z.object({ amount_minor: zMinor, fund_id: z.string().uuid().optional() }) }, async ({ actor, db, body, idempotencyKey }) => {
     const me = await myPartner(db, actor);
     if (!idempotencyKey) throw badRequest('IDEMPOTENCY_KEY_REQUIRED');
     return withTx(db, async (tx) => {
       const amt = BigInt(body.amount_minor);
+      const bal = await one<{ available_minor: string }>(tx, `SELECT available_minor::text FROM partner_balances WHERE partner_id=$1 FOR UPDATE`, [me.id]).catch(() => ({ available_minor: '0' }));
+      // Checked after the balance row lock, so a double click cannot pass both checks (charity #14).
       const exists = await maybeOne<{ id: string }>(tx, `SELECT source_id AS id FROM partner_ledger WHERE source_type='charity' AND effect_key=$1 AND partner_id=$2`, [`k:${idempotencyKey}`, me.id]);
       if (exists) return { id: exists.id, replayed: true };
-      const bal = await one<{ available_minor: string }>(tx, `SELECT available_minor::text FROM partner_balances WHERE partner_id=$1 FOR UPDATE`, [me.id]).catch(() => ({ available_minor: '0' }));
       if (BigInt(bal.available_minor) < amt) throw new AppError(422, 'INSUFFICIENT_AVAILABLE');
-      const d = await one<{ id: string }>(tx, `INSERT INTO charity_donations (partner_id, amount_minor) VALUES ($1,$2) RETURNING id`, [me.id, amt.toString()]);
+      if (body.fund_id && !(await maybeOne(tx, `SELECT 1 FROM charity_funds WHERE id=$1 AND status='approved'`, [body.fund_id]))) throw notFound('FUND');
+      const d = await one<{ id: string }>(tx, `INSERT INTO charity_donations (partner_id, amount_minor, fund_id, source, idem_key) VALUES ($1,$2,$3,'one_time',$4) RETURNING id`, [me.id, amt.toString(), body.fund_id ?? null, idempotencyKey]);
       await transfer(tx, { partnerId: me.id, from: 'available', to: 'external', amount: amt, sourceType: 'charity', sourceId: d.id, effectKey: `k:${idempotencyKey}`, reason: 'hayriya qutisi', actorId: actor.userId });
       await postJournal(tx, `charity:${d.id}`, 'charity_donation', [{ account: 'partner_payable', debit: amt }, { account: 'charity_fund', credit: amt }]);
       await audit(tx, actor, 'charity.donated', { type: 'partner', id: me.id }, { after: { amount_minor: amt.toString() } });

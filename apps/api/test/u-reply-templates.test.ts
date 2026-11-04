@@ -32,3 +32,17 @@ describe('Saved replies', () => {
     expect((await api(t, 'POST', '/admin/reply-templates', { token: s.operator.token, body: { code: 'x_x_x', title: 'Sinov', audience: 'customer', body_latn: 'salom dunyo' } })).status).toBe(403);
   });
 });
+
+describe('Product facts on the task card', () => {
+  it('shows current stock, price now vs ordered, and warranty from the catalog', async () => {
+    const prod = await mkProduct(t, { prices: [52_000], stock: [3] });
+    const r = await placeOrder(t, { guest: randomUUID() + randomUUID(), phone: nextPhone() }, [{ sku_id: prod.skuIds[0]!, qty: 1 }]);
+    await api(t, 'GET', '/ops/center', { token: s.operator.token });
+    const task = (await t.db.query(`SELECT id FROM ops_tasks WHERE order_id=$1`, [r.json.order_id])).rows[0];
+    await t.db.query(`UPDATE offers SET price_minor = 6000000 WHERE sku_id=$1`, [prod.skuIds[0]]);
+    const f = await api(t, 'GET', `/ops/center/tasks/${task.id}/product-facts`, { token: s.operator.token });
+    expect(f.json.items[0].ordered_unit_minor).toBe('5200000');
+    expect(f.json.items[0].current_unit_minor).toBe('6000000');
+    expect(typeof f.json.items[0].available).toBe('number');
+  });
+});

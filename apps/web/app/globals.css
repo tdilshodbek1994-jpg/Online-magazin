@@ -1255,3 +1255,4 @@ a.admin-tab { text-decoration: none; color: inherit; }
 .inc-box { display: grid; gap: 8px; border-color: color-mix(in srgb, #ef4444 45%, var(--border)); }
 .inc-item { display: grid; gap: 4px; padding: 10px; border-radius: 12px; background: var(--surface-2); }
 .q-box summary { cursor: pointer; min-height: 36px; display: flex; align-items: center; } .q-table td, .q-table th { white-space: nowrap; font-size: 13px; }
+.facts { display: grid; gap: 8px; } .fact-item { display: grid; gap: 3px; padding: 8px 10px; border-radius: 10px; background: var(--surface-2); }

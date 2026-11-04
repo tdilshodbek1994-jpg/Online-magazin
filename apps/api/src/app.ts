@@ -18,7 +18,7 @@ import { registerOperatorCentre } from './modules/opscenter/routes.js';
 import { registerOperatorCentreP1 } from './modules/opscenter/handoff.js';
 import { registerPartnerRequests } from './modules/opscenter/partnerRequests.js';
 import { registerOrderMessages } from './modules/opscenter/messages.js';
-import { registerReplyTemplates } from './modules/opscenter/templates.js';
+import { registerProductFacts, registerReplyTemplates } from './modules/opscenter/templates.js';
 import { registerDuplicateReview } from './modules/opscenter/duplicates.js';
 import { registerBulkActions } from './modules/opscenter/bulk.js';
 import { registerIncidents, registerOperatorQuality } from './modules/opscenter/incidents.js';
@@ -143,6 +143,7 @@ export async function buildApp(cfg: AppConfig, db: Db): Promise<FastifyInstance>
       registerPartnerRequests(api, deps);
       registerOrderMessages(api, deps);
       registerReplyTemplates(api, deps);
+      registerProductFacts(api, deps);
       registerDuplicateReview(api, deps);
       registerBulkActions(api, deps);
       registerIncidents(api, deps);

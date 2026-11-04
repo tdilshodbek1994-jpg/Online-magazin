@@ -135,6 +135,7 @@ function TaskCard({ task, order, lang, busy, onClose, onAct }: { task: any; orde
             <div className="small muted">{[order.address_snapshot?.district, order.address_snapshot?.street, order.address_snapshot?.house].filter((x: any) => x && x !== '-').join(', ') || 'Manzil hali yo‘q'}</div>
           </div>
         )}
+        <ProductFacts taskId={task.id} lang={lang} />
         <DuplicatePanel taskId={task.id} canAct={task.mine} />
         <TaskPartnerRequests taskId={task.id} />
         <Composer taskId={task.id} />
@@ -310,5 +311,31 @@ function DuplicatePanel({ taskId, canAct }: { taskId: string; canAct: boolean })
       )}
       {msg && <div className="small" role="status">{msg}</div>}
     </div>
+  );
+}
+
+/** Verified product facts (stock now, price now vs ordered, warranty, description) — never quoted from memory. */
+function ProductFacts({ taskId, lang }: { taskId: string; lang: any }) {
+  const [d, setD] = useState<any>(null);
+  useEffect(() => { api(`/ops/center/tasks/${taskId}/product-facts`).then(setD).catch(() => {}); }, [taskId]);
+  if (!d?.items?.length) return null;
+  return (
+    <details className="task-more facts">
+      <summary>📦 Mahsulot ma’lumoti (katalogdan)</summary>
+      {d.items.map((x: any) => {
+        const changed = x.current_unit_minor && x.current_unit_minor !== x.ordered_unit_minor;
+        return (
+          <div key={x.line_id} className="fact-item small">
+            <b>{pick(x.name, lang)}{x.variant && Object.values(x.variant).length ? ` (${Object.values(x.variant).join('/')})` : ''} × {x.qty}</b>
+            <span>SKU: {x.sku_code} · Omborda hozir: <b className={x.available < x.qty ? 'warn-t' : ''}>{x.available} dona</b></span>
+            <span>Buyurtmadagi narx: {som(x.ordered_unit_minor)}{changed ? ` · hozirgi narx: ${som(x.current_unit_minor)} (buyurtma narxi o‘zgarmaydi)` : ''}</span>
+            {x.warranty_months ? <span>Kafolat: {x.warranty_months} oy</span> : <span className="muted">Kafolat ko‘rsatilmagan — va’da bermang</span>}
+            {x.description && <span className="muted">{x.description}</span>}
+            <a href={`/p/${x.slug}`} target="_blank" rel="noopener noreferrer">Mahsulot sahifasi ↗</a>
+          </div>
+        );
+      })}
+      <p className="muted small">Tekshirilgan: {tash(d.checked_at)}</p>
+    </details>
   );
 }

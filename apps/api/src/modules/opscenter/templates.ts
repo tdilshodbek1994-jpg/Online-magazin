@@ -65,3 +65,23 @@ export function registerReplyTemplates(app: FastifyInstance, deps: Deps): void {
     return { ok: true };
   });
 }
+
+/**
+ * Product facts for the task card (spec §11): current stock, price now vs ordered, warranty and a short description —
+ * read from the catalog, so the operator never quotes price or stock from memory.
+ */
+export function registerProductFacts(app: FastifyInstance, deps: Deps): void {
+  route(app, deps, { method: 'GET', url: '/ops/center/tasks/:id/product-facts', tags: T, summary: 'Verified product facts for each order line', params: zIdParam }, async ({ actor, db, params }) => {
+    requirePerm(actor, 'orders.operate');
+    const t = await maybeOne<{ order_id: string }>(db, `SELECT order_id FROM ops_tasks WHERE id=$1`, [params.id]);
+    if (!t) throw notFound('TASK');
+    const items = await many(db, `
+      SELECT l.id AS line_id, l.qty - l.canceled_qty AS qty, l.unit_price_minor::text AS ordered_unit_minor, l.product_snapshot->'name' AS name, l.product_snapshot->'variant' AS variant,
+             s.sku_code, p.slug, p.warranty_months, left(p.description->>'uz-Latn', 220) AS description,
+             (SELECT MIN(o.price_minor)::text FROM offers o WHERE o.sku_id=s.id AND o.status='active') AS current_unit_minor,
+             (SELECT COALESCE(SUM(GREATEST(0, sb.on_hand_sellable - sb.reserved - sb.safety_buffer)),0)::int FROM stock_balances sb WHERE sb.sku_id=s.id) AS available
+        FROM order_lines l JOIN skus s ON s.id=l.sku_id JOIN products p ON p.id=s.product_id
+       WHERE l.order_id=$1 AND l.qty > l.canceled_qty ORDER BY l.id`, [t.order_id]);
+    return { items, checked_at: new Date().toISOString() };
+  });
+}

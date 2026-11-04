@@ -109,6 +109,7 @@ export function AddToCart({ product, minPrice }: { product: any; minPrice: strin
         <button className="btn secondary" disabled={!inStock || busy} onClick={add}>🛒 Savatga</button>
         <button className="btn bb-now" disabled={!inStock} onClick={() => { setQuickKey((k) => k + 1); setTimeout(() => document.getElementById('quick-order')?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 50); }}>Hozir olish</button>
       </div>
+      <Specs product={product} lang={lang} />
       {pick(product.description, lang) && (
         <section className="card desc">
           <h2>{t('description')}</h2>
@@ -116,5 +117,28 @@ export function AddToCart({ product, minPrice }: { product: any; minPrice: strin
         </section>
       )}
     </>
+  );
+}
+
+/** "Xususiyatlar": only facts the catalog really has (brand, model, warranty, category, variant options, codes). */
+function Specs({ product, lang }: { product: any; lang: any }) {
+  const variants: any[] = product.variants ?? [];
+  const opts: Record<string, string[]> = {};
+  for (const v of variants) for (const [k, val] of Object.entries(v.variant ?? {})) { (opts[k] ??= []); if (!opts[k].includes(String(val))) opts[k].push(String(val)); }
+  const rows: [string, string][] = [];
+  if (product.brand) rows.push(['Brend', product.brand]);
+  if (product.model) rows.push(['Model', product.model]);
+  if (product.category_name) rows.push(['Toifa', pick(product.category_name, lang)]);
+  for (const [k, vals] of Object.entries(opts)) rows.push([k.charAt(0).toUpperCase() + k.slice(1), vals.join(', ')]);
+  rows.push(['Kafolat', product.warranty_months ? `${product.warranty_months} oy` : 'Ko‘rsatilmagan']);
+  const inStock = variants.filter((v) => v.available > 0).length;
+  if (variants.length > 1) rows.push(['Mavjud variantlar', `${inStock} / ${variants.length}`]);
+  if (variants.length) rows.push(['Mahsulot kodi', variants.map((v) => v.sku_code).slice(0, 4).join(', ') + (variants.length > 4 ? ' …' : '')]);
+  if (rows.length < 2) return null;
+  return (
+    <section className="card specs" aria-labelledby="specs-h">
+      <h2 id="specs-h">Xususiyatlar</h2>
+      <dl className="spec-list">{rows.map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}</dl>
+    </section>
   );
 }

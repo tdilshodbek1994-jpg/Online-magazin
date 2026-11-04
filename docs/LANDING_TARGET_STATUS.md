@@ -114,7 +114,7 @@ Branch `claude/online-marketplace-platform-sdtv52` · not merged to main · not 
 - `apps/api/test/zk-domains.test.ts` (own DB `om_test_domains`, simulated DNS): LT-031…LT-040 (8 tests).
 - `apps/api/test/zl-landing-remaining.test.ts` (own DB `om_test_landing_rest`): LT-003, 006, 007, 009, 017, 019, 024 + 025 (7 tests). Browser (Playwright) checks 2026-11-04: LT-018 reduced-motion animation `none`; LT-009 offline → no order, message, after reconnect price refresh and manual resubmit → 1 order with 2 lines (multi).
 - LT-048 note: local outbox dedup is tested; provider-side dedup can only be verified with a real dataset (not run).
-- Full run 2026-11-04 (final): `cd apps/api && pnpm vitest run` → 37 files, 285 tests passed, exit 0. Web E2E 15/15 (fresh DB, before the last web change set; re-run below).
+- Full run 2026-11-04 (final): `cd apps/api && pnpm vitest run` → 37 files, 285 tests passed, exit 0. Web E2E 15/15 on a fresh DB after the final web changes.
 - Acceptance coverage: 100 of 100 package cases have an automated test or a recorded browser check (provider-side behaviour — Meta dedup, real moderation, real DNS/TLS — is simulated, not run against live services). (After P0C: 32 files, 238.) Web build OK; manual browser check: consent banner appears only after the owner connects a dataset, PageView recorded after consent. Web E2E not re-run for P0C (banner hidden by default).
 
 ## Not started

@@ -52,7 +52,6 @@ function Requests({ embedded = false }: { embedded?: boolean }) {
                 <span className={`pill b-${o.bucket}`}>{BUCKET_LABEL[o.bucket]}</span>
               </span>
             </div>
-      {data && data.items.length > shown && <button className="btn secondary full mt8" onClick={() => setShown(shown + 20)}>Yana ko‘rsatish ({data.items.length - shown} ta qoldi)</button>}
             <div className="req-grid">
               <div><span>Mijoz</span>{o.customer} · {o.customer_phone}</div>
               <div><span>Hudud</span>{o.district ?? '—'}</div>
@@ -64,6 +63,7 @@ function Requests({ embedded = false }: { embedded?: boolean }) {
           </article>
         ))}
       </div>
+      {data && data.items.length > shown && <button className="btn secondary full mt8" onClick={() => setShown(shown + 20)}>Yana ko‘rsatish ({data.items.length - shown} ta qoldi)</button>}
       <p className="muted small">Mijoz ma’lumotlari maxfiylik uchun qisman yashirilgan. Buyurtmani operator tasdiqlaydi; bonus yetkazilgandan keyin hisobingizga o‘tadi.</p>
     </>
   );

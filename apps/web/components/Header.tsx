@@ -1,9 +1,10 @@
 'use client';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
-import { IconBag, IconCart, IconPlay, IconSearch, IconUser } from '@/components/Icons';
+import { IconBag, IconCart, IconPlay, IconUser } from '@/components/Icons';
 import { api, getToken, setToken } from '@/lib/api';
+import { SearchBox } from '@/components/SearchBox';
 import { useI18n } from '@/lib/i18n';
 
 /** Fire after any cart change so the header/bottom-nav badges refresh. */
@@ -22,12 +23,10 @@ export function useCartCount(): number {
 
 export function Header() {
   const { t, lang, setLang } = useI18n();
-  const router = useRouter();
   const path = usePathname();
   const [perms, setPerms] = useState<string[]>([]);
   const [roles, setRoles] = useState<string[]>([]);
   const [logged, setLogged] = useState(false);
-  const [q, setQ] = useState('');
   const count = useCartCount();
   // The partner profile menu is a <details>: it must close after a choice (also when the chosen page is the current
   // one, where the route does not change), on a tap outside, and on Escape — otherwise it stays open over the page.
@@ -45,9 +44,6 @@ export function Header() {
     if (!getToken()) return;
     api('/me').then((m) => { setLogged(true); setPerms(m.permissions); setRoles(m.roles.map((r: any) => r.role)); }).catch((e) => { if (e?.status === 401) setToken(null); }); // network errors/aborts never log the user out
   }, []);
-  useEffect(() => {
-    try { setQ(new URLSearchParams(location.search).get('q') ?? ''); } catch {}
-  }, [path]);
   const staff: [string, string][] = [];
   if (roles.includes('partner')) staff.push(['/partner', t('partner')]);
   if (perms.includes('orders.read_all')) staff.push(['/ops', t('ops')]);
@@ -99,11 +95,7 @@ export function Header() {
           <span className="logo-mark"><IconBag size={20} /></span>
           <span>Uz<b>Shop</b></span>
         </Link>
-        <form className="search" role="search" onSubmit={(e) => { e.preventDefault(); router.push(q.trim() ? `/catalog?q=${encodeURIComponent(q.trim())}` : '/catalog'); }}>
-          <label htmlFor="q" className="sr-only">{t('search')}</label>
-          <input id="q" type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('searchPh')} autoComplete="off" />
-          <button type="submit" className="search-btn" aria-label={t('search')}><IconSearch size={20} /><span className="sb-text" aria-hidden>{t('search')}</span></button>
-        </form>
+        <SearchBox />
         <nav className="head-actions" aria-label="Asosiy">
           <Link href="/reels" className="icon-link"><IconPlay /><span className="icon-label">Video</span></Link>
           <Link href="/cart" className="icon-link" aria-label={`${t('cart')}${count ? ` (${count})` : ''}`}>

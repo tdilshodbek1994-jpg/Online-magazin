@@ -24,6 +24,10 @@ describe('Catalog: in-stock first, exact total, typo-tolerant search', () => {
     expect(typo.status).toBe(200);
     expect(typo.json.fuzzy).toBe(true);
     expect(typo.json.items.map((x: any) => x.id)).toContain(p.productId);
+    const swapped = await mkProduct(t, { name: 'Qovoqdon Xumcha', stock: [2] });
+    const kq = await api(t, 'GET', '/products?q=kovokdon');
+    expect(kq.json.fuzzy).toBe(true);
+    expect(kq.json.items.map((x: any) => x.id)).toContain(swapped.productId);
     const nothing = await api(t, 'GET', '/products?q=qwxzjvbn');
     expect(nothing.json.items).toEqual([]);
     expect(nothing.json.fuzzy).toBe(false);

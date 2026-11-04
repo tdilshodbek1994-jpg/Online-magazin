@@ -111,8 +111,15 @@ export function registerCatalog(app: FastifyInstance, deps: Deps): void {
     if (query.q && rows.length === 0 && (query.offset === 0 || query.fuzzy)) {
       const toks = tokenize(query.q).filter((x) => x.length >= 3).slice(0, 5);
       if (toks.length) {
-        const sim = toks.map((_, i) => `word_similarity($${i + 1}, p.search_doc)`);
-        const ids = await many<{ id: string }>(db, `SELECT p.id FROM products p WHERE p.status='published' AND ${sim.map((x) => `${x} >= 0.45`).join(' AND ')} ORDER BY ${sim.join(' + ')} DESC LIMIT 60`, toks);
+        // Letters Uzbek shoppers swap most often in Latin typing (k/q, x/h): a swapped spelling counts as a match too.
+        const swaps = (w: string) => [...new Set([w.replace(/k/g, 'q'), w.replace(/q/g, 'k'), w.replace(/x/g, 'h'), w.replace(/h/g, 'x')])].filter((v) => v !== w);
+        const fp: unknown[] = [];
+        const conds = toks.map((tok) => {
+          fp.push(tok); const i = fp.length;
+          const alts = swaps(tok).map((a) => { fp.push(`%${a}%`); return `p.search_doc LIKE $${fp.length}`; });
+          return { cond: `(word_similarity($${i}, p.search_doc) >= 0.45${alts.length ? ` OR ${alts.join(' OR ')}` : ''})`, score: `word_similarity($${i}, p.search_doc)` };
+        });
+        const ids = await many<{ id: string }>(db, `SELECT p.id FROM products p WHERE p.status='published' AND ${conds.map((c) => c.cond).join(' AND ')} ORDER BY ${conds.map((c) => c.score).join(' + ')} DESC LIMIT 60`, fp);
         if (ids.length) { rows = await listQuery([...baseWhere, `p.id = ANY($${baseParams.length + 1}::uuid[])`], [...baseParams, ids.map((x) => x.id)]); fuzzy = rows.length > 0; }
       }
     }

@@ -19,6 +19,9 @@ function MarketCard({ p, onCreated }: { p: any; onCreated: () => void }) {
   const [open, setOpen] = useState(false);
   const [sname, setSname] = useState('');
   const [sdisc, setSdisc] = useState('');
+  const [landings, setLandings] = useState<any[]>([]);
+  const [landing, setLanding] = useState('');
+  const [channel, setChannel] = useState('telegram');
   const [busy, setBusy] = useState(false);
   const [created, setCreated] = useState<any>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -58,10 +61,15 @@ function MarketCard({ p, onCreated }: { p: any; onCreated: () => void }) {
         ) : open ? (
           <form className="stream-form" onSubmit={async (e) => {
             e.preventDefault(); setBusy(true); setErr(null);
-            try { setCreated(await api('/partner/streams', { method: 'POST', body: { product_id: p.id, name: sname.trim() || 'Asosiy oqim', ...(sdisc ? { customer_discount_minor: String(BigInt(sdisc) * 100n) } : {}) } })); onCreated(); } catch (x: any) { setErr(x.code === 'DISCOUNT_TOO_BIG' ? 'Chegirma bonusingizdan katta bo‘lmasin.' : errText(x)); } finally { setBusy(false); }
+            try { setCreated(await api('/partner/streams', { method: 'POST', body: { product_id: p.id, name: sname.trim() || 'Asosiy oqim', ...(sdisc ? { customer_discount_minor: String(BigInt(sdisc) * 100n) } : {}), ...(landing ? { landing_id: landing, channel } : {}) } })); onCreated(); } catch (x: any) { setErr(x.code === 'DISCOUNT_TOO_BIG' ? 'Chegirma bonusingizdan katta bo‘lmasin.' : errText(x)); } finally { setBusy(false); }
           }}>
             <label htmlFor={`sn-${p.id}`}>Oqim nomi (masalan: Telegram kanal)</label>
             <input id={`sn-${p.id}`} value={sname} maxLength={80} onChange={(e) => setSname(e.target.value)} placeholder="Asosiy oqim" />
+            {landings.filter((l) => (l.product_ids ?? []).includes(p.id)).length > 0 && (<>
+              <label htmlFor={`sl-${p.id}`}>Landing sahifa (ixtiyoriy)</label>
+              <select id={`sl-${p.id}`} value={landing} onChange={(e) => setLanding(e.target.value)}><option value="">— mahsulot sahifasi —</option>{landings.filter((l) => (l.product_ids ?? []).includes(p.id)).map((l) => <option key={l.id} value={l.id}>{l.title}</option>)}</select>
+              {landing && <><label htmlFor={`sc-${p.id}`}>Manba</label><select id={`sc-${p.id}`} value={channel} onChange={(e) => setChannel(e.target.value)}><option value="telegram">Telegram</option><option value="instagram">Instagram</option><option value="facebook">Facebook</option><option value="other">Boshqa</option></select></>}
+            </>)}
             <label htmlFor={`sd-${p.id}`}>🎁 Mijoz uchun chegirma (ixtiyoriy, so‘m)</label>
             <input id={`sd-${p.id}`} inputMode="numeric" value={sdisc} onChange={(e) => setSdisc(e.target.value.replace(/\D/g, '').slice(0, 9))} placeholder="0" />
             <p className="muted small">Mijoz narxni shuncha arzon ko‘radi; chegirma bonusingizdan ayiriladi{p.payout_minor ? ` (eng ko‘pi ${som(p.payout_minor)})` : ''}. Bo‘sh qoldirsangiz — oddiy havola.</p>
@@ -72,7 +80,7 @@ function MarketCard({ p, onCreated }: { p: any; onCreated: () => void }) {
             {err && <div className="field-error" role="alert">{err}</div>}
           </form>
         ) : (
-          <button type="button" className="btn big" disabled={p.stock === 0 || !p.payout_minor} onClick={() => setOpen(true)}>Oqim yaratish</button>
+          <button type="button" className="btn big" disabled={p.stock === 0 || !p.payout_minor} onClick={() => { setOpen(true); if (!landings.length) api('/partner/landings').then((r) => setLandings(r.items ?? [])).catch(() => {}); }}>Oqim yaratish</button>
         )}
         {p.stock > 0 && <Link href={`/partner/new?product=${encodeURIComponent(p.slug)}`} className="btn secondary full mt8">📞 Mijoz uchun buyurtma</Link>}
         <AdTexts productId={p.id} />

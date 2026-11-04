@@ -1580,3 +1580,25 @@ img.t3-ava { object-fit: cover; display: block; }
 .uzc-gift { display: grid; gap: 6px; }
 .uzc-gift img { width: 100%; max-height: 200px; object-fit: contain; border-radius: 12px; background: var(--surface-2); }
 .uzc-price { color: #b07800; white-space: nowrap; }
+/* Landing pages */
+.lp { display: grid; gap: 14px; max-width: 640px; margin: 0 auto; }
+.lp-hero { display: grid; gap: 8px; text-align: center; }
+.lp-hero img { width: 100%; max-height: 360px; object-fit: contain; border-radius: 18px; background: var(--surface-2); }
+.lp-hero h1 { margin: 4px 0 0; font-size: clamp(22px, 6vw, 30px); }
+.lp-price { display: flex; justify-content: center; align-items: baseline; gap: 10px; }
+.lp-price b { font-size: 28px; color: var(--primary); }
+.lp-gallery { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.lp-gallery img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 12px; }
+.lp-video iframe, .lp-video video { width: 100%; aspect-ratio: 16/9; border: 0; border-radius: 14px; }
+.lp-benefits { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
+.lp-benefits li { padding: 10px 12px; border-radius: 12px; background: var(--primary-50); font-weight: 600; }
+.lp-faq details { padding: 10px 0; border-bottom: 1px solid var(--border); }
+.lp-form { display: grid; gap: 6px; padding: 14px; border-radius: 16px; background: var(--surface); box-shadow: var(--shadow); }
+.lp-dr, .lp-contact, .lp-footer { color: var(--muted); }
+.lp-boom .lp-hero img { animation: lp-float 4s ease-in-out infinite; }
+.lp-boom .lp-form .btn { animation: lp-pulse 2.6s ease-in-out infinite; }
+@keyframes lp-float { 50% { transform: translateY(-6px); } }
+@keyframes lp-pulse { 50% { box-shadow: 0 0 0 6px rgba(0,128,74,.15); } }
+@media (prefers-reduced-motion: reduce) { .lp-boom .lp-hero img, .lp-boom .lp-form .btn { animation: none; } }
+.ln-block { display: grid; gap: 6px; padding: 10px; border-radius: 12px; background: var(--surface-2); }
+.ln-preview { max-width: 100%; margin: 0 auto; border: 1px solid var(--border); border-radius: 18px; padding: 10px; overflow: hidden; }

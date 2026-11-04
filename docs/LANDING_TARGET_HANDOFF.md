@@ -1,0 +1,5 @@
+# Landing & Target — handoff
+- Code: `apps/api/src/modules/landings/{schema,routes}.ts`; wiring in `partners/cabinet.ts` (flow `landing_id`/`channel`), `partners/routes.ts` (touch redirect), `checkout/routes.ts` (quick-order `landing` snapshot). Web: `apps/web/components/LandingView.tsx`, `apps/web/app/l/[slug]/page.tsx`, `apps/web/app/admin/LandingsAdmin.tsx`, Market flow form.
+- Package (task spec, 100 cases, event matrix, permissions, decisions): kept outside the repo in the session scratchpad; copy `contracts/` and `tests/acceptance_cases.json` into `docs/landing/` when P0C starts so case ids stay traceable.
+- Next single task: P0C — `consent_records` + `tracking_events` outbox (one event_id per business event, PurchaseCOD only on delivered + remitted), adapter `meta_capi` returning `blocked_reason='no_credentials'` until the owner connects an account; on-behalf orders never send the partner's browser identity.
+- Owner gates still open: D09 window, D10 Purchase policy, D14 budgets, D18 A/B rules, D19 Meta permissions, D20 legal/cookie/billing.

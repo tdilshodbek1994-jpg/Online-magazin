@@ -21,11 +21,11 @@ Branch `claude/online-marketplace-platform-sdtv52` · not merged · not deployed
 
 ## Tests
 - `apps/api/test/zm-levels.test.ts` (own DB `om_test_levels`): task cases 1–12 + coupon release on cancel + margin refusal + advice (8 tests). 10 000 / 100 000 units are reached with audited adjustments plus a real sale crossing the threshold.
-- Full run 2026-11-04: `cd apps/api && pnpm vitest run` → 38 files, 293 tests passed, exit 0.
+- Full run 2026-11-04: `cd apps/api && pnpm vitest run` → 38 files, 294 tests passed, exit 0.
 
 ## Rollback
 Additive only. Turn off: disable all benefit products (no 50%), set gift discounts to 0. Level tables can be dropped without touching orders, commissions or coins.
 
 ## Next
-- Optional: notify the partner (Telegram/in-app) on level up and coupon issue.
+- Done: level-up and coupon notifications (Telegram + cabinet list), deduplicated.
 - Owner decisions: real gift-discount table; which products get 50%; enter `cost_minor` for those SKUs (without cost the 50% is never applied).

@@ -2,7 +2,7 @@ import type { Queryable } from '../../platform/db.js';
 import { queueNotification } from './service.js';
 
 /** Partner-facing events (Telegram + in-cabinet list). Amounts are tiyin strings; text never contains customer PII. */
-export type PartnerEvent = 'partner.customer_filled' | 'partner.order_new' | 'partner.order_delivered' | 'partner.order_cancelled' | 'partner.commission_available' | 'partner.payout_paid' | 'partner.bonus' | 'partner.contest_prize' | 'partner.penalty' | 'telegram.linked';
+export type PartnerEvent = 'partner.customer_filled' | 'partner.order_new' | 'partner.order_delivered' | 'partner.order_cancelled' | 'partner.commission_available' | 'partner.payout_paid' | 'partner.bonus' | 'partner.contest_prize' | 'partner.penalty' | 'partner.level_up' | 'partner.coupon_issued' | 'telegram.linked';
 
 const som = (minor: unknown) => {
   try { return `${(BigInt(String(minor ?? '0')) / 100n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} so‘m`; } catch { return '—'; }
@@ -24,6 +24,8 @@ export function renderText(template: string, p: Record<string, unknown>): string
     case 'price_watch.dropped': return `UzShop: «${p.product ?? 'mahsulot'}» narxi tushdi: ${p.was ?? ''} → ${p.now ?? ''}. ${p.path ?? ''}`;
     case 'waitlist.back_in_stock': return `UzShop: «${p.product ?? 'mahsulot'}» yana sotuvda. Buyurtma: ${p.path ?? ''}`;
     case 'offer.reminder': return 'UzShop: sizga yuborilgan mahsulot taklifi hali amal qilmoqda. Havolani qayta ochib, tanlashingiz mumkin.';
+    case 'partner.level_up': return `${p.badge ?? '🎖️'} Tabriklaymiz! Yangi daraja: ${p.name ?? ''}\nHisobga olingan sotuvlar: ${p.units ?? 0} dona\nSovg‘alarga chegirma: ${p.discount ?? 0}%${p.next ? `\nKeyingi daraja: ${p.next} (${p.remaining} ta qoldi)` : ''}\n\nKabinet → Darajam`;
+    case 'partner.coupon_issued': return `🎟️ Sizga bir martalik 50% komissiya kuponi berildi!\n${p.units ?? ''} ta sotuvga yetdingiz. Kabinet → Darajam bo‘limida faollashtiring — keyingi mos buyurtmaga qo‘llanadi.`;
     case 'telegram.linked': return '✅ UzShop hamkor bildirishnomalari ulandi. Yangi buyurtma, yetkazish va to‘lovlar haqida shu yerga xabar keladi.';
     default: return String(p.text ?? template);
   }

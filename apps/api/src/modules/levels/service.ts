@@ -1,6 +1,7 @@
 import { audit } from '../../platform/audit.js';
 import { many, maybeOne, one, type Queryable, type Tx } from '../../platform/db.js';
 import type { RuleSnapshot } from '../commissions/service.js';
+import { notifyPartner } from '../notifications/telegram.js';
 
 /**
  * Partner Level & Loyalty PRO. Units = qualified units from the UzCoin ledger (only lines whose commission became
@@ -38,11 +39,20 @@ export async function syncPartnerLevel(tx: Tx, partnerId: string, reason: string
   if ((prev?.level ?? 0) !== def.level) {
     await tx.query(`INSERT INTO partner_level_history (partner_id, from_level, to_level, units, reason) VALUES ($1,$2,$3,$4,$5)`, [partnerId, prev?.level ?? 0, def.level, units, reason]);
     await audit(tx, null, 'partner.level_changed', { type: 'partner', id: partnerId }, { before: { level: prev?.level ?? 0 }, after: { level: def.level, units }, reason });
+    if (def.level > (prev?.level ?? 0)) {
+      // congratulate once per reached level (dedupe key), never on a downgrade
+      const defs = await levelDefs(tx);
+      const next = defs.find((d) => d.threshold > units);
+      await notifyPartner(tx, partnerId, 'partner.level_up', { name: def.name, badge: def.badge, units, discount: def.gift_discount_bps / 100, next: next?.name ?? null, remaining: next ? next.threshold - units : null }, `lvl:${partnerId}:${def.level}`);
+    }
   }
   // One coupon per partner ever: issued at 10 000; voided while below the threshold unused; re-activated (same row) on crossing again.
   if (units >= COUPON_UNITS) {
     const c = await tx.query(`INSERT INTO partner_commission_coupons (partner_id) VALUES ($1) ON CONFLICT (partner_id) DO UPDATE SET status = CASE WHEN partner_commission_coupons.status='void' THEN 'available' ELSE partner_commission_coupons.status END, updated_at=now() RETURNING (xmax = 0) AS inserted`, [partnerId]);
-    if (c.rows[0]?.inserted) await audit(tx, null, 'partner.coupon_issued', { type: 'partner', id: partnerId }, { after: { units, rate_bps: BENEFIT_BPS } });
+    if (c.rows[0]?.inserted) {
+      await audit(tx, null, 'partner.coupon_issued', { type: 'partner', id: partnerId }, { after: { units, rate_bps: BENEFIT_BPS } });
+      await notifyPartner(tx, partnerId, 'partner.coupon_issued', { units: COUPON_UNITS }, `coupon:${partnerId}`);
+    }
   } else {
     await tx.query(`UPDATE partner_commission_coupons SET status='void', updated_at=now() WHERE partner_id=$1 AND status IN ('available','armed')`, [partnerId]);
   }

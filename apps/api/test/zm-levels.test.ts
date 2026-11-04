@@ -184,4 +184,22 @@ describe('Partner levels', () => {
     expect(a.json.tips.join(' ')).toMatch(/10 ta tasdiqlangan sotuv qoldi/);
     expect((await api(t, 'POST', '/admin/levels/adjustments', { token: p.token, body: { partner_id: p.partnerId, units: 100, reason: 'o‘zimga qo‘shaman' } })).status).toBe(403);
   });
+
+  it('level-up and coupon notifications: once per reached level, none on downgrade, coupon message once', async () => {
+    const p = await mkPartner(t);
+    const uid = (await t.db.query(`SELECT user_id FROM partners WHERE id=$1`, [p.partnerId])).rows[0].user_id;
+    const notes = async (tpl: string) => (await t.db.query(`SELECT params FROM notifications WHERE user_id=$1 AND template=$2`, [uid, tpl])).rows;
+    await adjust(p, 50);
+    expect((await notes('partner.level_up')).map((r: any) => r.params.name)).toEqual(['Do‘st']);
+    await adjust(p, -10); // downgrade → no message
+    await adjust(p, 10);  // back to Do‘st → no second message
+    expect(await notes('partner.level_up')).toHaveLength(1);
+    await adjust(p, 9_950);
+    const ups = (await notes('partner.level_up')).map((r: any) => r.params.name);
+    expect(ups).toContain('Elita hamkor');
+    expect(await notes('partner.coupon_issued')).toHaveLength(1);
+    await adjust(p, -100); await adjust(p, 100);
+    expect(await notes('partner.coupon_issued')).toHaveLength(1);
+  });
 });
+

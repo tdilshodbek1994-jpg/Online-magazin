@@ -4,7 +4,7 @@ import { api } from '@/lib/api';
 import { TelegramConnect } from '../shared';
 import { errText } from '@/lib/errors';
 
-const ICON: Record<string, string> = { 'partner.order_new': '🛒', 'partner.order_delivered': '✅', 'partner.order_cancelled': '❌', 'partner.commission_available': '💰', 'partner.payout_paid': '💳', 'partner.bonus': '🎁', 'partner.contest_prize': '🏆', 'partner.penalty': '⚠️' };
+const ICON: Record<string, string> = { 'partner.order_new': '🛒', 'partner.order_delivered': '✅', 'partner.order_cancelled': '❌', 'partner.commission_available': '💰', 'partner.payout_paid': '💳', 'partner.bonus': '🎁', 'partner.contest_prize': '🏆', 'partner.penalty': '⚠️', 'partner.level_up': '🎖️', 'partner.coupon_issued': '🎟️' };
 
 export default function PartnerNotifications() {
   const [items, setItems] = useState<any[] | null>(null);

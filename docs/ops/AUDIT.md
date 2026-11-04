@@ -72,7 +72,7 @@ Vertical slice UI → API → DB → tests:
 ## 3. Not done yet (honest list)
 
 P1 (remaining): skill/language routing and capacity round-robin, business calendar (holidays) for SLA, quiet-hours digest for notifications.
-P2 (remaining): load test (100k orders / 30 operators) and restore drill on a separate environment.
+P2: load test done — see `docs/ops/LOAD.md` (100k orders, 1 000 open tasks, 30 operators: p95 166 ms queue / 175 ms claim, 0 errors, 0 double holds). Restore drill still to be run on an isolated environment.
 P3: real telephony adapter, Telegram Business, AI assistant (read-only, human approval).
 
 ## 4. Policy register (owner decisions pending — no hidden production defaults)

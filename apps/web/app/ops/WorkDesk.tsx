@@ -133,6 +133,7 @@ function TaskCard({ task, order, lang, busy, onClose, onAct }: { task: any; orde
             <div className="small muted">{[order.address_snapshot?.district, order.address_snapshot?.street, order.address_snapshot?.house].filter((x: any) => x && x !== '-').join(', ') || 'Manzil hali yo‘q'}</div>
           </div>
         )}
+        <TaskPartnerRequests taskId={task.id} />
         {!task.mine && task.state !== 'resolved' && task.state !== 'closed' && <button className="btn full" disabled={busy} onClick={() => onAct('claim', {}, false)}>Bu ishni olish</button>}
         {canWrite && (
           <div className="task-actions">
@@ -194,5 +195,35 @@ function HandoffForm({ busy, onSend }: { busy: boolean; onSend: (to: string, pkg
       <label htmlFor="ho-next">Keyingi qadam *</label><input id="ho-next" value={p.next} onChange={upd('next')} />
       <button className="btn secondary full mt8" disabled={busy || !to || p.done.length < 2 || p.next.length < 2} onClick={() => onSend(to, p)}>Topshirish so‘rovini yuborish</button>
     </details>
+  );
+}
+
+const PR_KIND: Record<string, string> = { callback_time: 'Qo‘ng‘iroq vaqtini o‘zgartirish', address: 'Manzilni to‘ldirish', variant_change: 'Variantni almashtirish', commission_question: 'Komissiya savoli', message: 'Mas’ulga xabar' };
+/** Partner requests of this order; the answer typed here is what the partner sees (internal notes stay separate). */
+function TaskPartnerRequests({ taskId }: { taskId: string }) {
+  const [items, setItems] = useState<any[]>([]);
+  const [ans, setAns] = useState<Record<string, string>>({});
+  const [msg, setMsg] = useState<string | null>(null);
+  const load = useCallback(() => { api(`/ops/center/tasks/${taskId}/partner-requests`).then((r) => setItems(r.items)).catch(() => {}); }, [taskId]);
+  useEffect(load, [load]);
+  if (!items.length) return null;
+  return (
+    <div className="task-preq">
+      <b>Hamkor so‘rovlari</b>
+      {items.map((r) => (
+        <div key={r.id} className="preq-item">
+          <div className="spread small"><span>🤝 {r.partner_name} · {PR_KIND[r.kind] ?? r.kind}</span><span className={`pill ${r.status === 'answered' ? 'b-delivered' : 'b-accepted'}`}>{r.status === 'answered' ? 'Javob berildi' : 'Javob kutilmoqda'}</span></div>
+          <div className="small">{r.body}{r.preferred_at ? ` · 📞 ${tash(r.preferred_at)}` : ''}</div>
+          {r.answer ? <div className="preq-ans small">💬 {r.answer}</div> : (
+            <>
+              <label className="small" htmlFor={`pa-${r.id}`}>Hamkorga javob (hamkor shu matnni ko‘radi)</label>
+              <textarea id={`pa-${r.id}`} rows={2} value={ans[r.id] ?? ''} onChange={(e) => setAns({ ...ans, [r.id]: e.target.value })} />
+              <button className="btn secondary sm" disabled={(ans[r.id] ?? '').trim().length < 2} onClick={async () => { try { await api(`/ops/center/partner-requests/${r.id}/answer`, { method: 'POST', body: { answer: ans[r.id] } }); setMsg('✓ Javob yuborildi'); load(); } catch (e: any) { setMsg(errText(e)); } }}>Javob yuborish</button>
+            </>
+          )}
+        </div>
+      ))}
+      {msg && <div className="small" role="status">{msg}</div>}
+    </div>
   );
 }

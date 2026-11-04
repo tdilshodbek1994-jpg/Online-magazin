@@ -16,6 +16,7 @@ import { registerCheckout } from './modules/checkout/routes.js';
 import { registerOrders } from './modules/orders/routes.js';
 import { registerOperatorCentre } from './modules/opscenter/routes.js';
 import { registerOperatorCentreP1 } from './modules/opscenter/handoff.js';
+import { registerPartnerRequests } from './modules/opscenter/partnerRequests.js';
 import { registerAmendments } from './modules/orders/amendments.js';
 import { registerPartners } from './modules/partners/routes.js';
 import { registerPartnerCabinet } from './modules/partners/cabinet.js';
@@ -134,6 +135,7 @@ export async function buildApp(cfg: AppConfig, db: Db): Promise<FastifyInstance>
       registerOrders(api, deps);
       registerOperatorCentre(api, deps);
       registerOperatorCentreP1(api, deps);
+      registerPartnerRequests(api, deps);
       registerAmendments(api, deps);
       registerPartners(api, deps);
       registerPartnerCabinet(api, deps);

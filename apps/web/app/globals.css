@@ -1156,3 +1156,16 @@ a.admin-tab { text-decoration: none; color: inherit; }
 .board-act { display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
 .board-act select { width: auto; flex: 1 1 180px; min-height: 40px; }
 .warn-t { color: #9b1c1c; }
+/* Partner requests */
+.preq { display: grid; gap: 6px; }
+.preq-list { list-style: none; padding: 0; margin: 8px 0 0; display: grid; gap: 8px; }
+.preq-list li, .preq-item { display: grid; gap: 4px; padding: 10px; border: 1px solid var(--border); border-radius: 12px; }
+.preq-ans { padding: 6px 8px; border-radius: 8px; background: var(--surface-2); }
+.task-preq { display: grid; gap: 8px; padding: 10px; border-radius: 12px; background: #eef6ff; color: var(--text); }
+/* Theme-safe tints for the operator centre (work in light and dark) */
+.task-preq { background: color-mix(in srgb, #3b82f6 12%, var(--surface)); }
+.desk-ho { background: color-mix(in srgb, #f59e0b 16%, var(--surface)); color: var(--text); }
+.desk-stats .warn { background: color-mix(in srgb, #f59e0b 20%, var(--surface)); color: var(--text); }
+.desk-stats .bad { background: color-mix(in srgb, #ef4444 18%, var(--surface)); color: var(--text); }
+.pill.st-off { background: color-mix(in srgb, #ef4444 18%, var(--surface)); color: var(--text); }
+.warn-t { color: color-mix(in srgb, #ef4444 75%, var(--text)); }

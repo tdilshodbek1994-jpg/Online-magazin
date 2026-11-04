@@ -44,9 +44,16 @@ Vertical slice UI → API → DB → tests:
 * Waiting time counts from when the order came in (not from when the task row was created).
 * Tests `r-ops-handoff.test.ts`: T14, handoff expiry, supervisor transfer permission + audit, T16.
 
+## 2c. Done in P1 (part 2): partner requests
+
+* `migrations/0017_partner_order_requests.sql`, `modules/opscenter/partnerRequests.ts`.
+* Partner (sales passport → "Operatorga yozish"): message, callback time (exact time required), address, variant change, commission question. Scoped to the partner's own orders (other partners get 404, T04).
+* All requests of one order join one open `partner_request` task (no duplicate cases). Operator answers in the task card; the partner sees only that answer, no staff identity. When every request is answered the task resolves; a requested call time updates the order's callback.
+* Test `s-partner-requests.test.ts`.
+
 ## 3. Not done yet (honest list)
 
-P1 (remaining): skill/language routing and capacity round-robin, SLA clocks with business calendar and pause reasons, partner requests into tasks, customer-safe vs internal message composer, notification outbox per audience, staff layout for `/ops` without shop header.
+P1 (remaining): skill/language routing and capacity round-robin, SLA clocks with business calendar and pause reasons, customer-safe vs internal message composer, notification outbox per audience, staff layout for `/ops` without shop header.
 P2: supervisor dashboard UI (API exists), incident grouping, QA sampling, duplicate review, bulk-safe actions, KB/templates, load and restore tests.
 P3: real telephony adapter, Telegram Business, AI assistant (read-only, human approval).
 

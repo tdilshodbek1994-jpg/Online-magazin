@@ -5,6 +5,7 @@ import { Async } from '@/components/Header';
 import { api, som } from '@/lib/api';
 import { pick, useI18n } from '@/lib/i18n';
 import { BUCKET_LABEL } from '../../shared';
+import { PartnerRequests } from './Requests';
 
 const STEPS: [string, string][] = [['new', 'Qabul qilindi'], ['accepted', 'Tasdiqlandi'], ['shipping', 'Yo‘lda'], ['delivered', 'Yetkazildi']];
 const STATUS_TEXT: Record<string, string> = {
@@ -76,6 +77,7 @@ export default function SalesPassport({ params }: { params: Promise<{ id: string
             <p className="muted small">Qoida buyurtma vaqtida qotirilgan: keyin foiz o‘zgarsa ham bu buyurtmaga ta’sir qilmaydi.</p>
           </section>
 
+          <PartnerRequests orderId={id} />
           <section className="card">
             <h2>Tarix</h2>
             <ul className="timeline">

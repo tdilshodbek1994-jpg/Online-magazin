@@ -7,7 +7,10 @@
   "server": {
     "url": "https://uzshop.net/app",
     "androidScheme": "https",
-    "allowNavigation": ["uzshop.net", "www.uzshop.net"],
+    "allowNavigation": [
+      "uzshop.net",
+      "www.uzshop.net"
+    ],
     "errorPath": "offline.html"
   },
   "android": {
@@ -16,7 +19,23 @@
     "webContentsDebuggingEnabled": false
   },
   "plugins": {
-    "SplashScreen": { "launchShowDuration": 800, "backgroundColor": "#0b7a55", "showSpinner": false, "androidScaleType": "CENTER_CROP" },
-    "StatusBar": { "style": "LIGHT", "backgroundColor": "#ffffff", "overlaysWebView": false }
+    "SplashScreen": {
+      "launchShowDuration": 800,
+      "backgroundColor": "#0b7a55",
+      "showSpinner": false,
+      "androidScaleType": "CENTER_CROP"
+    },
+    "StatusBar": {
+      "style": "LIGHT",
+      "backgroundColor": "#ffffff",
+      "overlaysWebView": false
+    },
+    "PushNotifications": {
+      "presentationOptions": [
+        "badge",
+        "sound",
+        "alert"
+      ]
+    }
   }
 }

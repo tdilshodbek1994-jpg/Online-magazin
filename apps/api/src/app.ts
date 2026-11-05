@@ -54,6 +54,7 @@ import { registerSearch } from './modules/admin/search.js';
 import { registerReviews } from './modules/catalog/reviews.js';
 import { registerAutomation } from './modules/admin/automation.js';
 import { registerTgApps } from './modules/tgapp/routes.js';
+import { registerPushDevices } from './modules/notifications/devices.js';
 import { registerReturns } from './modules/returns/routes.js';
 import { registerPayments } from './modules/payments/routes.js';
 import { registerSupport } from './modules/support/routes.js';
@@ -222,6 +223,7 @@ export async function buildApp(cfg: AppConfig, db: Db): Promise<FastifyInstance>
       registerReviews(api, deps);
       registerAutomation(api, deps);
       registerTgApps(api, deps);
+      registerPushDevices(api, deps);
     },
     { prefix: '/api/v1' },
   );

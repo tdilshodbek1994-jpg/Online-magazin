@@ -7,6 +7,7 @@ import { api, setToken, som } from '@/lib/api';
 import { pick, useI18n } from '@/lib/i18n';
 import { orderStage, uzDate } from '@/lib/orderStatus';
 import { InstallRow } from '@/components/InstallApp';
+import { forgetPushDevice } from '@/lib/native';
 
 /** "Buyurtmalarim": one card per order with a plain status, the first item and the total — no technical codes. */
 export default function Account() {
@@ -55,7 +56,7 @@ export default function Account() {
         <Link href="/account/profile">⚙️ Telefon raqam va ma’lumotlarim</Link>
         {roles.includes('partner') ? <Link href="/partner">🤝 Hamkor kabineti</Link> : <Link href="/partner">🤝 Hamkor bo‘lib pul ishlash</Link>}
       </section>
-      <button type="button" className="btn secondary acc-logout" onClick={async () => { await api('/auth/logout', { method: 'POST' }).catch(() => {}); setToken(null); location.href = '/'; }}>{t('logout')}</button>
+      <button type="button" className="btn secondary acc-logout" onClick={async () => { await forgetPushDevice(api); await api('/auth/logout', { method: 'POST' }).catch(() => {}); setToken(null); location.href = '/'; }}>{t('logout')}</button>
     </div>
   );
 }

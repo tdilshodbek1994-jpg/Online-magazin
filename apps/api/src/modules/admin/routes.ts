@@ -7,6 +7,7 @@ import { hashToken, requirePerm, requireStepUp, requireUser } from '../../platfo
 import { many, maybeOne, one, withTx } from '../../platform/db.js';
 import { AppError, badRequest, conflict, notFound } from '../../platform/errors.js';
 import { type Deps, route, zIdParam, zLocalized } from '../../platform/http.js';
+import { fcmConfigured } from '../notifications/push.js';
 
 /** CSV cell escaping incl. spreadsheet formula injection (T084, AC-M20-2). */
 export function csvCell(v: unknown): string {
@@ -147,7 +148,7 @@ export function registerAdmin(app: FastifyInstance, deps: Deps): void {
     // Support contact is configuration (SUPPORT_TELEGRAM=@username or https://t.me/...), never hard-coded.
     const sup = (process.env.SUPPORT_TELEGRAM ?? '').trim();
     const support = sup ? (sup.startsWith('https://') ? sup : `https://t.me/${sup.replace(/^@/, '')}`) : null;
-    return { ...Object.fromEntries(r.map((x) => [x.key, x.enabled])), support_telegram: support, demo: deps.cfg.env !== 'production' };
+    return { ...Object.fromEntries(r.map((x) => [x.key, x.enabled])), support_telegram: support, demo: deps.cfg.env !== 'production', push: fcmConfigured() };
   });
 
   route(app, deps, { method: 'GET', url: '/admin/audit', tags: T, summary: 'Audit log', query: z.object({ target_type: z.string().optional(), target_id: z.string().optional(), limit: z.coerce.number().int().min(1).max(500).default(100) }) },

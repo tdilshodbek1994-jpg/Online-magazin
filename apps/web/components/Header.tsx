@@ -8,7 +8,7 @@ import { SearchBox } from '@/components/SearchBox';
 import { CatalogMenu } from '@/components/CatalogMenu';
 import { useI18n } from '@/lib/i18n';
 import { markTgApp, tgAppName } from '@/lib/telegram';
-import { isNativeApp } from '@/lib/native';
+import { forgetPushDevice, isNativeApp } from '@/lib/native';
 
 /** Fire after any cart change so the header/bottom-nav badges refresh. */
 export const notifyCart = () => { try { window.dispatchEvent(new Event('om-cart')); } catch {} };
@@ -60,6 +60,7 @@ export function Header() {
     // Inside the Telegram mini app «Chiqish» also unties this Telegram, otherwise the next open would log straight back in.
     const tgApp = tgAppName();
     if (tgApp) await api(`/me/telegram/apps/${tgApp}`, { method: 'DELETE' }).catch(() => {});
+    await forgetPushDevice(api); // Android app: no more pushes for the account that leaves
     await api('/auth/logout', { method: 'POST' }).catch(() => {});
     setToken(null);
     if (tgApp) { markTgApp(tgApp); location.href = `/tg/${tgApp}`; } else location.href = '/';

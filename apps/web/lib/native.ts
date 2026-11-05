@@ -25,3 +25,17 @@ export function areasFor(me: { roles?: { role: string }[]; permissions?: string[
   return out;
 }
 export const AREA_KEY = 'om_app_area';
+
+/** Only builds made with Firebase can receive push (CI adds « push» to the user agent); others must never call register(). */
+export function appCanPush(): boolean {
+  return typeof navigator !== 'undefined' && /UzShopApp\/[\d.]+ push/.test(navigator.userAgent) && !!cap()?.Plugins?.PushNotifications;
+}
+export const PUSH_KEY = 'om_push_token';
+/** Logout: stop pushes to this phone for the account that is leaving. */
+export async function forgetPushDevice(apiFn: (p: string, o: any) => Promise<any>): Promise<void> {
+  let t: string | null = null;
+  try { t = localStorage.getItem(PUSH_KEY); } catch {}
+  if (!t) return;
+  await apiFn('/me/devices/remove', { method: 'POST', body: { token: t } }).catch(() => {});
+  try { localStorage.removeItem(PUSH_KEY); } catch {}
+}

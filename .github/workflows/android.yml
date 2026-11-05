@@ -21,6 +21,16 @@ jobs:
       # ubuntu-24.04 runners already ship the Android SDK (ANDROID_HOME) with accepted licenses.
       - run: echo "sdk.dir=$ANDROID_HOME" > android/local.properties
       - run: npm ci --no-audit --no-fund
+      # Push needs Firebase: with the GOOGLE_SERVICES_JSON secret the app is built with it and says so in its user agent
+      # («push»), so the website asks for push permission only in builds that can actually receive it.
+      - name: Firebase config (optional)
+        env: { GSJ: "${{ secrets.GOOGLE_SERVICES_JSON }}" }
+        run: |
+          if [ -n "$GSJ" ]; then
+            printf '%s' "$GSJ" > android/app/google-services.json
+            sed -i 's#"appendUserAgent": "UzShopApp/1.0"#"appendUserAgent": "UzShopApp/1.0 push"#' capacitor.config.json
+            echo "Firebase: on"
+          else echo "Firebase: off (no GOOGLE_SERVICES_JSON secret) — app builds without push"; fi
       - run: npx cap sync android
       - name: Debug APK (install on a phone for testing)
         run: cd android && chmod +x gradlew && ./gradlew --no-daemon assembleDebug

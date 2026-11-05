@@ -4,6 +4,7 @@ import { maybeOne, one } from '../../platform/db.js';
 import { type Deps, route } from '../../platform/http.js';
 import { getIntentClient } from '../aibiz/llm.js';
 import { smsConfigured } from '../notifications/sms.js';
+import { fcmConfigured } from '../notifications/push.js';
 
 /**
  * Integration & service health from REAL signals (not just «container alive»): database round-trip, job queue age and
@@ -45,6 +46,9 @@ export function registerHealth(app: FastifyInstance, deps: Deps): void {
       checks.push({ key: `telegram_${app}_app`, label, state: on ? 'ok' : 'not_configured',
         detail: on ? `@${process.env[`${env}_USERNAME`]}: ulanganlar ${st.links}, 24 soatda kirganlar ${st.logins_24h}` : 'Bot ulanmagan — faqat saytda ishlaydi.', action: on ? undefined : `Serverda: bash scripts/server/telegram-app-setup.sh ${app}` });
     }
+    const pd = await one<{ devices: number; sent: number }>(db, `SELECT (SELECT COUNT(*)::int FROM push_devices WHERE revoked_at IS NULL) AS devices, (SELECT COUNT(*)::int FROM push_deliveries WHERE sent_at > now() - interval '24 hours') AS sent`);
+    checks.push({ key: 'push', label: 'Ilova push bildirishnomalari', state: fcmConfigured() ? 'ok' : 'not_configured',
+      detail: fcmConfigured() ? `Ulangan telefonlar: ${pd.devices}, 24 soatda yuborildi: ${pd.sent}` : 'Firebase ulanmagan — ilovada push yo‘q (Telegram va kabinet ishlaydi).', action: fcmConfigured() ? undefined : 'Serverda: bash scripts/server/push-setup.sh' });
     const sms = await one<{ n: number; sent: number; failed: number }>(db, `SELECT COUNT(*)::int AS n, COUNT(*) FILTER (WHERE status='sent')::int AS sent, COUNT(*) FILTER (WHERE status='failed')::int AS failed FROM notifications WHERE channel='sms' AND created_at > now() - interval '24 hours'`);
     checks.push(smsConfigured()
       ? { key: 'sms', label: 'SMS (Eskiz)', state: sms.failed > sms.sent && sms.failed > 0 ? 'degraded' : 'ok', detail: `24 soat: yuborildi ${sms.sent}, xato ${sms.failed}. «Yuborildi» = Eskiz qabul qildi.`, action: sms.failed > sms.sent && sms.failed > 0 ? 'Eskiz kabinetida balans va SMS matni tasdiqlanganini tekshiring.' : undefined }

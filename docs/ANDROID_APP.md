@@ -42,5 +42,23 @@ brand icon and green splash screen. Outside links (Telegram, Instagram, maps, ph
 
 - The app opens the live site. While the site is behind the DEMO password the app cannot open it (Android, like Telegram,
   does not show the password window). It works after the switch to the real site (`docs/GO_LIVE.md`).
-- Push notifications in the app: next step. Needs a Firebase project (free) and its `google-services.json` from the owner.
+- Push notifications: see below.
 - iPhone: later (Apple Developer 99$/year + a Mac or a paid cloud build).
+
+## Push notifications (done in code; needs Firebase from the owner)
+
+The same events as the partner Telegram messages (new order, delivered, money available, payout, bonus, level…) also go
+as a push to the person's phones; a tap opens that order/page. Marketing is never pushed. Logout stops pushes to that phone.
+A phone logged in by someone else moves to that person. Dead tokens are removed automatically; a retry never pushes twice.
+
+Owner steps (Firebase is free):
+1. console.firebase.google.com → new project «UzShop» → add an **Android app** with package name `net.uzshop.app`.
+2. Download `google-services.json` → GitHub → Settings → Secrets → Actions → new secret `GOOGLE_SERVICES_JSON` with the
+   file's whole text. The next app build includes push (the build log says «Firebase: on»).
+3. Firebase → Project settings → Service accounts → «Generate new private key» (a JSON file). Put it on the server and run
+   `bash scripts/server/push-setup.sh /path/to/file.json` (the script deletes the file after saving). Never send it in chat.
+4. Admin → integrations health shows «Ilova push bildirishnomalari».
+
+Builds made without Firebase never ask for push permission (the website checks the app's user agent), so they cannot crash.
+Tests: `apps/api/test/zt-push.test.ts` (5, fake Google): deep link, dead token revoked, 503 retry without duplicates,
+logout and device moving to a new user, login required / bad token / marketing not pushed.

@@ -1,5 +1,6 @@
 import type { Queryable } from '../../platform/db.js';
 import { enqueueJob } from '../../platform/outbox.js';
+import { fcmConfigured } from './push.js';
 
 /**
  * Queue a notification (M17). OTP/security bypass marketing consent; marketing checks consent at send time.
@@ -15,4 +16,8 @@ export async function queueNotification(
     [n.userId ?? null, n.phone ?? null, n.channel, n.purpose, n.template, n.locale, JSON.stringify(n.params), n.dedupeKey ?? null],
   );
   if (r.rowCount) await enqueueJob(q, 'notification.send', { id: r.rows[0].id }, { queue: n.purpose === 'otp' ? 'otp' : 'default', dedupeKey: `notif:${r.rows[0].id}` });
+  // Android app: the same event also goes as a push to the user's devices (only when Firebase is configured).
+  if (r.rowCount && n.userId && n.channel === 'telegram' && n.purpose !== 'marketing' && fcmConfigured()) {
+    await enqueueJob(q, 'push.send', { id: r.rows[0].id }, { dedupeKey: `push:${r.rows[0].id}` });
+  }
 }

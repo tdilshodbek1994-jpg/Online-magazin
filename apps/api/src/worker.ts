@@ -10,6 +10,7 @@ import { runAdSafety } from './modules/target/safety.js';
 import { loadConfig } from './config.js';
 import { decrypt } from './platform/mfa.js';
 import { otpText, sendSms, SmsError, smsConfigured } from './modules/notifications/sms.js';
+import { pushHref, sendPush } from './modules/notifications/push.js';
 
 /**
  * Durable worker (ADR-005). Jobs are claimed with FOR UPDATE SKIP LOCKED; scheduled tasks run under a
@@ -59,6 +60,20 @@ export async function runJobsOnce(db: Db, workerId: string, limit = 20): Promise
             const why = n.channel === 'telegram' ? (token ? 'no_telegram_link' : 'telegram_not_configured') : n.channel === 'sms' && smsConfigured() ? 'sms_otp_only' : 'dev_log_only';
             await tx.query(`UPDATE notifications SET status='suppressed', provider_ref=$2, attempts=attempts+1, params = params - 'code_enc' WHERE id=$1`, [n.id, why]);
           }
+        }
+        if (j.kind === 'push.send') {
+          const n = (await tx.query(`SELECT id, user_id, template, params FROM notifications WHERE id=$1`, [j.payload.id])).rows[0];
+          const devices = n?.user_id ? (await tx.query(`SELECT d.id, d.token FROM push_devices d WHERE d.user_id=$1 AND d.revoked_at IS NULL
+              AND NOT EXISTS (SELECT 1 FROM push_deliveries x WHERE x.notification_id=$2 AND x.device_id=d.id)`, [n.user_id, n.id])).rows : [];
+          let retry: string | null = null;
+          for (const d of devices) {
+            const r = await sendPush(d.token, { title: 'UzShop', body: renderText(n.template, n.params ?? {}), href: pushHref(n.template, n.params ?? {}) });
+            if (r.ok) await db.query(`INSERT INTO push_deliveries (notification_id, device_id, provider_ref) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING`, [n.id, d.id, r.ref.slice(0, 200)]);
+            else if (r.invalidToken) await db.query(`UPDATE push_devices SET revoked_at=now() WHERE id=$1`, [d.id]);
+            else if (r.retry) retry = r.error;
+          }
+          // Deliveries/revocations are written outside the job transaction, so a retry (429/5xx) never pushes twice.
+          if (retry) throw new Error(retry);
         }
         await tx.query(`UPDATE jobs SET status='done', finished_at=now() WHERE id=$1`, [j.id]);
       });

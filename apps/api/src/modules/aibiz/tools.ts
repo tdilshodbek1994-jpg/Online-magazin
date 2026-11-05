@@ -84,8 +84,8 @@ export async function earnings(q: Queryable, s: Scope, p: Period, metric: 'commi
   const payout = await one<{ paid: string }>(q, `SELECT COALESCE(SUM(amount_minor),0)::text AS paid FROM partner_ledger WHERE partner_id=$1 AND source_type='payout' AND to_bucket='paid' AND created_at >= $2 AND created_at < $3`, [s.partnerId, a, b]);
   const net = inflow - outflow;
   const facts: Fact[] = [
-    { id: 'commission_recognized_net', label: 'Tan olingan sof komissiya', value: net.toString(), unit: 'som', kind: 'computed', primary: true },
-    { id: 'commission_inflow', label: 'Yechish mumkin bo‘lgan komissiya', value: inflow.toString(), unit: 'som', kind: 'observed' },
+    { id: 'commission_recognized_net', label: 'Topgan pulingiz', value: net.toString(), unit: 'som', kind: 'computed', primary: true },
+    { id: 'commission_inflow', label: 'Hisobingizga o‘tgan komissiya', value: inflow.toString(), unit: 'som', kind: 'observed' },
     { id: 'commission_reversed', label: 'Qaytarish sababli ayirildi', value: outflow.toString(), unit: 'som', kind: 'observed' },
   ];
   if (!channel) facts.push(
@@ -218,20 +218,20 @@ export async function topProducts(q: Queryable, s: Scope, p: Period): Promise<To
   };
 }
 
-/** Shop-wide ranking open to partners: rank + product only (counts are not published, D10); products with < 3 delivered orders are suppressed. */
+/** Shop-wide ranking open to partners: rank + product only — counts, sellers and partners are never published (D10). */
 export async function bestsellers(q: Queryable, p: Period): Promise<ToolResult> {
   const [a, b] = range(p);
   const rows = await many<{ product_id: string; slug: string; name: Record<string, string> }>(q, `
     SELECT pr.id AS product_id, pr.slug, pr.name FROM orders o JOIN order_lines ol ON ol.order_id=o.id JOIN skus sk ON sk.id=ol.sku_id JOIN products pr ON pr.id=sk.product_id AND pr.status='published'
      WHERE o.fulfillment_status='delivered' AND o.delivered_at >= $1 AND o.delivered_at < $2
-     GROUP BY pr.id, pr.slug, pr.name HAVING COUNT(DISTINCT o.id) >= 3
+     GROUP BY pr.id, pr.slug, pr.name
      ORDER BY SUM(GREATEST(0, ol.qty - ol.canceled_qty - ol.returned_qty)) DESC, pr.id LIMIT 10`, [a, b]);
   return {
     status: rows.length ? 'ok' : 'zero', tool: 'public_bestsellers', metric: 'shop_bestseller_rank', metric_version: 1, title: 'Do‘kondagi eng ko‘p sotilayotgan mahsulotlar (faqat o‘rin)', period: per(p),
     facts: rows[0] ? [{ id: 'rank1', label: '1-o‘rin', value: pname(rows[0].name), unit: 'text', kind: 'computed', primary: true }] : [],
     table: { columns: ['O‘rin', 'Mahsulot'], rows: rows.map((r, i) => ({ cells: [i + 1, pname(r.name)] })) },
     evidence: rows.map((r) => ({ type: 'product', label: pname(r.name), href: `/p/${r.slug}` })),
-    method: 'Butun do‘kon bo‘yicha yetkazilgan donalar tartibi. Aniq sonlar va boshqa hamkorlar ma’lumoti ko‘rsatilmaydi; 3 tadan kam buyurtmali mahsulotlar ro‘yxatga kirmaydi.',
+    method: 'Butun do‘kon bo‘yicha yetkazilgan donalar tartibi. Faqat o‘rin ko‘rsatiladi: aniq sonlar, kim sotgani va boshqa hamkorlar ma’lumoti ochilmaydi.',
     partial_reasons: [], open: { label: 'Marketni ochish', href: '/partner/market' },
   };
 }
@@ -361,7 +361,7 @@ export async function afterAd(q: Queryable, s: Scope, p: Period): Promise<ToolRe
     status: net || spend ? 'ok' : 'zero', tool: 'partner_earnings_summary', metric: 'partner_after_ad_result', metric_version: 1,
     title: 'Reklamadan keyingi natija = sof komissiya − o‘zingiz to‘lagan reklama', period: base.period,
     facts: [{ id: 'partner_after_ad_result', label: 'Reklamadan keyingi natija', value: (net - spend).toString(), unit: 'som', kind: 'computed', primary: true },
-      { id: 'commission_recognized_net', label: 'Tan olingan sof komissiya', value: net.toString(), unit: 'som', kind: 'observed' },
+      { id: 'commission_recognized_net', label: 'Topgan pulingiz (komissiya)', value: net.toString(), unit: 'som', kind: 'observed' },
       { id: 'ad_spend_partner', label: 'Siz to‘lagan reklama (davrga taqsimlangan)', value: spend.toString(), unit: 'som', kind: 'computed' },
       { id: 'ad_records', label: 'Hisobga olingan xarajat yozuvlari', value: ads.n, unit: 'count', kind: 'observed' }],
     evidence: [{ type: 'page', label: 'Reklama xarajatlari', href: '/partner/expenses' }, ...base.evidence.slice(0, 10)],

@@ -15,59 +15,97 @@ type Card = { report_id: string | null; session_id: string | null; status: strin
   method: string; partial_reasons: string[]; open?: { label: string; href: string } } };
 type Msg = { role: 'user'; text: string } | { role: 'assistant'; card: Card } | { role: 'error'; text: string };
 
-const SOM_COLS = new Set(['Komissiya', 'Sof komissiya']);
 const fmt = (f: { value: string | number | null; unit: string }) => {
-  if (f.value === null || f.value === undefined) return 'maʼlumot yo‘q';
+  if (f.value === null || f.value === undefined) return '—';
   if (f.unit === 'som') return som(String(f.value));
-  if (f.unit === 'orders') return `${f.value} ta`;
+  if (f.unit === 'orders' || f.unit === 'count') return `${f.value} ta`;
   if (f.unit === 'units') return `${f.value} dona`;
   if (f.unit === 'coins') return `${f.value} coin`;
-  if (f.unit === 'count') return `${f.value} ta`;
+  if (f.unit === 'percent') return `${f.value}%`;
+  if (f.unit === 'date') return String(f.value).split(', ').map(dmy).join(', ');
   return String(f.value);
 };
-const STATUS: Record<string, [string, string]> = { ok: ['Natija', 'ok'], zero: ['Natija: 0', 'zero'], partial: ['Qisman', 'partial'], forbidden: ['Ruxsat yo‘q', 'no'], unsupported: ['Hali ulanmagan', 'no'], unknown: ['Maʼlumot yo‘q', 'zero'] };
+const MON = ['yan', 'fev', 'mar', 'apr', 'may', 'iyun', 'iyul', 'avg', 'sen', 'okt', 'noy', 'dek'];
+const dmy = (d: string) => /^\d{4}-\d{2}-\d{2}/.test(d) ? `${Number(d.slice(8, 10))}-${MON[Number(d.slice(5, 7)) - 1]}` : d;
+const titleCase = (s: string) => (s === s.toUpperCase() && /[A-ZА-ЯЎҚҒҲ]/.test(s) ? s.charAt(0) + s.slice(1).toLowerCase() : s);
+/** One table cell → short text by its column (keeps rows on one line). */
+function cell(col: string, v: string | number): string {
+  if (col === 'Komissiya' || col === 'Sof komissiya' || col.startsWith('Komissiya')) return som(String(v));
+  if (col === 'Dona' || col === 'Sotish mumkin') return `${v} dona`;
+  if (col.startsWith('Buyurtma') && typeof v === 'number') return `${v} buyurtma`;
+  if (col === 'Tugaydi' || col === 'Kun') return dmy(String(v));
+  if (col === 'Qatnashyapsizmi') return v === 'Ha' ? 'qatnashyapsiz' : 'qatnashmayapsiz';
+  if (col === 'Bosish') return `${v} bosish`;
+  if (col === 'Yetkazildi') return `${v} yetkazildi`;
+  if (col === 'Qo‘ng‘iroq') return `${v} qo‘ng‘iroq`;
+  if (col === 'Tasdiqladi') return `${v} tasdiq`;
+  if (col === 'Bekor qildi') return `${v} bekor`;
+  if (col === 'Jami') return `${v} jami`;
+  if (col === 'Urinish') return `${v} urinish`;
+  return String(v);
+}
+const ICON: Record<string, string> = { ok: '✓', zero: '0', partial: '…', forbidden: '🔒', unsupported: '?', unknown: '—' };
 
 function AnswerCard({ c }: { c: Card }) {
-  const [sent, setSent] = useState<string | null>(null);
+  const [sent, setSent] = useState(false);
   const r = c.result;
-  const primary = r?.facts.find((f) => f.primary);
-  const rest = r?.facts.filter((f) => f !== primary) ?? [];
-  const fb = async (verdict: 'correct' | 'wrong') => { if (!c.report_id) return; try { await api('/ai/biz/feedback', { method: 'POST', body: { report_id: c.report_id, verdict } }); setSent(verdict); } catch { /* ignore */ } };
-  const [label, tone] = STATUS[c.status] ?? ['Javob', 'ok'];
+  const fb = async (verdict: 'correct' | 'wrong') => { if (!c.report_id || sent) return; try { await api('/ai/biz/feedback', { method: 'POST', body: { report_id: c.report_id, verdict } }); setSent(true); } catch { /* ignore */ } };
+  // No report (refusal / not understood): one short line, nothing else.
+  if (!r) return <article className={`ai-card ai-c-${c.status}`}><p className="ai-sum"><span className="ai-ic" aria-hidden>{ICON[c.status] ?? '•'}</span>{c.summary}</p></article>;
+  const compare = r.metric.startsWith('compare:');
+  const primary = r.facts.find((f) => f.primary);
+  const rest = r.facts.filter((f) => f !== primary);
+  const nonZero = rest.filter((f) => !['0', 0, null].includes(f.value as never));
+  const shown = compare ? rest : (c.status === 'zero' ? nonZero : rest).slice(0, 3);
+  const hidden = compare ? [] : rest.slice(3);
+  const rows = r.table?.rows ?? [];
+  const cols = r.table?.columns ?? [];
+  const linkRows = rows.length > 0 && r.evidence.length > 0 && r.evidence.every((e) => e.type === 'order' || e.type === 'product');
+  const rank = cols[0] === 'O‘rin';
+  const row = (x: { cells: (string | number)[] }, i: number) => {
+    const name = titleCase(String(rank ? x.cells[1] : x.cells[0]));
+    const meta = (rank ? [] : x.cells.slice(1).map((v, j) => cell(cols[j + 1]!, v))).join(' · ');
+    const href = linkRows ? r.evidence[i]?.href : undefined;
+    const body = <><span className="ai-rn">{rank ? `${x.cells[0]}.` : `${i + 1}.`}</span><span className="ai-rt">{name}</span>{meta && <span className="ai-rm">{meta}</span>}</>;
+    return href ? <Link key={i} href={href} className="ai-row">{body}</Link> : <div key={i} className="ai-row">{body}</div>;
+  };
+  const ev = linkRows ? [] : r.evidence.filter((e) => e.type === 'order');
+  const zero = c.status === 'zero';
   return (
-    <article className={`ai-card ai-${tone}`}>
-      <div className="ai-card-top"><span className={`ai-st ai-st-${tone}`}>{label}</span><span className="ai-scope">🔒 {c.scope_label}</span></div>
-      <p className="ai-sum">{c.summary}</p>
-      {r && (
-        <>
-          <div className="ai-chips">
-            {r.period && <span className="ai-chip">📅 {r.period.label}</span>}
-            {r.filters && Object.entries(r.filters).map(([k, v]) => <span key={k} className="ai-chip">🔎 {v}</span>)}
-            <span className="ai-chip">📐 {r.title}</span>
-          </div>
-          {primary && <div className="ai-big"><span>{primary.label}</span><b>{fmt(primary)}</b></div>}
-          {rest.length > 0 && <dl className="ai-facts">{rest.map((f) => <div key={f.id}><dt>{f.label}</dt><dd>{fmt(f)}</dd></div>)}</dl>}
-          {r.table && r.table.rows.length > 0 && (
-            <div className="ai-table" role="table" aria-label={r.title}>
-              {r.table.rows.map((row, i) => (
-                <div key={i} className="ai-tr" role="row">{row.cells.map((cell, j) => (
-                  <div key={j} role="cell" className="ai-td"><small>{r.table!.columns[j]}</small><span>{SOM_COLS.has(r.table!.columns[j]!) ? som(String(cell)) : cell}</span></div>
-                ))}</div>
-              ))}
-            </div>
-          )}
-          {r.evidence.length > 0 && (
-            <div className="ai-ev"><b>Manba</b>{r.evidence.map((e, i) => <Link key={i} href={e.href}>{e.label}{e.value ? ` · ${som(e.value)}` : ''} ›</Link>)}</div>
-          )}
-          {r.partial_reasons.length > 0 && <ul className="ai-note">{r.partial_reasons.map((x, i) => <li key={i}>{x}</li>)}</ul>}
-          <details className="ai-method"><summary>Hisoblash usuli</summary><p>{r.method}</p><p className="muted small">Ko‘rsatkich: {r.metric} · v{r.metric_version}{r.period ? ` · ${r.period.timezone} · [${r.period.from}, ${r.period.to_exclusive})` : ''}</p></details>
-          <div className="ai-foot">
-            {r.open && <Link className="btn sm" href={r.open.href}>{r.open.label}</Link>}
-            <span className="muted small">Holat: {new Date(c.as_of).toLocaleString('uz-UZ', { dateStyle: 'short', timeStyle: 'short' })}</span>
-          </div>
-          {c.report_id && <div className="ai-fb">{sent ? <span className="muted small">Rahmat, qayd qilindi.</span> : <><button className="link-btn" onClick={() => fb('correct')}>👍 To‘g‘ri</button><button className="link-btn" onClick={() => fb('wrong')}>⚠️ Xato haqida xabar</button></>}</div>}
-        </>
+    <article className={`ai-card ai-c-${c.status}`}>
+      <div className="ai-meta">{r.period ? `📅 ${compare ? `${r.period.label} · oldingi teng davr bilan` : r.period.label}` : '🕒 Hozirgi holat'}{r.filters?.channel ? ` · ${r.filters.channel}` : ''}</div>
+      {primary && !zero && !compare && <div className="ai-big"><small>{primary.label}</small><b>{fmt(primary)}</b></div>}
+      {compare && primary && (
+        <div className="ai-cmp">
+          {[primary, ...rest.filter((f) => f.id !== 'diff_pct')].map((f) => (
+            <div key={f.id} className={f.id === 'diff' ? (String(f.value).startsWith('-') ? 'neg' : 'pos') : ''}><small>{f.id === 'diff' ? 'Farq' : f.primary ? 'Shu davr' : 'Oldingi davr'}</small><b>{f.id === 'diff' && !String(f.value).startsWith('-') ? '+' : ''}{fmt(f)}</b>{f.id === 'diff' && rest.find((x) => x.id === 'diff_pct') && <em>{fmt(rest.find((x) => x.id === 'diff_pct')!)}</em>}</div>
+          ))}
+        </div>
       )}
+      {zero && !compare && <p className="ai-zero">{primary && primary.unit !== 'text' ? `${primary.label}: ${fmt(primary)}.` : 'Bu davrda natija yo‘q.'}</p>}
+      {!compare && shown.length > 0 && <dl className="ai-facts">{shown.map((f) => <div key={f.id}><dt>{f.label}</dt><dd>{fmt(f)}</dd></div>)}</dl>}
+      {rows.length > 0 && !zero && (
+        <div className="ai-rows">
+          {rows.slice(0, 5).map(row)}
+          {rows.length > 5 && <details className="ai-more-rows"><summary>Yana {rows.length - 5} ta</summary>{rows.slice(5).map((x, i) => row(x, i + 5))}</details>}
+        </div>
+      )}
+      {ev.length > 0 && !zero && (
+        <div className="ai-ev">{ev.slice(0, 3).map((e, i) => <Link key={i} href={e.href}>{e.label}{e.value ? ` · ${som(e.value)}` : ''} ›</Link>)}
+          {ev.length > 3 && <details><summary>Yana {ev.length - 3} ta</summary>{ev.slice(3).map((e, i) => <Link key={i} href={e.href}>{e.label} ›</Link>)}</details>}
+        </div>
+      )}
+      <details className="ai-method">
+        <summary>Qanday hisoblandi?</summary>
+        {hidden.length > 0 && <dl className="ai-facts sm">{hidden.map((f) => <div key={f.id}><dt>{f.label}</dt><dd>{fmt(f)}</dd></div>)}</dl>}
+        <p>{r.method}</p>
+        {r.partial_reasons.map((x, i) => <p key={i} className="ai-note">• {x}</p>)}
+        <p className="muted small">🔒 {c.scope_label} · {new Date(c.as_of).toLocaleString('uz-UZ', { dateStyle: 'short', timeStyle: 'short' })}</p>
+      </details>
+      <div className="ai-foot">
+        {r.open && <Link className="ai-open" href={r.open.href}>{r.open.label} ›</Link>}
+        {c.report_id && <span className="ai-fb">{sent ? <small className="muted">Rahmat</small> : <><button aria-label="To‘g‘ri" onClick={() => fb('correct')}>👍</button><button aria-label="Xato haqida xabar" onClick={() => fb('wrong')}>👎</button></>}</span>}
+      </div>
     </article>
   );
 }
@@ -126,7 +164,6 @@ export function AiChat({ defaultWorkspace }: { defaultWorkspace?: string }) {
         {busy && <div className="ai-wait" role="status"><span className="spinner" aria-hidden />Hisobot olinmoqda…</div>}
         <div ref={end} />
       </div>
-      {msgs.length > 0 && <div className="ai-more">{cap.quick_questions.slice(0, 6).map((q: string) => <button key={q} className="ai-q sm" onClick={() => ask(q)}>{q}</button>)}</div>}
       <form className="ai-input" onSubmit={(e) => { e.preventDefault(); void ask(text); }}>
         <label className="sr-only" htmlFor="aiq">Savolingiz</label>
         <input id="aiq" value={text} onChange={(e) => setText(e.target.value)} placeholder="Savolingizni yozing…" maxLength={500} autoComplete="off" />

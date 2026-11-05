@@ -52,7 +52,7 @@ export function resolvePeriod(text: string, now: Date, ctxYear?: number | null):
   const monday = addDays(today, -dow);
   if (/otgan hafta|proshl\w* nedel/.test(t)) return mk(addDays(monday, -7), monday, `O‘tgan hafta (${human(ymd(addDays(monday, -7)))} — ${human(ymd(addDays(monday, -1)))})`, 'last_week', today);
   if (/(bu|shu|joriy) hafta/.test(t)) return mk(monday, tomorrow, `Shu hafta (${human(ymd(monday))} dan hozirgacha)`, 'this_week', today);
-  const lastN = /(oxirgi|songgi)\s+(\d{1,3})\s*kun/.exec(t) ?? (/(oxirgi|songgi) hafta/.test(t) ? [null, null, '7'] : null);
+  const lastN = /(oxirgi|oxirigi|songgi)\s+(\d{1,3})\s*kun/.exec(t) ?? (/(oxirgi|oxirigi|songgi) hafta/.test(t) ? [null, null, '7'] : /(oxirgi|oxirigi|songgi) (bir )?oy/.test(t) ? [null, null, '30'] : null);
   if (lastN) { const n = Math.min(366, Math.max(1, Number(lastN[2]))); const f = addDays(today, -(n - 1)); return mk(f, tomorrow, `Oxirgi ${n} kun (${human(ymd(f))} — bugun)`, `last_${n}d`, today); }
   const monthStart = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1));
   if (/otgan oy|proshl\w* mesyats/.test(t)) { const pm = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() - 1, 1)); return mk(pm, monthStart, `O‘tgan oy (${UZ_MONTH[pm.getUTCMonth()]} ${pm.getUTCFullYear()})`, 'last_month', today); }

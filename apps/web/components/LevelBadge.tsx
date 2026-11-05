@@ -1,5 +1,6 @@
 'use client';
 import { useId } from 'react';
+import { GLYPHS } from './LevelGlyphs';
 
 /**
  * Partner level badge (SVG, no image files): metal frame by tier (bronze 0–4, silver 5–9, gold 10–14, royal 15+),
@@ -66,7 +67,9 @@ export function LevelBadge({ level, color, symbol, size = 72, locked = false, la
       <g>{leaves}</g><g transform="translate(200 0) scale(-1 1)">{leaves}</g>
       {/* symbol */}
       <circle cx="100" cy="122" r="31" fill="#000" opacity=".12" />
-      <text x="100" y="124" fontSize="46" textAnchor="middle" dominantBaseline="central">{symbol}</text>
+      {GLYPHS[level]
+        ? <g transform="translate(60 82) scale(0.8)" style={{ filter: 'drop-shadow(0 2px 1.5px rgba(0,0,0,.35))' }}>{GLYPHS[level]!(`url(#m${id})`, m[3], `url(#g${id})`)}</g>
+        : <text x="100" y="124" fontSize="46" textAnchor="middle" dominantBaseline="central">{symbol}</text>}
       {/* crown */}
       <path d="M62 44 L70 14 L86 32 L100 6 L114 32 L130 14 L138 44 Z" fill={`url(#m${id})`} stroke={m[3]} strokeWidth="2" strokeLinejoin="round" />
       <rect x="60" y="40" width="80" height="10" rx="4" fill={`url(#m${id})`} stroke={m[3]} strokeWidth="2" />

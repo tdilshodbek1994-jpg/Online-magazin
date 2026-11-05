@@ -2,7 +2,7 @@
  * Customer-facing order status in plain Uzbek. The order has three technical dimensions (commercial,
  * fulfillment, payment); the customer only needs one sentence and a step on a simple tracker.
  */
-export const STEPS = ['Qabul qilindi', 'Tasdiqlandi', 'Yig‘ilmoqda', 'Yo‘lda', 'Yetkazildi'];
+export const STEPS = ['Yangi', 'Tasdiqlandi', 'Yig‘ilmoqda', 'Yo‘lda', 'Yetkazildi'];
 
 export type Stage = { label: string; hint: string; step: number; cls: 'ok' | 'wait' | 'road' | 'off' };
 
@@ -19,7 +19,7 @@ export function orderStage(o: { commercial_status?: string; fulfillment_status?:
     if (o.payment_method === 'online' && o.payment_status !== 'paid') return { label: 'To‘lov kutilmoqda', hint: 'Buyurtma tasdiqlandi — onlayn to‘lovni amalga oshiring.', step: 1, cls: 'wait' };
     return { label: 'Tasdiqlandi', hint: 'Operator buyurtmani tasdiqladi, tez orada jo‘natiladi.', step: 1, cls: 'wait' };
   }
-  return { label: 'Qabul qilindi', hint: 'Operator tez orada qo‘ng‘iroq qilib, buyurtmani tasdiqlaydi.', step: 0, cls: 'wait' };
+  return { label: 'Yangi', hint: 'Buyurtmangiz qabul qilindi. Operator tez orada qo‘ng‘iroq qilib, buyurtmani tasdiqlaydi.', step: 0, cls: 'wait' };
 }
 
 export const PAYMENT_LABEL: Record<string, string> = {

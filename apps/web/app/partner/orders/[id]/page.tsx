@@ -32,7 +32,7 @@ function Milestones({ m }: { m: any }) {
     { icon: '🛒', title: 'Buyurtma tushdi', at: m.received_at },
     ...(m.calls.length ? m.calls.map((c: any, i: number) => ({ icon: '📞', title: `Operator${c.operator ? ` ${c.operator}` : ''} gaplashdi`, at: c.created_at, sub: CALL[c.outcome] ?? c.outcome, prev: i === 0 ? m.received_at : m.calls[i - 1].created_at, bad: c.outcome === 'rejected' }))
       : [{ icon: '📞', title: `Operator${m.operator ? ` ${m.operator}` : ''} qo‘ng‘irog‘i`, at: null }]),
-    { icon: '✅', title: 'Qabul qilindi', at: m.accepted_at, prev: lastCall ?? m.received_at },
+    { icon: '✅', title: 'Tasdiqlandi', at: m.accepted_at, prev: lastCall ?? m.received_at },
     { icon: '🚚', title: 'Yetkazishga chiqarildi', at: m.shipped_at, prev: m.accepted_at },
     { icon: '📦', title: 'Mijozga yetib bordi', at: m.delivered_at, prev: m.shipped_at },
   ];

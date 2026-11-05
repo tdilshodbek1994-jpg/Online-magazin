@@ -32,14 +32,14 @@ async function myOrder(db: Queryable, actor: Actor, orderId: string) {
 
 /** Customer-facing stage from the independent statuses (delivery ≠ payment ≠ return). */
 export function customerStage(o: { commercial_status: string; confirmation_status?: string; fulfillment_status: string }): { key: string; label: string } {
-  if (o.commercial_status === 'cancelled') return { key: 'cancelled', label: 'Bekor qilingan' };
-  if (o.fulfillment_status === 'returned') return { key: 'returned', label: 'Qaytarilgan' };
+  if (o.commercial_status === 'cancelled') return { key: 'cancelled', label: 'Bekor qilindi' };
+  if (o.fulfillment_status === 'returned') return { key: 'returned', label: 'Qaytarildi' };
   if (o.fulfillment_status === 'failed') return { key: 'failed', label: 'Yetkazib bo‘lmadi' };
-  if (o.fulfillment_status === 'delivered' || o.commercial_status === 'completed') return { key: 'delivered', label: 'Topshirildi' };
+  if (o.fulfillment_status === 'delivered' || o.commercial_status === 'completed') return { key: 'delivered', label: 'Yetkazildi' };
   if (o.fulfillment_status === 'shipped') return { key: 'shipping', label: 'Yo‘lda' };
   if (['picking', 'packed'].includes(o.fulfillment_status)) return { key: 'packing', label: 'Yig‘ilmoqda' };
   if (o.commercial_status === 'confirmed') return { key: 'confirmed', label: 'Tasdiqlandi' };
-  return { key: 'received', label: 'Qabul qilindi, tasdiqlanmoqda' };
+  return { key: 'received', label: 'Yangi — tasdiqlanmoqda' };
 }
 const STAGES = ['received', 'confirmed', 'packing', 'shipping', 'delivered'];
 const CANCELLABLE_FULFILMENT = ['unallocated', 'reserved'];

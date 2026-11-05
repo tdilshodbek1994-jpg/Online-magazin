@@ -2,7 +2,7 @@
 import { use, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 
-const LABEL: Record<string, string> = { received: 'Qabul qilindi', confirmed: 'Tasdiqlandi', packing: 'Yig‘ilmoqda', shipping: 'Yo‘lda', delivered: 'Topshirildi' };
+const LABEL: Record<string, string> = { received: 'Yangi', confirmed: 'Tasdiqlandi', packing: 'Yig‘ilmoqda', shipping: 'Yo‘lda', delivered: 'Yetkazildi' };
 
 /** Minimal order status by an opaque link: stages only — no address, phone or money. */
 export default function StatusLink({ params }: { params: Promise<{ token: string }> }) {

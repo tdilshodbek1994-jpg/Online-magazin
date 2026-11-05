@@ -4,7 +4,7 @@ import { api, som } from '@/lib/api';
 import { pick, useI18n } from '@/lib/i18n';
 import { errText } from '@/lib/errors';
 
-export const BUCKETS_UZ: [string, string][] = [['all', 'Barchasi'], ['new', 'Yangi'], ['accepted', 'Qabul qilindi'], ['shipping', 'Yetkazilmoqda'], ['delivered', 'Yetkazildi'], ['returned', 'Qaytdi'], ['cancelled', 'Bekor qilingan']];
+export const BUCKETS_UZ: [string, string][] = [['all', 'Barchasi'], ['new', 'Yangi'], ['accepted', 'Tasdiqlandi'], ['shipping', 'Yo‘lda'], ['delivered', 'Yetkazildi'], ['returned', 'Qaytarildi'], ['cancelled', 'Bekor qilindi']];
 const LABEL = Object.fromEntries(BUCKETS_UZ) as Record<string, string>;
 const MON = ['yan', 'fev', 'mar', 'apr', 'may', 'iyun', 'iyul', 'avg', 'sen', 'okt', 'noy', 'dek'];
 /** «3-noy, 07:35» in Tashkent time (no ambiguous 03/11). */

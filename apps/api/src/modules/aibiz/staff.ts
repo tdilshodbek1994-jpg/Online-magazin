@@ -117,7 +117,7 @@ export async function salesSummary(q: Queryable, p: Period): Promise<ToolResult>
   const top = await many<{ name: Record<string, string>; units: number }>(q, `SELECT (array_agg(ol.product_snapshot->'name'))[1] AS name, SUM(GREATEST(0, ol.qty - ol.canceled_qty - ol.returned_qty))::int AS units
       FROM orders o JOIN order_lines ol ON ol.order_id=o.id JOIN skus sk ON sk.id=ol.sku_id WHERE o.fulfillment_status='delivered' AND o.delivered_at >= $1 AND o.delivered_at < $2
      GROUP BY sk.product_id ORDER BY 2 DESC LIMIT 5`, [a, b]);
-  const L: Record<string, string> = { new: 'Kutilmoqda', accepted: 'Qabul qilindi', shipping: 'Yo‘lda', delivered: 'Yetkazildi', returned: 'Qaytdi', cancelled: 'Bekor/rad' };
+  const L: Record<string, string> = { new: 'Yangi', accepted: 'Tasdiqlandi', shipping: 'Yo‘lda', delivered: 'Yetkazildi', returned: 'Qaytarildi', cancelled: 'Bekor qilindi' };
   const facts: Fact[] = [
     { id: 'delivered_amount', label: 'Yetkazilgan buyurtmalar summasi', value: del.amount, unit: 'som', kind: 'observed', primary: true },
     { id: 'delivered_orders', label: 'Yetkazilgan buyurtmalar', value: del.orders, unit: 'orders', kind: 'observed' },

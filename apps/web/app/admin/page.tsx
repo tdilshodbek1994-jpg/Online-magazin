@@ -165,7 +165,7 @@ function Products({ act, lang, openNew = 0 }: { act: any; lang: any; openNew?: n
   );
 }
 
-const BUCKET_UZ: Record<string, string> = { new: 'Yangi', accepted: 'Qabul qilindi', shipping: 'Yetkazilmoqda', delivered: 'Yetkazildi', returned: 'Qaytdi', cancelled: 'Bekor qilingan' };
+const BUCKET_UZ: Record<string, string> = { new: 'Yangi', accepted: 'Tasdiqlandi', shipping: 'Yo‘lda', delivered: 'Yetkazildi', returned: 'Qaytarildi', cancelled: 'Bekor qilindi' };
 const PERIODS_UZ: [string, string][] = [['today', 'Bugun'], ['yesterday', 'Kecha'], ['week', 'Hafta'], ['month', 'Shu oy'], ['all', 'Hammasi']];
 
 function Orders({ lang: _lang }: { lang: any }) {

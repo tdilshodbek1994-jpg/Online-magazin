@@ -114,7 +114,7 @@ export async function ordersCount(q: Queryable, s: Scope, p: Period, status?: st
   const by = Object.fromEntries(rows.map((r) => [r.bucket, r.n])) as Record<string, number>;
   const total = rows.reduce((t, r) => t + r.n, 0);
   const origin = await many<{ channel: string; n: number }>(q, `SELECT o.channel, COUNT(*)::int AS n FROM orders o WHERE o.attributed_partner_id=$1 AND o.created_at >= $2 AND o.created_at < $3${ch} GROUP BY 1`, params);
-  const L: Record<string, string> = { new: 'Kutilmoqda', accepted: 'Qabul qilindi', shipping: 'Yo‘lda', delivered: 'Yetkazildi', returned: 'Qaytdi', cancelled: 'Bekor/rad' };
+  const L: Record<string, string> = { new: 'Yangi', accepted: 'Tasdiqlandi', shipping: 'Yo‘lda', delivered: 'Yetkazildi', returned: 'Qaytarildi', cancelled: 'Bekor qilindi' };
   const ORIG: Record<string, string> = { web: 'Havola orqali (mijoz o‘zi)', partner_assisted: 'Siz kiritgan', operator: 'Operator kiritgan' };
   const facts: Fact[] = [{ id: 'orders_created', label: status ? `Jami (shu kunlarda kelgan)` : 'Kelgan buyurtmalar', value: total, unit: 'orders', kind: 'observed', primary: !status }];
   if (status) facts.unshift({ id: `orders_${status}`, label: `${L[status]} (hozirgi holati)`, value: by[status] ?? 0, unit: 'orders', kind: 'observed', primary: true });

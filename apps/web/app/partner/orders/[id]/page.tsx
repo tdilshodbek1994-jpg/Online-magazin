@@ -97,8 +97,8 @@ export default function SalesPassport({ params }: { params: Promise<{ id: string
           <Milestones m={d.milestones} />
 
           {/* Settlement: clean table */}
-          <section className="card pp-sec">
-            <h2 className="pp-h">🧾 Bonus hisob-kitobi</h2>
+          <details className="card pp-sec pp-fold">
+            <summary><span className="pp-fi" aria-hidden>🧾</span><span className="pp-ft"><span className="pp-h">Bonus hisob-kitobi</span><span className="pp-fs">{d.commission.lines.length ? <><b className="ok-t">{som(d.commission.lines.reduce((t: bigint, l: any) => t + BigInt(l.target_minor ?? 0), 0n).toString())}</b> · {d.commission.lines.length} ta mahsulot</> : 'Bonus yo‘q'}</span></span></summary>
             {d.commission.lines.length === 0 ? <p className="muted small">Bu buyurtmada bonus yo‘q (mahsulot uchun qoida belgilanmagan yoki buyurtma tasdiqlanmagan).</p> : d.commission.lines.map((l: any) => (
               <div key={l.id} className="pp-line">
                 <div className="pp-line-h"><b>{pick(l.product, lang)}</b><span className={`pill r-${l.reason}`}>{l.reason_label}</span></div>
@@ -112,21 +112,21 @@ export default function SalesPassport({ params }: { params: Promise<{ id: string
               </div>
             ))}
             <p className="pp-foot">🔒 Foiz buyurtma vaqtida qotirilgan — keyin o‘zgarsa ham bu buyurtmaga ta’sir qilmaydi.</p>
-          </section>
+          </details>
 
-          <section className="card pp-sec">
-            <h2 className="pp-h">🔗 Buyurtma qayerdan</h2>
+          <details className="card pp-sec pp-fold">
+            <summary><span className="pp-fi" aria-hidden>🔗</span><span className="pp-ft"><span className="pp-h">Buyurtma qayerdan</span><span className="pp-fs">{d.source}</span></span></summary>
             <dl className="pp-dl">
               <div><dt>Manba</dt><dd>{d.source}</dd></div>
               <div><dt>Nega sizniki</dt><dd>{d.attribution.reason_label}</dd></div>
               <div><dt>Mijoz</dt><dd>{d.customer} · {d.customer_phone}</dd></div>
               {d.contact_time_note && <div><dt>Aloqa vaqti</dt><dd>{d.contact_time_note}</dd></div>}
             </dl>
-          </section>
+          </details>
 
           {d.entries.length > 0 && (
             <details className="card pp-sec pp-fold">
-              <summary><span className="pp-h">💰 Bonus harakatlari</span><span className="pp-count">{d.entries.length}</span></summary>
+              <summary><span className="pp-fi" aria-hidden>💰</span><span className="pp-ft"><span className="pp-h">Bonus harakatlari</span><span className="pp-fs">Pul harakatlari tarixi</span></span><span className="pp-count">{d.entries.length}</span></summary>
               <ul className="pp-moves">
                 {d.entries.map((e: any, i: number) => (
                   <li key={i}><div><b>{MONEY[e.from_bucket] ?? e.from_bucket} → {MONEY[e.to_bucket] ?? e.to_bucket}</b><div className="small muted">{e.reason ? (MONEY_REASON[e.reason] ?? e.reason) : ''}{e.created_at ? ` · ${tm(e.created_at)}` : ''}</div></div><b className="ok-t">{som(e.amount_minor)}</b></li>
@@ -136,7 +136,7 @@ export default function SalesPassport({ params }: { params: Promise<{ id: string
           )}
 
           <details className="card pp-sec pp-fold pp-ask">
-            <summary><span className="pp-h">✉️ Operatorga yozish</span><span className="small muted">savol yoki muammo</span></summary>
+            <summary><span className="pp-fi" aria-hidden>✉️</span><span className="pp-ft"><span className="pp-h">Operatorga yozish</span><span className="pp-fs">Savol yoki muammo bo‘lsa yozing</span></span></summary>
             <PartnerRequests orderId={id} />
           </details>
         </div>

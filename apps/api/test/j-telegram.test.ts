@@ -46,6 +46,10 @@ describe('Partner notifications (Telegram + cabinet list)', () => {
     expect(list.json.items[0].text).toContain('Hisobingizga 20 000 so‘m o‘tdi');
     expect(list.json.items[2].text).toMatch(/Yangi buyurtma OM-\*\*\*\d{3}/);
     expect(JSON.stringify(list.json)).not.toContain(customerPhone);
+    // every order notification links to the order and names the product the money came from
+    expect(list.json.items.map((i: any) => i.href)).toEqual(Array(3).fill(`/partner/orders/${orderId}`));
+    expect(list.json.items[0].text).toMatch(/Mahsulot: .+ × 1\nBuyurtma: OM-\*\*\*\d{3}/);
+    expect(list.json.items[1].text).toContain('Mahsulot:');
   });
 
   it('cancelled order notifies once', async () => {

@@ -207,7 +207,13 @@ export async function accrueForOrder(tx: Tx, orderId: string, partnerId: string)
             (SELECT COALESCE(SUM(target_minor),0)::text FROM commission_accruals WHERE order_id=o.id AND state <> 'superseded') AS amount
        FROM orders o LEFT JOIN referral_links l ON l.id::text = o.attribution->>'link_id' WHERE o.id=$1`, [orderId]);
   const i = info.rows[0];
-  if (i) await notifyPartner(tx, partnerId, 'partner.order_new', { number: maskedNumber(i.number), products: i.products, stream: i.stream, amount_minor: i.amount }, `p:new:${orderId}`);
+  if (i) await notifyPartner(tx, partnerId, 'partner.order_new', { number: maskedNumber(i.number), order_id: orderId, products: i.products, stream: i.stream, amount_minor: i.amount }, `p:new:${orderId}`);
+}
+
+/** «Name × qty, …» for partner notifications (no customer data). */
+export async function orderProducts(q: Tx, orderId: string): Promise<string | null> {
+  const r = await q.query(`SELECT string_agg((product_snapshot->'name'->>'uz-Latn') || ' × ' || qty, ', ') AS p FROM order_lines WHERE order_id=$1`, [orderId]);
+  return r.rows[0]?.p ?? null;
 }
 
 /**
@@ -264,7 +270,7 @@ export async function recalcOrder(tx: Tx, orderId: string, reason: string, actor
   for (const r of left.rows) {
     if (r.n > 0 && r.live === 0) {
       const num = await tx.query(`SELECT number FROM orders WHERE id=$1`, [orderId]);
-      await notifyPartner(tx, r.partner_id, 'partner.order_cancelled', { number: maskedNumber(num.rows[0].number) }, `p:rev:${orderId}`);
+      await notifyPartner(tx, r.partner_id, 'partner.order_cancelled', { number: maskedNumber(num.rows[0].number), order_id: orderId, products: await orderProducts(tx, orderId) }, `p:rev:${orderId}`);
     }
   }
   // Returns after coins were issued => visible UzCoin adjustment (never a silent rewrite).
@@ -293,9 +299,10 @@ export async function promoteToPending(tx: Tx, orderId: string, holdDays: number
   }
   if (acc.rows.length) {
     const num = await tx.query(`SELECT number FROM orders WHERE id=$1`, [orderId]);
+    const products = await orderProducts(tx, orderId);
     const byPartner = new Map<string, bigint>();
     for (const a of acc.rows) byPartner.set(a.partner_id, (byPartner.get(a.partner_id) ?? 0n) + BigInt(a.target_minor));
-    for (const [pid, amt] of byPartner) await notifyPartner(tx, pid, 'partner.order_delivered', { number: maskedNumber(num.rows[0].number), amount_minor: amt.toString() }, `p:deliv:${orderId}:${pid}`);
+    for (const [pid, amt] of byPartner) await notifyPartner(tx, pid, 'partner.order_delivered', { number: maskedNumber(num.rows[0].number), order_id: orderId, products, amount_minor: amt.toString() }, `p:deliv:${orderId}:${pid}`);
   }
 }
 
@@ -315,7 +322,8 @@ export async function releaseMatured(tx: Tx, now: Date = new Date()): Promise<nu
     await transfer(tx, { partnerId: a.partner_id, from: 'pending', to: 'available', amount: amt, sourceType: 'accrual', sourceId: a.id, effectKey: `v${v}:available`, reason: 'hold_elapsed' });
     await postJournal(tx, `commission:${a.id}:v${v}`, 'commission_available', [{ account: 'commission_expense', debit: amt }, { account: 'partner_payable', credit: amt }]);
     await tx.query(`UPDATE commission_accruals SET state='available', available_at=now(), version=$2 WHERE id=$1`, [a.id, v]);
-    await notifyPartner(tx, a.partner_id, 'partner.commission_available', { amount_minor: amt.toString() }, `p:avail:${a.id}`);
+    const info = await tx.query(`SELECT o.number, (ol.product_snapshot->'name'->>'uz-Latn') || ' × ' || ol.qty AS product FROM orders o JOIN order_lines ol ON ol.id=$2 WHERE o.id=$1`, [a.order_id, a.order_line_id]);
+    await notifyPartner(tx, a.partner_id, 'partner.commission_available', { amount_minor: amt.toString(), order_id: a.order_id, number: info.rows[0] ? maskedNumber(info.rows[0].number) : null, products: info.rows[0]?.product ?? null }, `p:avail:${a.id}`);
     // Partner's own opt-in charity share of this now-available commission (idempotent; OFF unless the partner consented).
     const { applyCharityAuto } = await import('../charity/service.js');
     await applyCharityAuto(tx, a);

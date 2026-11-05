@@ -160,7 +160,7 @@ export function registerPartnerP2(app: FastifyInstance, deps: Deps): void {
         [f.partner_id, partner.user_id, JSON.stringify([{ sku_id: body.sku_id, qty: body.qty }]), body.name, phone, body.delivery_zone_id, JSON.stringify(body.address), body.contact_time ?? null]);
       const r = await convertDraft(tx, cfg, { ...actor, kind: 'anonymous' }, d);
       await tx.query(`UPDATE partner_offers SET status='chosen', chosen_sku_id=$2, draft_id=$3, order_id=$4, remind_at=NULL, updated_at=now() WHERE id=$1`, [f.id, body.sku_id, d.id, r.order_id]);
-      await notifyPartner(tx, f.partner_id, 'partner.customer_filled', { number: maskedNumber(r.number), source: 'taklif to‘plami' }, `offer-chosen:${f.id}`);
+      await notifyPartner(tx, f.partner_id, 'partner.customer_filled', { number: maskedNumber(r.number), order_id: r.order_id, source: 'taklif to‘plami' }, `offer-chosen:${f.id}`);
       await audit(tx, null, 'offer.chosen', { type: 'partner_offer', id: f.id }, { after: { order_id: r.order_id } });
       const dev = r as { dev_customer_link_token?: string; dev_customer_code?: string };
       return { ok: true, order_number: r.number, next: dev.dev_customer_link_token ? 'confirm_by_sms' : 'operator_call', ...(dev.dev_customer_link_token ? { dev_customer_link_token: dev.dev_customer_link_token, dev_customer_code: dev.dev_customer_code } : {}) };

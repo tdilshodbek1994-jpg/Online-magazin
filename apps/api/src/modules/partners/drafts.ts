@@ -255,7 +255,7 @@ export function registerSalesDrafts(app: FastifyInstance, deps: Deps): void {
         [d.id, body.name, phone, body.delivery_zone_id, JSON.stringify(body.address), body.contact_time ?? null]);
       const fresh = await one<DraftRow>(tx, `SELECT * FROM sales_drafts WHERE id=$1`, [d.id]);
       const r = await convertDraft(tx, cfg, { ...actor, kind: 'anonymous' }, fresh);
-      await notifyPartner(tx, d.partner_id, 'partner.customer_filled', { number: maskedNumber(r.number), source: 'to‘ldirish havolasi' }, `filled:${d.id}`);
+      await notifyPartner(tx, d.partner_id, 'partner.customer_filled', { number: maskedNumber(r.number), order_id: r.order_id, source: 'to‘ldirish havolasi' }, `filled:${d.id}`);
       await audit(tx, null, 'draft.customer_filled', { type: 'sales_draft', id: d.id }, { after: { order_id: r.order_id } });
       // The customer receives the SMS code on their own phone; the response carries no code (dev echo only outside production).
       const dev = r as { dev_customer_link_token?: string; dev_customer_code?: string };

@@ -7,7 +7,7 @@ import { many, maybeOne, one, withTx } from '../../platform/db.js';
 import { AppError, conflict, forbidden, notFound } from '../../platform/errors.js';
 import { type Deps, route, zIdParam } from '../../platform/http.js';
 import { queueNotification } from './service.js';
-import { renderText, sendTelegram } from './telegram.js';
+import { maskedNumber, renderText, sendTelegram } from './telegram.js';
 
 const LATEST_CONSENT = `(SELECT c.granted FROM consents c WHERE c.user_id=u.id AND c.purpose='marketing' AND c.channel IN ($CH,'any') ORDER BY c.created_at DESC, c.id DESC LIMIT 1)`;
 
@@ -84,9 +84,54 @@ export function registerMessaging(app: FastifyInstance, deps: Deps): void {
   // In-cabinet notification list (same events as Telegram; works even when Telegram is not linked).
   route(app, deps, { method: 'GET', url: '/me/notifications', tags: ['messaging'], summary: 'My recent notifications (rendered text)' }, async ({ actor, db }) => {
     requireUser(actor);
-    const rows = await many<{ id: string; template: string; params: Record<string, unknown>; status: string; created_at: string }>(db,
-      `SELECT id, template, params, status, created_at FROM notifications WHERE user_id=$1 AND purpose IN ('transactional','marketing') AND template LIKE 'partner.%' ORDER BY created_at DESC LIMIT 50`, [actor.userId]);
-    return { items: rows.map((r) => ({ id: r.id, kind: r.template, text: renderText(r.template, r.params ?? {}), telegram: r.status === 'sent', created_at: r.created_at })) };
+    const rows = await many<{ id: string; template: string; params: Record<string, unknown>; status: string; created_at: string; dedupe_key: string | null }>(db,
+      `SELECT id, template, params, status, created_at, dedupe_key FROM notifications WHERE user_id=$1 AND purpose IN ('transactional','marketing') AND template LIKE 'partner.%' ORDER BY created_at DESC LIMIT 50`, [actor.userId]);
+    // Older rows were stored without order/product: recover them from the dedupe key (order id or accrual id), only for this user's partner.
+    const partner = await maybeOne<{ id: string }>(db, `SELECT id FROM partners WHERE user_id=$1`, [actor.userId]);
+    const accIds: string[] = [], orderIds: string[] = [];
+    const keyOf = (r: (typeof rows)[number]): { order?: string; accrual?: string; draft?: string; offer?: string } => {
+      const k = r.dedupe_key ?? '';
+      const m = /^p:(new|rev|deliv):([0-9a-f-]{36})/.exec(k);
+      if (m) return { order: m[2]! };
+      const a = /^p:avail:([0-9a-f-]{36})$/.exec(k);
+      if (a) return { accrual: a[1]! };
+      const f = /^(filled|offer-chosen):([0-9a-f-]{36})$/.exec(k);
+      return f ? { [f[1] === 'filled' ? 'draft' : 'offer']: f[2]! } as { draft?: string; offer?: string } : {};
+    };
+    for (const r of rows) {
+      const k = keyOf(r);
+      if (k.accrual && !r.params?.order_id) accIds.push(k.accrual);
+      const oid = (r.params?.order_id as string | undefined) ?? k.order;
+      if (oid) orderIds.push(oid);
+    }
+    const draftIds = rows.map((r) => keyOf(r).draft).filter(Boolean) as string[];
+    const offerIds = rows.map((r) => keyOf(r).offer).filter(Boolean) as string[];
+    const fills = partner && (draftIds.length || offerIds.length) ? await many<{ id: string; order_id: string }>(db,
+      `SELECT id, order_id FROM sales_drafts WHERE id = ANY($1::uuid[]) AND partner_id=$3 AND order_id IS NOT NULL
+       UNION ALL SELECT id, order_id FROM partner_offers WHERE id = ANY($2::uuid[]) AND partner_id=$3 AND order_id IS NOT NULL`, [draftIds, offerIds, partner.id]) : [];
+    const fillMap = new Map(fills.map((f) => [f.id, f.order_id]));
+    for (const f of fills) orderIds.push(f.order_id);
+    const acc = partner && accIds.length ? await many<{ id: string; order_id: string; product: string | null }>(db,
+      `SELECT a.id, a.order_id, (ol.product_snapshot->'name'->>'uz-Latn') || ' × ' || ol.qty AS product FROM commission_accruals a JOIN order_lines ol ON ol.id=a.order_line_id WHERE a.id = ANY($1::uuid[]) AND a.partner_id=$2`, [accIds, partner.id]) : [];
+    const accMap = new Map(acc.map((a) => [a.id, a]));
+    for (const a of acc) orderIds.push(a.order_id);
+    const ords = partner && orderIds.length ? await many<{ id: string; number: string; products: string | null }>(db,
+      `SELECT o.id, o.number, (SELECT string_agg((ol.product_snapshot->'name'->>'uz-Latn') || ' × ' || ol.qty, ', ') FROM order_lines ol WHERE ol.order_id=o.id) AS products
+         FROM orders o WHERE o.id = ANY($1::uuid[]) AND EXISTS (SELECT 1 FROM commission_accruals c WHERE c.order_id=o.id AND c.partner_id=$2)`, [[...new Set(orderIds)], partner.id]) : [];
+    const ordMap = new Map(ords.map((o) => [o.id, o]));
+    const STATIC: Record<string, string> = { 'partner.payout_paid': '/partner/payouts', 'partner.bonus': '/partner/wallet', 'partner.penalty': '/partner/programs', 'partner.contest_prize': '/partner/contests', 'partner.level_up': '/partner/level', 'partner.coupon_issued': '/partner/level' };
+    return { items: rows.map((r) => {
+      const k = keyOf(r);
+      const p: Record<string, unknown> = { ...(r.params ?? {}) };
+      const a = k.accrual ? accMap.get(k.accrual) : undefined;
+      if (a && !p.order_id) { p.order_id = a.order_id; p.products ??= a.product; }
+      const fid = k.draft ?? k.offer;
+      const oid = (p.order_id as string | undefined) ?? k.order ?? (fid ? fillMap.get(fid) : undefined);
+      const o = oid ? ordMap.get(oid) : undefined;
+      if (o) { p.number ??= maskedNumber(o.number); if (r.template !== 'partner.order_new') p.products ??= o.products; }
+      const href = o ? `/partner/orders/${o.id}` : STATIC[r.template] ?? null;
+      return { id: r.id, kind: r.template, text: renderText(r.template, p), href, telegram: r.status === 'sent', created_at: r.created_at };
+    }) };
   });
 
   app.post('/webhooks/telegram', { schema: { hide: true } }, async (req, reply) => {

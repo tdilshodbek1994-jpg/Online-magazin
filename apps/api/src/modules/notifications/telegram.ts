@@ -11,16 +11,16 @@ const som = (minor: unknown) => {
 export function renderText(template: string, p: Record<string, unknown>): string {
   switch (template) {
     case 'partner.order_new': return `🛒 Yangi buyurtma ${p.number ?? ''}\n${p.products ?? ''}\nOqim: ${p.stream ?? '—'}\nKutilayotgan bonus: ${som(p.amount_minor)}\n\nOperator mijoz bilan bog‘lanib tasdiqlaydi.`;
-    case 'partner.order_delivered': return `✅ Buyurtma ${p.number ?? ''} yetkazildi va to‘landi\nBonus: ${som(p.amount_minor)} — kutish muddatidan keyin hisobingizga o‘tadi.`;
-    case 'partner.order_cancelled': return `❌ Buyurtma ${p.number ?? ''} bekor qilindi yoki qaytarildi\nBu buyurtma bo‘yicha bonus hisoblanmaydi.`;
-    case 'partner.commission_available': return `💰 Hisobingizga ${som(p.amount_minor)} o‘tdi\nEndi pul yechish so‘rovini yuborishingiz mumkin.`;
+    case 'partner.order_delivered': return `✅ Buyurtma ${p.number ?? ''} yetkazildi va to‘landi${p.products ? `\nMahsulot: ${p.products}` : ''}\nBonus: ${som(p.amount_minor)} — kutish muddatidan keyin hisobingizga o‘tadi.`;
+    case 'partner.order_cancelled': return `❌ Buyurtma ${p.number ?? ''} bekor qilindi yoki qaytarildi${p.products ? `\nMahsulot: ${p.products}` : ''}\nBu buyurtma bo‘yicha bonus hisoblanmaydi.`;
+    case 'partner.commission_available': return `💰 Hisobingizga ${som(p.amount_minor)} o‘tdi${p.products ? `\nMahsulot: ${p.products}` : ''}${p.number ? `\nBuyurtma: ${p.number}` : ''}\nEndi pul yechish so‘rovini yuborishingiz mumkin.`;
     case 'partner.payout_paid': return `💳 To‘lov amalga oshirildi: ${som(p.amount_minor)}\nKarta: ${p.destination ?? '—'}`;
     case 'partner.bonus': return `🎁 Bonus: +${som(p.amount_minor)}\n${p.reason ?? ''}\nHisobingizga (yechish mumkin) qo‘shildi.`;
     case 'partner.contest_prize': return `🏆 Tabriklaymiz! ${p.reason ?? 'Konkurs sovrini'}\n+${som(p.amount_minor)} hisobingizga qo‘shildi.`;
     case 'partner.operator_message': return `💬 Operator xabari — buyurtma ${p.number ?? ''}\n${p.text ?? ''}`;
     case 'partner.weekly': return `📊 O‘tgan hafta natijangiz\nBuyurtmalar: ${p.orders ?? 0}\nYetkazildi: ${p.delivered ?? 0}\nYechish mumkin bo‘ldi: ${som(p.amount_minor)}\nEng yaxshi oqim: ${p.stream ?? '—'}\n\nBatafsil: kabinet → Statistika`;
     case 'partner.penalty': return `⚠️ Jarima: −${som(p.amount_minor)}\nSabab: ${p.reason ?? '—'}\nSavol bo‘lsa, qo‘llab-quvvatlashga yozing.`;
-    case 'partner.customer_filled': return `📝 Mijoz ma’lumotlarini o‘zi to‘ldirdi (${p.source ?? 'havola'})\nBuyurtma ${p.number ?? ''} yaratildi — endi mijoz SMS kod bilan tasdiqlaydi.`;
+    case 'partner.customer_filled': return `📝 Mijoz ma’lumotlarini o‘zi to‘ldirdi (${p.source ?? 'havola'})\nBuyurtma ${p.number ?? ''} yaratildi — operator mijoz bilan bog‘lanib tasdiqlaydi.`;
     case 'price_watch.dropped': return `UzShop: «${p.product ?? 'mahsulot'}» narxi tushdi: ${p.was ?? ''} → ${p.now ?? ''}. ${p.path ?? ''}`;
     case 'waitlist.back_in_stock': return `UzShop: «${p.product ?? 'mahsulot'}» yana sotuvda. Buyurtma: ${p.path ?? ''}`;
     case 'offer.reminder': return 'UzShop: sizga yuborilgan mahsulot taklifi hali amal qilmoqda. Havolani qayta ochib, tanlashingiz mumkin.';

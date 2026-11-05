@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { api } from '@/lib/api';
 import { TelegramConnect } from '../shared';
 import { errText } from '@/lib/errors';
@@ -18,15 +19,21 @@ export default function PartnerNotifications() {
       {err && <div className="notice" role="alert">{errText(err)}</div>}
       {items && items.length === 0 && <div className="empty">Hozircha xabar yo‘q. Birinchi buyurtma kelganda shu yerda ko‘rinadi.</div>}
       <div className="slist">
-        {items?.slice(0, shown).map((n) => (
-          <article key={n.id} className="scard notif">
-            <span className="notif-ico" aria-hidden>{ICON[n.kind] ?? '🔔'}</span>
-            <div>
-              <div style={{ whiteSpace: 'pre-line' }}>{n.text}</div>
-              <div className="muted small">🕒 {new Date(n.created_at).toLocaleString('uz-UZ', { dateStyle: 'short', timeStyle: 'short' })}{n.telegram ? ' · Telegram’ga yuborildi' : ''}</div>
-            </div>
-          </article>
-        ))}
+        {items?.slice(0, shown).map((n) => {
+          const body = (
+            <>
+              <span className="notif-ico" aria-hidden>{ICON[n.kind] ?? '🔔'}</span>
+              <div>
+                <div style={{ whiteSpace: 'pre-line' }}>{n.text}</div>
+                <div className="muted small">🕒 {new Date(n.created_at).toLocaleString('uz-UZ', { dateStyle: 'short', timeStyle: 'short' })}{n.telegram ? ' · Telegram’ga yuborildi' : ''}</div>
+                {n.href && <div className="notif-more">{n.href.startsWith('/partner/orders/') ? 'Buyurtmani ochish →' : 'Batafsil →'}</div>}
+              </div>
+            </>
+          );
+          return n.href
+            ? <Link key={n.id} href={n.href} className="scard notif notif-link">{body}</Link>
+            : <article key={n.id} className="scard notif">{body}</article>;
+        })}
       </div>
       {items && items.length > shown && <button className="btn secondary full mt8" onClick={() => setShown(shown + 20)}>Yana ko‘rsatish ({items.length - shown} ta qoldi)</button>}
     </>

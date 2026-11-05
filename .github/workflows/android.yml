@@ -18,7 +18,8 @@ jobs:
         with: { node-version: 22 }
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: "21" }
-      - uses: android-actions/setup-android@v3
+      # ubuntu-24.04 runners already ship the Android SDK (ANDROID_HOME) with accepted licenses.
+      - run: echo "sdk.dir=$ANDROID_HOME" > android/local.properties
       - run: npm ci --no-audit --no-fund
       - run: npx cap sync android
       - name: Debug APK (install on a phone for testing)

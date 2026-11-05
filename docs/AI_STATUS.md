@@ -51,13 +51,22 @@ Tests: `apps/api/test/zn-aibiz.test.ts` (own DB `om_test_aibiz`, real PostgreSQL
 
 Tests now 36 in `zn-aibiz` (+ operator isolation, operator denied shop sales, owner reports, finance/catalog permission split, compare, after-ad, LLM off/on/allow-list/bad period/provider error with a fake client — no network). Full suite: 39 files, 331 tests passed (local).
 
+## P1 (part) — done
+
+| Item | State |
+|---|---|
+| Contest place in the partner answer: legacy board or Contest Center snapshot (final > provisional) / live provisional; other partners’ numbers never returned | done |
+| CSV export of a stored report revision (`GET /ai/biz/reports/:id/export.csv`): same facts as the screen, metadata (metric/period/timezone/as_of/scope/method/limits), re-authorised at download, formula-safe cells, BOM for Excel; flag `ai.business.export` on (migration 0040) | done |
+| Compact answer card (meta line, one big number, ≤3 facts, ≤5 rows linked to orders/products, details folded) | done |
+
+Tests: `zn-aibiz` 38 passed.
+
 ## Not done yet (honest)
 
 | Item | Why / next |
 |---|---|
 | Operator lead («Jamoa») workspace | there is no team-membership model with effective_from/to in the schema yet; owner sees all operators instead |
-| Contest rank in the partner answer | wire `cc_rankings` |
-| Export (XLSX/CSV/PDF), voice, action drafts, scheduled summaries, forecasts | P1/P2, flags off |
+| XLSX/PDF export, voice, action drafts, scheduled summaries, forecasts | P1/P2, flags off |
 | Real LLM run | not executed by Claude: no key here and no paid provider was turned on |
 | `docs/ai/tests/acceptance_cases.json` | still `not_run` in the file; code tests cover the P0 paths listed above |
 

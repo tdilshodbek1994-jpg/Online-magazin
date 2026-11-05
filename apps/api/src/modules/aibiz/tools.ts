@@ -329,17 +329,42 @@ export async function charity(q: Queryable, s: Scope, p: Period): Promise<ToolRe
 }
 
 export async function contests(q: Queryable, s: Scope): Promise<ToolResult> {
-  const legacy = await many<{ title: string; ends_at: string }>(q, `SELECT title, ends_at FROM contests WHERE status='active' AND ends_at > now() ORDER BY ends_at LIMIT 10`);
-  const cc = await many<{ title: string; ends_at: string; joined: boolean }>(q, `SELECT v.title_latn AS title, v.ends_at, EXISTS (SELECT 1 FROM cc_enrollments e WHERE e.contest_id=c.id AND e.partner_id=$1 AND e.left_at IS NULL) AS joined
+  // Rank comes from each contest's own official source: legacy board, or Contest Center snapshot (final > provisional) /
+  // live provisional ranking. The shop bestseller list is a different thing and is never mixed in.
+  const { contestBoard } = await import('../partners/programs.js');
+  const { liveRanking, loadRules } = await import('../contests/engine.js');
+  const legacy = await many<{ id: string; title: string; starts_at: string; ends_at: string; metric: string; min_delivered: number }>(q, `SELECT id, title, starts_at, ends_at, metric, min_delivered FROM contests WHERE status='active' AND ends_at > now() ORDER BY ends_at LIMIT 10`);
+  const cc = await many<{ id: string; title: string; ends_at: string; joined: boolean }>(q, `SELECT c.id, v.title_latn AS title, v.ends_at, EXISTS (SELECT 1 FROM cc_enrollments e WHERE e.contest_id=c.id AND e.partner_id=$1 AND e.left_at IS NULL) AS joined
       FROM cc_contests c JOIN cc_versions v ON v.contest_id=c.id AND v.version=c.current_version WHERE c.status IN ('scheduled','active') ORDER BY v.ends_at LIMIT 10`, [s.partnerId]);
-  const all = [...legacy.map((l) => ({ ...l, joined: true })), ...cc];
+  const rows: { title: string; ends_at: string; joined: boolean; rank: number | null; total: number; kind: string }[] = [];
+  for (const l of legacy) {
+    const board = await contestBoard(q as never, l);
+    const me = board.find((r) => r.pid === s.partnerId);
+    rows.push({ title: l.title, ends_at: l.ends_at, joined: true, rank: me?.rank ?? null, total: board.length, kind: 'provisional' });
+  }
+  for (const c of cc) {
+    let rank: number | null = null; let total = 0; let kind = 'provisional';
+    if (c.joined) {
+      const snap = await maybeOne<{ kind: string; rows: { partner_id: string; rank: number | null }[] }>(q, `SELECT kind, rows FROM cc_rankings WHERE contest_id=$1 ORDER BY (kind='final') DESC, computed_at DESC LIMIT 1`, [c.id]);
+      const rules = snap ? null : await loadRules(q, c.id);
+      const list = snap ? snap.rows : rules ? await liveRanking(q, c.id, 'provisional', rules) : [];
+      kind = snap?.kind ?? 'provisional';
+      rank = list.find((r) => r.partner_id === s.partnerId)?.rank ?? null;
+      total = list.filter((r) => r.rank !== null).length;
+    }
+    rows.push({ title: c.title, ends_at: c.ends_at, joined: c.joined, rank, total, kind });
+  }
+  const mine = rows.filter((r) => r.rank !== null).sort((a, b) => a.rank! - b.rank!)[0];
   return {
-    status: all.length ? 'partial' : 'zero', tool: 'partner_contest_status', metric: 'contest_list', metric_version: 1, title: 'Davom etayotgan konkurslar',
-    facts: [{ id: 'active_contests', label: 'Faol konkurslar', value: all.length, unit: 'count', kind: 'observed', primary: true }],
-    table: { columns: ['Konkurs', 'Tugaydi', 'Qatnashyapsizmi'], rows: all.map((c) => ({ cells: [c.title, new Date(c.ends_at).toISOString().slice(0, 10), c.joined ? 'Ha' : 'Yo‘q'] })) },
+    status: rows.length ? 'ok' : 'zero', tool: 'partner_contest_status', metric: 'contest_status', metric_version: 2, title: 'Davom etayotgan konkurslar va o‘rningiz',
+    facts: [
+      ...(mine ? [{ id: 'best_rank', label: `O‘rningiz (${mine.title.length > 24 ? mine.title.slice(0, 24) + '…' : mine.title})`, value: `${mine.rank}-o‘rin / ${mine.total}`, unit: 'text' as const, kind: 'observed' as const, primary: true }] : []),
+      { id: 'active_contests', label: 'Faol konkurslar', value: rows.length, unit: 'count', kind: 'observed', primary: !mine },
+    ],
+    table: { columns: ['Konkurs', 'O‘rningiz', 'Tugaydi'], rows: rows.map((c) => ({ cells: [c.title, !c.joined ? 'qatnashmayapsiz' : c.rank ? `${c.rank}-o‘rin / ${c.total}` : 'hali reytingda yo‘q', new Date(c.ends_at).toISOString().slice(0, 10)] })) },
     evidence: [{ type: 'page', label: 'Konkurs markazi', href: '/partner/contests' }],
-    method: 'E’lon qilingan konkurslar ro‘yxati va tugash sanasi. O‘rin va sovrin holati faqat Konkurs markazidagi rasmiy reytingdan olinadi.',
-    partial_reasons: all.length ? ['O‘rningiz bu javobga hali ulanmagan — Konkurs markazida ko‘ring.'] : [], open: { label: 'Konkurs markazini ochish', href: '/partner/contests' },
+    method: 'O‘rin har bir konkursning o‘z rasmiy reytingidan olinadi (yakuniy bo‘lsa yakuniy, aks holda joriy). Joriy o‘rin o‘zgarishi mumkin: yetkazilmagan yoki to‘lovi tasdiqlanmagan buyurtmalar yakuniy hisobga kirmasligi mumkin. Sovrin faqat yakuniy natijadan keyin.',
+    partial_reasons: rows.some((r) => r.kind !== 'final' && r.rank) ? ['O‘rin hali yakuniy emas.'] : [], open: { label: 'Konkurs markazini ochish', href: '/partner/contests' },
   };
 }
 

@@ -53,7 +53,7 @@ export function currentPeriodKey(period: 'week' | 'month', now = new Date()): st
   return mon.toISOString().slice(0, 10);
 }
 
-async function contestBoard(q: Tx | Deps['db'], c: { starts_at: string; ends_at: string; metric: string; min_delivered: number }) {
+export async function contestBoard(q: Tx | Deps['db'], c: { starts_at: string; ends_at: string; metric: string; min_delivered: number }) {
   const rows = await many<{ pid: string; display_name: string; delivered: number; sales: string }>(q, `
     SELECT o.attributed_partner_id AS pid, pa.display_name, COUNT(*)::int AS delivered, COALESCE(SUM(o.payable_minor),0)::text AS sales
       FROM orders o JOIN partners pa ON pa.id=o.attributed_partner_id

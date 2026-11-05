@@ -298,3 +298,30 @@ describe('P0B: optional LLM routing (fake client, no network)', () => {
     await t.db.query(`UPDATE feature_flags SET enabled=false WHERE key='ai.business.llm'`);
   });
 });
+
+describe('contest rank from the official board', () => {
+  it('partner sees own place (A: 2 delivered → 1st of 2), never the others’ numbers', async () => {
+    await t.db.query(`INSERT INTO contests (title, starts_at, ends_at, metric, min_delivered) VALUES ('Test konkurs', now() - interval '1 day', now() + interval '10 days', 'delivered_orders', 1)`);
+    const r = await ask(A, 'Konkursda nechanchi o‘rindaman?');
+    expect(r.json.result.tool).toBe('partner_contest_status');
+    expect(r.json.result.facts.find((f: any) => f.id === 'best_rank').value).toBe('1-o‘rin / 2');
+    const b = await ask(B, 'Konkursda nechanchi o‘rindaman?');
+    expect(b.json.result.facts.find((f: any) => f.id === 'best_rank').value).toBe('2-o‘rin / 2');
+    expect(JSON.stringify(b.json)).not.toContain(A.partnerId);
+  });
+});
+
+describe('CSV export of a stored report', () => {
+  it('same numbers as the screen, metadata included, re-authorised, flag-gated', async () => {
+    const r = await ask(A, 'Bugun qancha pul topdim?');
+    const csv = await api(t, 'GET', `/ai/biz/reports/${r.json.report_id}/export.csv`, { token: A.token });
+    expect(csv.status).toBe(200);
+    const text = csv.raw.body;
+    expect(String(text)).toContain('Topgan pulingiz,40000,so‘m');
+    expect(String(text)).toContain('Asia/Tashkent');
+    expect((await api(t, 'GET', `/ai/biz/reports/${r.json.report_id}/export.csv`, { token: B.token })).status).toBe(404);
+    await t.db.query(`UPDATE feature_flags SET enabled=false WHERE key='ai.business.export'`);
+    expect((await api(t, 'GET', `/ai/biz/reports/${r.json.report_id}/export.csv`, { token: A.token })).status).toBe(403);
+    await t.db.query(`UPDATE feature_flags SET enabled=true WHERE key='ai.business.export'`);
+  });
+});

@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
-import { api, som } from '@/lib/api';
+import { api, getToken, som } from '@/lib/api';
 import { errText } from '@/lib/errors';
 
 /**
@@ -46,9 +46,15 @@ function cell(col: string, v: string | number): string {
 }
 const ICON: Record<string, string> = { ok: '✓', zero: '0', partial: '…', forbidden: '🔒', unsupported: '?', unknown: '—' };
 
-function AnswerCard({ c }: { c: Card }) {
+function AnswerCard({ c, canExport }: { c: Card; canExport?: boolean }) {
   const [sent, setSent] = useState(false);
   const r = c.result;
+  const csv = async () => {
+    if (!c.report_id) return;
+    const res = await fetch(`/api/v1/ai/biz/reports/${c.report_id}/export.csv`, { headers: { 'x-session-token': getToken() ?? '' } });
+    if (!res.ok) return;
+    const a = document.createElement('a'); a.href = URL.createObjectURL(await res.blob()); a.download = `uzshop-ai-${c.report_id.slice(0, 8)}.csv`; a.click(); URL.revokeObjectURL(a.href);
+  };
   const fb = async (verdict: 'correct' | 'wrong') => { if (!c.report_id || sent) return; try { await api('/ai/biz/feedback', { method: 'POST', body: { report_id: c.report_id, verdict } }); setSent(true); } catch { /* ignore */ } };
   // No report (refusal / not understood): one short line, nothing else.
   if (!r) return <article className={`ai-card ai-c-${c.status}`}><p className="ai-sum"><span className="ai-ic" aria-hidden>{ICON[c.status] ?? '•'}</span>{c.summary}</p></article>;
@@ -104,6 +110,7 @@ function AnswerCard({ c }: { c: Card }) {
       </details>
       <div className="ai-foot">
         {r.open && <Link className="ai-open" href={r.open.href}>{r.open.label} ›</Link>}
+        {c.report_id && canExport && <button className="ai-csv" onClick={csv} aria-label="CSV yuklab olish">⬇ CSV</button>}
         {c.report_id && <span className="ai-fb">{sent ? <small className="muted">Rahmat</small> : <><button aria-label="To‘g‘ri" onClick={() => fb('correct')}>👍</button><button aria-label="Xato haqida xabar" onClick={() => fb('wrong')}>👎</button></>}</span>}
       </div>
     </article>
@@ -158,7 +165,7 @@ export function AiChat({ defaultWorkspace }: { defaultWorkspace?: string }) {
         {msgs.map((m, i) => m.role === 'user' ? <div key={i} className="ai-u">{m.text}</div>
           : m.role === 'error' ? <div key={i} className="notice" role="alert">{m.text}</div>
           : <div key={i}>
-              <AnswerCard c={m.card} />
+              <AnswerCard c={m.card} canExport={!!cap.export} />
               {m.card.suggestions && <div className="ai-sugg">{m.card.suggestions.map((q) => <button key={q} className="ai-q sm" onClick={() => ask(q)}>{q}</button>)}</div>}
             </div>)}
         {busy && <div className="ai-wait" role="status"><span className="spinner" aria-hidden />Hisobot olinmoqda…</div>}

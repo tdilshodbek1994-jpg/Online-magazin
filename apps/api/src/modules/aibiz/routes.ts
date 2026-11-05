@@ -210,7 +210,7 @@ export function registerAiBiz(app: FastifyInstance, deps: Deps): void {
         workspace: pr.workspace, workspace_label: WS_LABEL[pr.workspace], available: pr.available.map((w) => ({ key: w, label: WS_LABEL[w] })), connected: allowedTools(pr).length > 0,
         tools: allowedTools(pr), quick_questions: quickFor(pr),
         llm: { enabled: llmOn, note: llmOn ? 'Erkin savollarni AI tushunadi; raqamlar faqat hisobotlardan.' : 'Savollar tayyor qoidalar bilan tushuniladi (tashqi AI o‘chiq).' },
-        voice: false, export: false, actions: false, timezone: 'Asia/Tashkent',
+        voice: false, export: !!(await maybeOne<{ enabled: boolean }>(db, `SELECT enabled FROM feature_flags WHERE key='ai.business.export'`))?.enabled, actions: false, timezone: 'Asia/Tashkent',
       };
     });
 
@@ -333,6 +333,32 @@ export function registerAiBiz(app: FastifyInstance, deps: Deps): void {
       try { pr = await principal(db, actor, r.workspace); } catch { throw notFound('AI_REPORT'); }
       if (pr.scopeHash !== r.scope_hash) throw notFound('AI_REPORT');
       return card({ id: r.id, as_of: r.as_of }, r.result.status, summarize(r.result), r.result, pr, null);
+    });
+
+  // CSV of a stored report revision: same facts as the screen, re-authorised at download, formula-safe cells.
+  route(app, deps, { method: 'GET', url: '/ai/biz/reports/:id/export.csv', tags: ['ai-biz'], summary: 'Download a stored report revision as CSV (same numbers as the screen)', params: zIdParam },
+    async ({ actor, db, params, reply }) => {
+      requireUser(actor);
+      const flag = await maybeOne<{ enabled: boolean }>(db, `SELECT enabled FROM feature_flags WHERE key='ai.business.export'`);
+      if (!flag?.enabled) throw new AppError(403, 'AI_EXPORT_DISABLED');
+      const r = await maybeOne<{ id: string; workspace: string; scope_hash: string; result: ToolResult; as_of: string }>(db, `SELECT id, workspace, scope_hash, result, as_of FROM ai_report_snapshots WHERE id=$1 AND user_id=$2`, [params.id, actor.userId]);
+      if (!r) throw notFound('AI_REPORT');
+      let pr: Principal;
+      try { pr = await principal(db, actor, r.workspace); } catch { throw notFound('AI_REPORT'); }
+      if (pr.scopeHash !== r.scope_hash) throw notFound('AI_REPORT');
+      const x = r.result;
+      const esc = (v: unknown) => { const s = String(v ?? '').replace(/^([=+\-@\t\r])/, "'$1"); return /[",\n;]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+      const val = (f: { value: string | number | null; unit: string }) => (f.unit === 'som' && f.value !== null ? (Number(BigInt(String(f.value)) / 100n)).toString() : String(f.value ?? ''));
+      const unitName: Record<string, string> = { som: 'so‘m', orders: 'buyurtma', units: 'dona', coins: 'coin', percent: '%', count: 'ta', text: '', date: 'sana' };
+      const lines: string[][] = [
+        ['Hisobot', x.title], ['Ko‘rsatkich', `${x.metric} v${x.metric_version}`], ['Davr', x.period ? `${x.period.label} [${x.period.from}, ${x.period.to_exclusive}) ${x.period.timezone}` : 'hozirgi holat'],
+        ['Filtr', x.filters ? Object.entries(x.filters).map(([k, v]) => `${k}=${v}`).join('; ') : '—'], ['Qamrov', SCOPE_LABEL[pr.workspace]], ['Holat vaqti', new Date(r.as_of).toISOString()],
+        ['Hisobot ID', r.id], ['Natija holati', x.status], ['Hisoblash usuli', x.method], ...x.partial_reasons.map((p) => ['Cheklov', p]), [],
+        ['Ko‘rsatkich', 'Qiymat', 'Birlik', 'Turi'], ...x.facts.map((f) => [f.label, val(f), unitName[f.unit] ?? f.unit, f.kind === 'computed' ? 'hisoblangan' : 'kuzatilgan']),
+      ];
+      if (x.table?.rows.length) lines.push([], x.table.columns, ...x.table.rows.map((row) => row.cells.map((c, i) => (/Komissiya/.test(x.table!.columns[i]!) ? (Number(BigInt(String(c)) / 100n)).toString() : String(c)))));
+      reply.header('content-type', 'text/csv; charset=utf-8').header('content-disposition', `attachment; filename="uzshop-ai-${r.id.slice(0, 8)}.csv"`);
+      return '\ufeff' + lines.map((l) => l.map(esc).join(',')).join('\n');
     });
 
   route(app, deps, { method: 'GET', url: '/ai/biz/sessions', tags: ['ai-biz'], summary: 'My chats in the current workspace', query: z.object({ workspace: z.string().max(20).optional() }) },

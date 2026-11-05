@@ -42,19 +42,23 @@ function MarketCard({ p, onCreated }: { p: any; onCreated: () => void }) {
       <div className="mcard-body">
         <h3><Link href={`/p/${p.slug}`}>{name}</Link></h3>
         {p.brand && <div className="pbrand">{p.brand}</div>}
-        <div className="mstats">
-          <div><span>Narx</span><b>{som(p.price_minor)}</b></div>
-          <div className="earn"><span>Siz olasiz</span><b>{p.payout_minor ? som(p.payout_minor) : '—'}</b></div>
-          <div><span>Qabul / Yetkazish</span><b>{p.accept_rate_pct ?? '—'}{p.accept_rate_pct !== null ? '%' : ''} / {p.delivery_rate_pct ?? '—'}{p.delivery_rate_pct !== null ? '%' : ''}</b></div>
-          <div><span>Zaxira</span><b className={p.stock > 5 ? 'ok-t' : 'no-t'}>{p.stock} ta</b></div>
+        <div className="mprice">
+          <div><b className="mprice-v">{som(p.price_minor)}</b>{p.compare_at_minor && <s className="muted small">{som(p.compare_at_minor)}</s>}</div>
+          <div className="mearn"><span>Sizga</span><b>{p.payout_minor ? som(p.payout_minor) : '—'}</b></div>
         </div>
-        <div className="mship">⏱ O‘rtacha jo‘natish: <b>{duration(p.avg_ship_seconds)}</b> <span className="muted">· 30 kunda {p.orders_30d} buyurtma</span></div>
+        <div className="mfacts">
+          <span className={p.stock > 5 ? 'ok' : p.stock > 0 ? 'warn' : 'no'}>📦 Omborda {p.stock} ta</span>
+          <span>🛒 Oxirgi 30 kunda {p.orders_30d} ta buyurtma</span>
+          {p.accept_rate_pct !== null && <span>✅ Tasdiqlangan {p.accept_rate_pct}%</span>}
+          {p.delivery_rate_pct !== null && <span>🚚 Yetkazilgan {p.delivery_rate_pct}%</span>}
+          {p.avg_ship_seconds ? <span>⏱ Jo‘natishgacha ~{duration(p.avg_ship_seconds)}</span> : null}
+        </div>
         {streamUrl ? (
           <>
-            <div className="muted small">Sizning oqimingiz:</div>
+            <div className="mlink-h">🔗 Sizning havolangiz</div>
             <LinkBox url={streamUrl} shareText={`${name} — ${som(p.price_minor)}`} />
             <div className="row" style={{ gap: 8, marginTop: 8 }}>
-              <button type="button" className="btn secondary sm" onClick={async () => { if (await copyText(postText(name, som(p.price_minor), streamUrl))) { setPostCopied(true); setTimeout(() => setPostCopied(false), 1500); } }}>{postCopied ? 'Post nusxalandi ✓' : '👉 Post matnini nusxalash'}</button>
+              <button type="button" className="btn secondary sm full" onClick={async () => { if (await copyText(postText(name, som(p.price_minor), streamUrl))) { setPostCopied(true); setTimeout(() => setPostCopied(false), 1500); } }}>{postCopied ? 'Post nusxalandi ✓' : '👉 Post matnini nusxalash'}</button>
             </div>
           </>
         ) : open ? (

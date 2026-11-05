@@ -1701,3 +1701,16 @@ img.t3-ava { object-fit: cover; display: block; }
 .lvl-lock { background: var(--surface); border: 1px solid var(--border); }
 .t3-ava.xs { width: 30px; height: 30px; flex: none; border-width: 1px; }
 .pod-rest li { grid-template-columns: 40px 30px minmax(0, 1fr) auto; }
+/* Partner market card — tidy price/facts */
+.mprice { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin: 6px 0; }
+.mprice > div:first-child { display: grid; }
+.mprice-v { font-size: 20px; }
+.mearn { display: grid; justify-items: end; padding: 6px 12px; border-radius: 12px; background: var(--primary-50); }
+.mearn span { font-size: 11px; color: var(--muted); }
+.mearn b { color: var(--primary-600); font-size: 17px; white-space: nowrap; }
+.mfacts { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 10px; }
+.mfacts span { font-size: 12px; padding: 4px 8px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--border); }
+.mfacts span.ok { color: var(--primary-600); }
+.mfacts span.warn { color: #b45309; }
+.mfacts span.no { color: var(--danger, #b42318); }
+.mlink-h { font-size: 13px; font-weight: 700; margin-top: 4px; }

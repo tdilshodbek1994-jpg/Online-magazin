@@ -1,0 +1,30 @@
+# STAGING/DEMO for {$OM_DOMAIN}: whole site behind HTTP basic auth (demo data + on-screen dev OTP must not be public).
+# Payment-provider callbacks stay reachable without the password (they authenticate themselves).
+{$OM_DOMAIN} {
+	encode zstd gzip
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Robots-Tag "noindex, nofollow"
+		X-Content-Type-Options "nosniff"
+	}
+	@webhooks path /api/v1/webhooks/*
+	handle @webhooks {
+		reverse_proxy om-api:4000
+	}
+	handle {
+		basic_auth {
+			{$OM_STAGE_USER} {$OM_STAGE_HASH}
+		}
+		@api path /api/* /media/* /health/*
+		handle @api {
+			reverse_proxy om-api:4000
+		}
+		handle {
+			reverse_proxy om-web:3000
+		}
+	}
+}
+
+www.{$OM_DOMAIN} {
+	redir https://{$OM_DOMAIN}{uri} permanent
+}

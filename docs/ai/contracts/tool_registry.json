@@ -1,0 +1,1411 @@
+{
+  "schema_version": "1.0",
+  "note": "Tool names are contracts, not implementations. No LLM-provided role/partner IDs. Admin target selection needs a separate authorized subject resolver. Metric registry allowlist still applies to broad enums.",
+  "tools": [
+    {
+      "name": "partner_earnings_summary",
+      "purpose_cyrl": "Комиссия, payout ёки рекламадан кейинги натижа; partner ID сервердан",
+      "phase": "P0",
+      "risk": "read",
+      "allowed_roles": [
+        "partner",
+        "admin",
+        "superadmin"
+      ],
+      "required_permission": "partner.analytics.read",
+      "scope": "server authorization context",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "date_from": {
+            "type": "string",
+            "format": "date"
+          },
+          "date_to_exclusive": {
+            "type": "string",
+            "format": "date"
+          },
+          "timezone": {
+            "type": "string",
+            "description": "validated IANA zone authorized for this report"
+          },
+          "metric": {
+            "type": "string",
+            "enum": [
+              "commission_recognized_net",
+              "payout_paid",
+              "partner_after_ad_result"
+            ]
+          },
+          "flow_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "date_from",
+          "date_to_exclusive",
+          "metric"
+        ],
+        "additionalProperties": false
+      },
+      "server_injected": [
+        "actor_id",
+        "active_workspace",
+        "effective_grants",
+        "authorized_scope",
+        "policy_revision"
+      ],
+      "output_fields": [
+        "status",
+        "facts",
+        "evidence_refs",
+        "as_of",
+        "source_watermarks",
+        "scope_hash",
+        "metric_version",
+        "partial_reasons",
+        "next_cursor"
+      ],
+      "guards": [
+        "auth before tool",
+        "column mask before model",
+        "bounded query",
+        "idempotency for side effects",
+        "current permissions before rendering"
+      ],
+      "implemented": false
+    },
+    {
+      "name": "partner_orders_search",
+      "purpose_cyrl": "Фақат рухсатли буюртмалар, safe drilldown",
+      "phase": "P0",
+      "risk": "read",
+      "allowed_roles": [
+        "partner",
+        "admin",
+        "superadmin"
+      ],
+      "required_permission": "partner.orders.read",
+      "scope": "server authorization context",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "date_from": {
+            "type": "string",
+            "format": "date"
+          },
+          "date_to_exclusive": {
+            "type": "string",
+            "format": "date"
+          },
+          "timezone": {
+            "type": "string",
+            "description": "validated IANA zone authorized for this report"
+          },
+          "date_basis": {
+            "type": "string",
+            "enum": [
+              "created_at",
+              "rejected_event_at",
+              "delivered_event_at"
+            ]
+          },
+          "status": {
+            "type": "string"
+          },
+          "order_id": {
+            "type": "string"
+          },
+          "flow_id": {
+            "type": "string"
+          },
+          "cursor": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          }
+        },
+        "required": [
+          "date_from",
+          "date_to_exclusive",
+          "date_basis"
+        ],
+        "additionalProperties": false
+      },
+      "server_injected": [
+        "actor_id",
+        "active_workspace",
+        "effective_grants",
+        "authorized_scope",
+        "policy_revision"
+      ],
+      "output_fields": [
+        "status",
+        "facts",
+        "evidence_refs",
+        "as_of",
+        "source_watermarks",
+        "scope_hash",
+        "metric_version",
+        "partial_reasons",
+        "next_cursor"
+      ],
+      "guards": [
+        "auth before tool",
+        "column mask before model",
+        "bounded query",
+        "idempotency for side effects",
+        "current permissions before rendering"
+      ],
+      "implemented": false
+    },
+    {
+      "name": "partner_flows_performance",
+      "purpose_cyrl": "Оқимлар статистикаси, сарф ва натижа",
+      "phase": "P0",
+      "risk": "read",
+      "allowed_roles": [
+        "partner",
+        "admin",
+        "superadmin"
+      ],
+      "required_permission": "partner.analytics.read",
+      "scope": "server authorization context",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "date_from": {
+            "type": "string",
+            "format": "date"
+          },
+          "date_to_exclusive": {
+            "type": "string",
+            "format": "date"
+          },
+          "timezone": {
+            "type": "string",
+            "description": "validated IANA zone authorized for this report"
+          },
+          "flow_id": {
+            "type": "string"
+          },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "all",
+              "telegram",
+              "instagram",
+              "facebook",
+              "other",
+              "unassigned"
+            ]
+          }
+        },
+        "required": [
+          "date_from",
+          "date_to_exclusive"
+        ],
+        "additionalProperties": false
+      },
+      "server_injected": [
+        "actor_id",
+        "active_workspace",
+        "effective_grants",
+        "authorized_scope",
+        "policy_revision"
+      ],
+      "output_fields": [
+        "status",
+        "facts",
+        "evidence_refs",
+        "as_of",
+        "source_watermarks",
+        "scope_hash",
+        "metric_version",
+        "partial_reasons",
+        "next_cursor"
+      ],
+      "guards": [
+        "auth before tool",
+        "column mask before model",
+        "bounded query",
+        "idempotency for side effects",
+        "current permissions before rendering"
+      ],
+      "implemented": false
+    },
+    {
+      "name": "partner_best_day",
+      "purpose_cyrl": "Энг даромадли маҳаллий кун, ties ва coverage",
+      "phase": "P0",
+      "risk": "read",
+      "allowed_roles": [
+        "partner",
+        "admin",
+        "superadmin"
+      ],
+      "required_permission": "partner.analytics.read",
+      "scope": "server authorization context",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "year": {
+            "type": "integer",
+            "minimum": 2000,
+            "maximum": 2100
+          },
+          "metric": {
+            "type": "string",
+            "enum": [
+              "commission_recognized_net",
+              "partner_after_ad_result"
+            ]
+          }
+        },
+        "required": [
+          "year",
+          "metric"
+        ],
+        "additionalProperties": false
+      },
+      "server_injected": [
+        "actor_id",
+        "active_workspace",
+        "effective_grants",
+        "authorized_scope",
+        "policy_revision"
+      ],
+      "output_fields": [
+        "status",
+        "facts",
+        "evidence_refs",
+        "as_of",
+        "source_watermarks",
+        "scope_hash",
+        "metric_version",
+        "partial_reasons",
+        "next_cursor"
+      ],
+      "guards": [
+        "auth before tool",
+        "column mask before model",
+        "bounded query",
+        "idempotency for side effects",
+        "current permissions before rendering"
+      ],
+      "implemented": false
+    },
+    {
+      "name": "partner_wallet_snapshot",
+      "purpose_cyrl": "Шахсий cash balance ва held/pending; actor контексти",
+      "phase": "P0",
+      "risk": "read",
+      "allowed_roles": [
+        "partner",
+        "admin",
+        "superadmin"
+      ],
+      "required_permission": "wallet.self.read",
+      "scope": "server authorization context",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "server_injected": [
+        "actor_id",
+        "active_workspace",
+        "effective_grants",
+        "authorized_scope",
+        "policy_revision"
+      ],
+      "output_fields": [
+        "status",
+        "facts",
+        "evidence_refs",
+        "as_of",
+        "source_watermarks",
+        "scope_hash",
+        "metric_version",
+        "partial_reasons",
+        "next_cursor"
+      ],
+      "guards": [
+        "auth before tool",
+        "column mask before model",
+        "bounded query",
+        "idempotency for side effects",
+        "current permissions before rendering"
+      ],
+      "implemented": false
+    },
+    {
+      "name": "partner_uzcoin_summary",
+      "purpose_cyrl": "UzCoin balance ва cash equivalent, payoutдан алоҳида",
+      "phase": "P0",
+      "risk": "read",
+      "allowed_roles": [
+        "partner",
+        "admin",
+        "superadmin"
+      ],
+      "required_permission": "uzcoin.self.read",
+      "scope": "server authorization context",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "server_injected": [
+        "actor_id",
+        "active_workspace",
+        "effective_grants",
+        "authorized_scope",
+        "policy_revision"
+      ],
+      "output_fields": [
+        "status",
+        "facts",
+        "evidence_refs",
+        "as_of",
+        "source_watermarks",
+        "scope_hash",
+        "metric_version",
+        "partial_reasons",
+        "next_cursor"
+      ],
+      "guards": [
+        "auth before tool",
+        "column mask before model",
+        "bounded query",
+        "idempotency for side effects",
+        "current permissions before rendering"
+      ],
+      "implemented": false
+    },
+    {
+      "name": "partner_contest_status",
+      "purpose_cyrl": "Қоида, рейтинг ва мукофот мақоми",
+      "phase": "P0",
+      "risk": "read",
+      "allowed_roles": [
+        "partner",
+        "admin",
+        "superadmin"
+      ],
+      "required_permission": "contests.self.read",
+      "scope": "server authorization context",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "contest_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "contest_id"
+        ],
+        "additionalProperties": false
+      },
+      "server_injected": [
+        "actor_id",
+        "active_workspace",
+        "effective_grants",
+        "authorized_scope",
+        "policy_revision"
+      ],
+      "output_fields": [
+        "status",
+        "facts",
+        "evidence_refs",
+        "as_of",
+        "source_watermarks",
+        "scope_hash",
+        "metric_version",
+        "partial_reasons",
+        "next_cursor"
+      ],
+      "guards": [
+        "auth before tool",
+        "column mask before model",
+        "bounded query",
+        "idempotency for side effects",
+        "current permissions before rendering"
+      ],
+      "implemented": false
+    },
+    {
+      "name": "partner_charity_summary",
+      "purpose_cyrl": "Ажратилган ва ҳақиқатан топширилган маблағ",
+      "phase": "P0",
+      "risk": "read",
+      "allowed_roles": [
+        "partner",
+        "admin",
+        "superadmin"
+      ],
+      "required_permission": "charity.self.read",
+      "scope": "server authorization context",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "date_from": {
+            "type": "string",
+            "format": "date"
+          },
+          "date_to_exclusive": {
+            "type": "string",
+            "format": "date"
+          },
+          "timezone": {
+            "type": "string",
+            "description": "validated IANA zone authorized for this report"
+          }
+        },
+        "required": [
+          "date_from",
+          "date_to_exclusive"
+        ],
+        "additionalProperties": false
+      },
+      "server_injected": [
+        "actor_id",
+        "active_workspace",
+        "effective_grants",
+        "authorized_scope",
+        "policy_revision"
+      ],
+      "output_fields": [
+        "status",
+        "facts",
+        "evidence_refs",
+        "as_of",
+        "source_watermarks",
+        "scope_hash",
+        "metric_version",
+        "partial_reasons",
+        "next_cursor"
+      ],
+      "guards": [
+        "auth before tool",
+        "column mask before model",
+        "bounded query",
+        "idempotency for side effects",
+        "current permissions before rendering"
+      ],
+      "implemented": false
+    },
+    {
+      "name": "partner_quality_cases",
+      "purpose_cyrl": "Ўз огоҳлантириш/низо ҳолатлари; automatic penalty йўқ",
+      "phase": "P0",
+      "risk": "read",
+      "allowed_roles": [
+        "partner",
+        "admin",
+        "superadmin"
+      ],
+      "required_permission": "quality.self.read",
+      "scope": "server authorization context",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "cursor": {
+            "type": "string"
+          },
+          "case_id": {
+            "type": "string"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "server_injected": [
+        "actor_id",
+        "active_workspace",
+        "effective_grants",
+        "authorized_scope",
+        "policy_revision"
+      ],
+      "output_fields": [
+        "status",
+        "facts",
+        "evidence_refs",
+        "as_of",
+        "source_watermarks",
+        "scope_hash",
+        "metric_version",
+        "partial_reasons",
+        "next_cursor"
+      ],
+      "guards": [
+        "auth before tool",
+        "column mask before model",
+        "bounded query",
+        "idempotency for side effects",
+        "current permissions before rendering"
+      ],
+      "implemented": false
+    },
+    {
+      "name": "public_bestsellers",
+      "purpose_cyrl": "Фақат published product aggregates; arbitrary partner filter йўқ",
+      "phase": "P0",
+      "risk": "read",
+      "allowed_roles": [
+        "partner",
+        "operator",
+        "operator_lead",
+        "admin",
+        "superadmin"
+      ],
+      "required_permission": "catalog.bestsellers.read",
+      "scope": "approved public aggregate, not private order table",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "period": {
+            "type": "string",
+            "enum": [
+              "yesterday",
+              "previous_week",
+              "previous_month"
+            ]
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20
+          }
+        },
+        "required": [
+          "period"
+        ],
+        "additionalProperties": false
+      },
+      "server_injected": [
+        "actor_id",
+        "active_workspace",
+        "effective_grants",
+        "authorized_scope",
+        "policy_revision"
+      ],
+      "output_fields": [
+        "status",
+        "facts",
+        "evidence_refs",
+        "as_of",
+        "source_watermarks",
+        "scope_hash",
+        "metric_version",
+        "partial_reasons",
+        "next_cursor"
+      ],
+      "guards": [
+        "auth before tool",
+        "column mask before model",
+        "bounded query",
+        "idempotency for side effects",
+        "current permissions before rendering"
+      ],
+      "implemented": false
+    },
+    {
+      "name": "operator_work_queue",
+      "purpose_cyrl": "Жорий бириктирилган ишлар ва қоидага асосланган навбат",
+      "phase": "P0",
+      "risk": "read",
+      "allowed_roles": [
+        "operator",
+        "operator_lead",
+        "admin",
+        "superadmin"
+      ],
+      "required_permission": "orders.assigned.read",
+      "scope": "server authorization context",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "queue": {
+            "type": "string",
+            "enum": [
+              "today",
+              "overdue_callback",
+              "awaiting_confirmation",
+              "no_answer_three"
+            ]
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          }
+        },
+        "required": [
+          "queue"
+        ],
+        "additionalProperties": false
+      },
+      "server_injected": [
+        "actor_id",
+        "active_workspace",
+        "effective_grants",
+        "authorized_scope",
+        "policy_revision"
+      ],
+      "output_fields": [
+        "status",
+        "facts",
+        "evidence_refs",
+        "as_of",
+        "source_watermarks",
+        "scope_hash",
+        "metric_version",
+        "partial_reasons",
+        "next_cursor"
+      ],
+      "guards": [
+        "auth before tool",
+        "column mask before model",
+        "bounded query",
+        "idempotency for side effects",
+        "current permissions before rendering"
+      ],
+      "implemented": false
+    },
+    {
+      "name": "operator_activity_summary",
+      "purpose_cyrl": "Ўз ёки рухсатли оператор амаллари; historical PII йўқ",
+      "phase": "P0",
+      "risk": "read",
+      "allowed_roles": [
+        "operator",
+        "operator_lead",
+        "admin",
+        "superadmin"
+      ],
+      "required_permission": "operator.activity.read",
+      "scope": "server authorization context",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "date_from": {
+            "type": "string",
+            "format": "date"
+          },
+          "date_to_exclusive": {
+            "type": "string",
+            "format": "date"
+          },
+          "timezone": {
+            "type": "string",
+            "description": "validated IANA zone authorized for this report"
+          },
+          "metric": {
+            "type": "string",
+            "enum": [
+              "orders_accepted_event",
+              "orders_rejected_event",
+              "operator_no_answer_attempts"
+            ]
+          }
+        },
+        "required": [
+          "date_from",
+          "date_to_exclusive",
+          "metric"
+        ],
+        "additionalProperties": false
+      },
+      "server_injected": [
+        "actor_id",
+        "active_workspace",
+        "effective_grants",
+        "authorized_scope",
+        "policy_revision"
+      ],
+      "output_fields": [
+        "status",
+        "facts",
+        "evidence_refs",
+        "as_of",
+        "source_watermarks",
+        "scope_hash",
+        "metric_version",
+        "partial_reasons",
+        "next_cursor"
+      ],
+      "guards": [
+        "auth before tool",
+        "column mask before model",
+        "bounded query",
+        "idempotency for side effects",
+        "current permissions before rendering"
+      ],
+      "implemented": false
+    },
+    {
+      "name": "team_performance",
+      "purpose_cyrl": "Ваколатли жамоани temporal membership билан таҳлил қилиш",
+      "phase": "P0",
+      "risk": "read",
+      "allowed_roles": [
+        "operator_lead",
+        "admin",
+        "superadmin"
+      ],
+      "required_permission": "team.analytics.read",
+      "scope": "server authorization context",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "date_from": {
+            "type": "string",
+            "format": "date"
+          },
+          "date_to_exclusive": {
+            "type": "string",
+            "format": "date"
+          },
+          "timezone": {
+            "type": "string",
+            "description": "validated IANA zone authorized for this report"
+          },
+          "team_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "date_from",
+          "date_to_exclusive",
+          "team_id"
+        ],
+        "additionalProperties": false
+      },
+      "server_injected": [
+        "actor_id",
+        "active_workspace",
+        "effective_grants",
+        "authorized_scope",
+        "policy_revision"
+      ],
+      "output_fields": [
+        "status",
+        "facts",
+        "evidence_refs",
+        "as_of",
+        "source_watermarks",
+        "scope_hash",
+        "metric_version",
+        "partial_reasons",
+        "next_cursor"
+      ],
+      "guards": [
+        "auth before tool",
+        "column mask before model",
+        "bounded query",
+        "idempotency for side effects",
+        "current permissions before rendering"
+      ],
+      "implemented": false
+    },
+    {
+      "name": "admin_sales_summary",
+      "purpose_cyrl": "Grantга мос sales metrics; semantic registry per-role whitelist",
+      "phase": "P0",
+      "risk": "read",
+      "allowed_roles": [
+        "admin",
+        "superadmin"
+      ],
+      "required_permission": "sales.analytics.read",
+      "scope": "server authorization context",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "date_from": {
+            "type": "string",
+            "format": "date"
+          },
+          "date_to_exclusive": {
+            "type": "string",
+            "format": "date"
+          },
+          "timezone": {
+            "type": "string",
+            "description": "validated IANA zone authorized for this report"
+          },
+          "product_id": {
+            "type": "string"
+          },
+          "region_id": {
+            "type": "string"
+          },
+          "metric": {
+            "type": "string",
+            "enum": [
+              "orders_created",
+              "orders_accepted_event",
+              "orders_rejected_event",
+              "orders_cancelled_event",
+              "orders_delivered",
+              "units_delivered_net",
+              "units_returned",
+              "cohort_acceptance_rate",
+              "finalized_delivery_rate"
+            ]
+          }
+        },
+        "required": [
+          "date_from",
+          "date_to_exclusive",
+          "metric"
+        ],
+        "additionalProperties": false
+      },
+      "server_injected": [
+        "actor_id",
+        "active_workspace",
+        "effective_grants",
+        "authorized_scope",
+        "policy_revision"
+      ],
+      "output_fields": [
+        "status",
+        "facts",
+        "evidence_refs",
+        "as_of",
+        "source_watermarks",
+        "scope_hash",
+        "metric_version",
+        "partial_reasons",
+        "next_cursor"
+      ],
+      "guards": [
+        "auth before tool",
+        "column mask before model",
+        "bounded query",
+        "idempotency for side effects",
+        "current permissions before rendering"
+      ],
+      "implemented": false
+    },
+    {
+      "name": "admin_financial_summary",
+      "purpose_cyrl": "Ҳисоб сиёсатидан молиявий натижа ва тўлиқлик",
+      "phase": "P0",
+      "risk": "read",
+      "allowed_roles": [
+        "admin",
+        "superadmin"
+      ],
+      "required_permission": "finance.analytics.read",
+      "scope": "server authorization context",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "date_from": {
+            "type": "string",
+            "format": "date"
+          },
+          "date_to_exclusive": {
+            "type": "string",
+            "format": "date"
+          },
+          "timezone": {
+            "type": "string",
+            "description": "validated IANA zone authorized for this report"
+          },
+          "metric": {
+            "type": "string",
+            "enum": [
+              "revenue_recognized_net",
+              "cogs_recognized",
+              "store_result_provisional",
+              "cash_collected",
+              "cash_remitted",
+              "reward_expense_recognized"
+            ]
+          }
+        },
+        "required": [
+          "date_from",
+          "date_to_exclusive",
+          "metric"
+        ],
+        "additionalProperties": false
+      },
+      "server_injected": [
+        "actor_id",
+        "active_workspace",
+        "effective_grants",
+        "authorized_scope",
+        "policy_revision"
+      ],
+      "output_fields": [
+        "status",
+        "facts",
+        "evidence_refs",
+        "as_of",
+        "source_watermarks",
+        "scope_hash",
+        "metric_version",
+        "partial_reasons",
+        "next_cursor"
+      ],
+      "guards": [
+        "auth before tool",
+        "column mask before model",
+        "bounded query",
+        "idempotency for side effects",
+        "current permissions before rendering"
+      ],
+      "implemented": false
+    },
+    {
+      "name": "admin_ad_performance",
+      "purpose_cyrl": "Сарф, атрибуция ва source freshness",
+      "phase": "P0",
+      "risk": "read",
+      "allowed_roles": [
+        "admin",
+        "superadmin"
+      ],
+      "required_permission": "marketing.analytics.read",
+      "scope": "server authorization context",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "date_from": {
+            "type": "string",
+            "format": "date"
+          },
+          "date_to_exclusive": {
+            "type": "string",
+            "format": "date"
+          },
+          "timezone": {
+            "type": "string",
+            "description": "validated IANA zone authorized for this report"
+          },
+          "campaign_id": {
+            "type": "string"
+          },
+          "payer_type": {
+            "type": "string",
+            "enum": [
+              "store",
+              "partner"
+            ]
+          }
+        },
+        "required": [
+          "date_from",
+          "date_to_exclusive"
+        ],
+        "additionalProperties": false
+      },
+      "server_injected": [
+        "actor_id",
+        "active_workspace",
+        "effective_grants",
+        "authorized_scope",
+        "policy_revision"
+      ],
+      "output_fields": [
+        "status",
+        "facts",
+        "evidence_refs",
+        "as_of",
+        "source_watermarks",
+        "scope_hash",
+        "metric_version",
+        "partial_reasons",
+        "next_cursor"
+      ],
+      "guards": [
+        "auth before tool",
+        "column mask before model",
+        "bounded query",
+        "idempotency for side effects",
+        "current permissions before rendering"
+      ],
+      "implemented": false
+    },
+    {
+      "name": "admin_inventory_summary",
+      "purpose_cyrl": "Мавжуд омбор маълумоти; forecast эмас",
+      "phase": "P0",
+      "risk": "read",
+      "allowed_roles": [
+        "admin",
+        "superadmin"
+      ],
+      "required_permission": "inventory.read",
+      "scope": "server authorization context",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "product_id": {
+            "type": "string"
+          },
+          "warehouse_id": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "available",
+              "reserved",
+              "out_of_stock"
+            ]
+          }
+        },
+        "required": [
+          "state"
+        ],
+        "additionalProperties": false
+      },
+      "server_injected": [
+        "actor_id",
+        "active_workspace",
+        "effective_grants",
+        "authorized_scope",
+        "policy_revision"
+      ],
+      "output_fields": [
+        "status",
+        "facts",
+        "evidence_refs",
+        "as_of",
+        "source_watermarks",
+        "scope_hash",
+        "metric_version",
+        "partial_reasons",
+        "next_cursor"
+      ],
+      "guards": [
+        "auth before tool",
+        "column mask before model",
+        "bounded query",
+        "idempotency for side effects",
+        "current permissions before rendering"
+      ],
+      "implemented": false
+    },
+    {
+      "name": "business_policy_search",
+      "purpose_cyrl": "ACL ва effective versionга мос тасдиқланган қоидалар",
+      "phase": "P0",
+      "risk": "read",
+      "allowed_roles": [
+        "partner",
+        "operator",
+        "operator_lead",
+        "admin",
+        "superadmin"
+      ],
+      "required_permission": "knowledge.read",
+      "scope": "server authorization context",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          },
+          "locale": {
+            "type": "string",
+            "enum": [
+              "uz-Cyrl",
+              "uz-Latn"
+            ]
+          }
+        },
+        "required": [
+          "query",
+          "locale"
+        ],
+        "additionalProperties": false
+      },
+      "server_injected": [
+        "actor_id",
+        "active_workspace",
+        "effective_grants",
+        "authorized_scope",
+        "policy_revision"
+      ],
+      "output_fields": [
+        "status",
+        "facts",
+        "evidence_refs",
+        "as_of",
+        "source_watermarks",
+        "scope_hash",
+        "metric_version",
+        "partial_reasons",
+        "next_cursor"
+      ],
+      "guards": [
+        "auth before tool",
+        "column mask before model",
+        "bounded query",
+        "idempotency for side effects",
+        "current permissions before rendering"
+      ],
+      "implemented": false
+    },
+    {
+      "name": "report_export_prepare",
+      "purpose_cyrl": "Экспорт preview; файл фақат қайта auth/тасдиқдан кейин",
+      "phase": "P1",
+      "risk": "draft",
+      "allowed_roles": [
+        "partner",
+        "operator",
+        "operator_lead",
+        "admin",
+        "superadmin"
+      ],
+      "required_permission": "reports.export",
+      "scope": "server authorization context",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "report_id": {
+            "type": "string"
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "xlsx",
+              "csv",
+              "pdf"
+            ]
+          }
+        },
+        "required": [
+          "report_id",
+          "format"
+        ],
+        "additionalProperties": false
+      },
+      "server_injected": [
+        "actor_id",
+        "active_workspace",
+        "effective_grants",
+        "authorized_scope",
+        "policy_revision"
+      ],
+      "output_fields": [
+        "status",
+        "facts",
+        "evidence_refs",
+        "as_of",
+        "source_watermarks",
+        "scope_hash",
+        "metric_version",
+        "partial_reasons",
+        "next_cursor"
+      ],
+      "guards": [
+        "auth before tool",
+        "column mask before model",
+        "bounded query",
+        "idempotency for side effects",
+        "current permissions before rendering"
+      ],
+      "implemented": false
+    },
+    {
+      "name": "assignment_preview",
+      "purpose_cyrl": "Order assignment қораламаси; ҳуқуқсиз ёзиш йўқ",
+      "phase": "P1",
+      "risk": "draft",
+      "allowed_roles": [
+        "operator_lead",
+        "admin",
+        "superadmin"
+      ],
+      "required_permission": "orders.assign",
+      "scope": "server authorization context",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "order_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "maxItems": 20,
+            "uniqueItems": true
+          },
+          "target_operator_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "order_ids",
+          "target_operator_id"
+        ],
+        "additionalProperties": false
+      },
+      "server_injected": [
+        "actor_id",
+        "active_workspace",
+        "effective_grants",
+        "authorized_scope",
+        "policy_revision"
+      ],
+      "output_fields": [
+        "status",
+        "facts",
+        "evidence_refs",
+        "as_of",
+        "source_watermarks",
+        "scope_hash",
+        "metric_version",
+        "partial_reasons",
+        "next_cursor"
+      ],
+      "guards": [
+        "auth before tool",
+        "column mask before model",
+        "bounded query",
+        "idempotency for side effects",
+        "current permissions before rendering"
+      ],
+      "implemented": false
+    },
+    {
+      "name": "callback_preview",
+      "purpose_cyrl": "Қайта қўнғироқ вазифаси preview",
+      "phase": "P1",
+      "risk": "draft",
+      "allowed_roles": [
+        "operator",
+        "operator_lead",
+        "admin",
+        "superadmin"
+      ],
+      "required_permission": "callbacks.create",
+      "scope": "server authorization context",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "order_id": {
+            "type": "string"
+          },
+          "due_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "order_id",
+          "due_at"
+        ],
+        "additionalProperties": false
+      },
+      "server_injected": [
+        "actor_id",
+        "active_workspace",
+        "effective_grants",
+        "authorized_scope",
+        "policy_revision"
+      ],
+      "output_fields": [
+        "status",
+        "facts",
+        "evidence_refs",
+        "as_of",
+        "source_watermarks",
+        "scope_hash",
+        "metric_version",
+        "partial_reasons",
+        "next_cursor"
+      ],
+      "guards": [
+        "auth before tool",
+        "column mask before model",
+        "bounded query",
+        "idempotency for side effects",
+        "current permissions before rendering"
+      ],
+      "implemented": false
+    },
+    {
+      "name": "contest_draft_prepare",
+      "purpose_cyrl": "Конкурс қораламаси; нашр/соврин ажратиш эмас",
+      "phase": "P1",
+      "risk": "draft",
+      "allowed_roles": [
+        "admin",
+        "superadmin"
+      ],
+      "required_permission": "contests.draft",
+      "scope": "server authorization context",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "starts_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "ends_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "title",
+          "starts_at",
+          "ends_at"
+        ],
+        "additionalProperties": false
+      },
+      "server_injected": [
+        "actor_id",
+        "active_workspace",
+        "effective_grants",
+        "authorized_scope",
+        "policy_revision"
+      ],
+      "output_fields": [
+        "status",
+        "facts",
+        "evidence_refs",
+        "as_of",
+        "source_watermarks",
+        "scope_hash",
+        "metric_version",
+        "partial_reasons",
+        "next_cursor"
+      ],
+      "guards": [
+        "auth before tool",
+        "column mask before model",
+        "bounded query",
+        "idempotency for side effects",
+        "current permissions before rendering"
+      ],
+      "implemented": false
+    }
+  ],
+  "command_executor": "Not exposed as an LLM tool. Existing server command endpoints require authenticated action-specific confirmation."
+}

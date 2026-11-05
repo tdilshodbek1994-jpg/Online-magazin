@@ -1,0 +1,25 @@
+action,owner,marketer,partner,operator,finance,support,scope,notes
+product_price_stock_edit,allowed,denied,denied,denied,denied,denied,catalog permission,Use existing roles; authorized product manager separate.
+landing_draft_edit,allowed,allowed,denied,denied,denied,denied,owned merchant scope,Partner chooses approved template only.
+landing_publish,allowed,propose_only,denied,denied,denied,denied,exact revision digest,Owner final publish.
+flow_create,allowed,allowed,own_only,denied,denied,denied,approved landing/products,No price/commission mutation.
+flow_analytics_read,allowed,delegated_scope,own_only,denied,finance_scope,redacted_only,server object ownership,No raw token/PII export.
+on_behalf_order_create,allowed,denied,own_customer_agreement,operator_scope,denied,denied,customer confirmation required,Actor and attribution separate.
+order_confirm,allowed,denied,denied,allowed,denied,denied,assigned orders,Independent verification.
+commission_override,finance_review,denied,denied,denied,finance_review,denied,existing ledger policy,No silent edits.
+domain_binding_create,allowed,propose_only,propose_own_only,denied,denied,denied,owner verification proof,P2 feature gate.
+domain_activate,allowed,denied,denied,denied,denied,denied,ownership + TLS,DNS/Meta statuses separate.
+meta_connection_manage,allowed,delegated_connect_only,denied,denied,denied,denied,named merchant assets,P0 one owner connection.
+secrets_read_raw,denied,denied,denied,denied,denied,denied,backend service only,UI never displays stored access token.
+campaign_draft,allowed,allowed,request_draft_only,denied,denied,denied,approved product/landing,No spend.
+campaign_preflight,allowed,allowed,denied,denied,review_read,denied,connected account,Read/validation no activation.
+campaign_approve_spend,allowed,denied,denied,denied,review_read,denied,exact account/budget/revision,Material change invalidates approval.
+campaign_activate,owner_approved_command,denied,denied,denied,denied,denied,backend validated operation,UI role alone not enough.
+campaign_pause,allowed,delegated_safety_only,denied,denied,delegated_safety_only,denied,managed IDs only,Paused only after remote confirmation.
+budget_increase_or_resume,new_owner_approval,propose_only,denied,denied,review_read,denied,new signed approval,AI denied.
+ad_expense_add,allowed,delegated_scope,own_only,denied,finance_scope,denied,payer+proof+allocation,No automatic wallet debit.
+insights_import,allowed,delegated_scope,own_authorized_P2,denied,finance_scope,denied,least privilege account,No count tripling across levels.
+experiment_publish,allowed,propose_only,denied,denied,denied,denied,reviewed hypotheses/revisions,No automatic price or attribution change.
+audit_read,allowed,delegated_redacted,own_actions_only,own_actions_only,finance_scope,redacted_only,PII minimization,Retention policy required.
+production_deploy,explicit_approval,denied,denied,denied,denied,denied,separate release approval,Package does not grant approval.
+taqvim_data_access,denied,denied,denied,denied,denied,denied,separate project,No religious-profile targeting.

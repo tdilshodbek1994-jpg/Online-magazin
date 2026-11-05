@@ -1,0 +1,23 @@
+# Online Magazin edge: automatic HTTPS (Let's Encrypt) for {$OM_DOMAIN}.
+# /api/* and /media/* go to the API, everything else to the web app. Only Caddy is exposed to the internet.
+{$OM_DOMAIN} {
+	encode zstd gzip
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		X-Frame-Options "DENY"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+	}
+	@api path /api/* /media/* /health/*
+	handle @api {
+		reverse_proxy om-api:4000
+	}
+	handle {
+		reverse_proxy om-web:3000
+	}
+}
+
+www.{$OM_DOMAIN} {
+	redir https://{$OM_DOMAIN}{uri} permanent
+}

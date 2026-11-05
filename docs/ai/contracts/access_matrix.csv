@@ -1,0 +1,73 @@
+role,resource,decision,scope,required_gate,field_policy
+customer,business_ai,deny,none,none,deny unknown fields; redact unnecessary PII; no secrets; recheck on fetch/export/execute
+customer,own_partner_analytics,deny,none,none,deny unknown fields; redact unnecessary PII; no secrets; recheck on fetch/export/execute
+customer,assigned_order_pii,deny,none,none,deny unknown fields; redact unnecessary PII; no secrets; recheck on fetch/export/execute
+customer,team_analytics,deny,none,none,deny unknown fields; redact unnecessary PII; no secrets; recheck on fetch/export/execute
+customer,shop_finance,deny,none,none,deny unknown fields; redact unnecessary PII; no secrets; recheck on fetch/export/execute
+customer,public_bestsellers,deny,none,none,deny unknown fields; redact unnecessary PII; no secrets; recheck on fetch/export/execute
+customer,contest_uzcoin_charity,deny,none,none,deny unknown fields; redact unnecessary PII; no secrets; recheck on fetch/export/execute
+customer,report_export,deny,none,none,deny unknown fields; redact unnecessary PII; no secrets; recheck on fetch/export/execute
+customer,assignment_command,deny,none,none,deny unknown fields; redact unnecessary PII; no secrets; recheck on fetch/export/execute
+customer,financial_command,deny,none,none,deny unknown fields; redact unnecessary PII; no secrets; recheck on fetch/export/execute
+customer,other_users_chats,deny,none,none,deny unknown fields; redact unnecessary PII; no secrets; recheck on fetch/export/execute
+customer,secrets,deny,none,none,deny unknown fields; redact unnecessary PII; no secrets; recheck on fetch/export/execute
+partner,business_ai,allow,active_workspace,ai.use,deny unknown fields; redact unnecessary PII; no secrets; recheck on fetch/export/execute
+partner,own_partner_analytics,allow,self_partner,partner.analytics.read,deny unknown fields; redact unnecessary PII; no secrets; recheck on fetch/export/execute
+partner,assigned_order_pii,deny,none,none,deny unknown fields; redact unnecessary PII; no secrets; recheck on fetch/export/execute
+partner,team_analytics,deny,none,none,deny unknown fields; redact unnecessary PII; no secrets; recheck on fetch/export/execute
+partner,shop_finance,deny,none,none,deny unknown fields; redact unnecessary PII; no secrets; recheck on fetch/export/execute
+partner,public_bestsellers,conditional,published_approved_aggregate_only,catalog.bestsellers.read,deny unknown fields; redact unnecessary PII; no secrets; recheck on fetch/export/execute
+partner,contest_uzcoin_charity,conditional,self_records_and_published_rules,rewards.self.read,deny unknown fields; redact unnecessary PII; no secrets; recheck on fetch/export/execute
+partner,report_export,conditional,subset_of_current_report_read_scope,reports.export,deny unknown fields; redact unnecessary PII; no secrets; recheck on fetch/export/execute
+partner,assignment_command,deny,none,none,deny unknown fields; redact unnecessary PII; no secrets; recheck on fetch/export/execute
+partner,financial_command,deny,none,none,deny unknown fields; redact unnecessary PII; no secrets; recheck on fetch/export/execute
+partner,other_users_chats,deny,none,none,deny unknown fields; redact unnecessary PII; no secrets; recheck on fetch/export/execute
+partner,secrets,deny,none,none,deny unknown fields; redact unnecessary PII; no secrets; recheck on fetch/export/execute
+operator,business_ai,allow,active_workspace,ai.use,deny unknown fields; redact unnecessary PII; no secrets; recheck on fetch/export/execute
+operator,own_partner_analytics,deny,none,none,deny unknown fields; redact unnecessary PII; no secrets; recheck on fetch/export/execute
+operator,assigned_order_pii,conditional,currently_assigned_orders,orders.assigned.read_pii,deny unknown fields; redact unnecessary PII; no secrets; recheck on fetch/export/execute
+operator,team_analytics,deny,none,none,deny unknown fields; redact unnecessary PII; no secrets; recheck on fetch/export/execute
+operator,shop_finance,deny,none,none,deny unknown fields; redact unnecessary PII; no secrets; recheck on fetch/export/execute
+operator,public_bestsellers,conditional,published_approved_aggregate_only,catalog.bestsellers.read,deny unknown fields; redact unnecessary PII; no secrets; recheck on fetch/export/execute
+operator,contest_uzcoin_charity,deny,none,none,deny unknown fields; redact unnecessary PII; no secrets; recheck on fetch/export/execute
+operator,report_export,conditional,subset_of_current_report_read_scope,reports.export,deny unknown fields; redact unnecessary PII; no secrets; recheck on fetch/export/execute
+operator,assignment_command,deny,none,none,deny unknown fields; redact unnecessary PII; no secrets; recheck on fetch/export/execute
+operator,financial_command,deny,none,none,deny unknown fields; redact unnecessary PII; no secrets; recheck on fetch/export/execute
+operator,other_users_chats,deny,none,none,deny unknown fields; redact unnecessary PII; no secrets; recheck on fetch/export/execute
+operator,secrets,deny,none,none,deny unknown fields; redact unnecessary PII; no secrets; recheck on fetch/export/execute
+operator_lead,business_ai,allow,active_workspace,ai.use,deny unknown fields; redact unnecessary PII; no secrets; recheck on fetch/export/execute
+operator_lead,own_partner_analytics,deny,none,none,deny unknown fields; redact unnecessary PII; no secrets; recheck on fetch/export/execute
+operator_lead,assigned_order_pii,deny,none,none,deny unknown fields; redact unnecessary PII; no secrets; recheck on fetch/export/execute
+operator_lead,team_analytics,conditional,granted_teams_with_temporal_membership,team.analytics.read,deny unknown fields; redact unnecessary PII; no secrets; recheck on fetch/export/execute
+operator_lead,shop_finance,deny,none,none,deny unknown fields; redact unnecessary PII; no secrets; recheck on fetch/export/execute
+operator_lead,public_bestsellers,conditional,published_approved_aggregate_only,catalog.bestsellers.read,deny unknown fields; redact unnecessary PII; no secrets; recheck on fetch/export/execute
+operator_lead,contest_uzcoin_charity,deny,none,none,deny unknown fields; redact unnecessary PII; no secrets; recheck on fetch/export/execute
+operator_lead,report_export,conditional,subset_of_current_report_read_scope,reports.export,deny unknown fields; redact unnecessary PII; no secrets; recheck on fetch/export/execute
+operator_lead,assignment_command,preview_then_confirmation,granted_team_only,orders.assign + explicit action confirmation,deny unknown fields; redact unnecessary PII; no secrets; recheck on fetch/export/execute
+operator_lead,financial_command,deny,none,none,deny unknown fields; redact unnecessary PII; no secrets; recheck on fetch/export/execute
+operator_lead,other_users_chats,deny,none,none,deny unknown fields; redact unnecessary PII; no secrets; recheck on fetch/export/execute
+operator_lead,secrets,deny,none,none,deny unknown fields; redact unnecessary PII; no secrets; recheck on fetch/export/execute
+admin,business_ai,allow,active_workspace,ai.use,deny unknown fields; redact unnecessary PII; no secrets; recheck on fetch/export/execute
+admin,own_partner_analytics,conditional,explicit_business_grants_not_role_name,resource-specific permission + column mask,deny unknown fields; redact unnecessary PII; no secrets; recheck on fetch/export/execute
+admin,assigned_order_pii,conditional,explicit_business_grants_not_role_name,resource-specific permission + column mask,deny unknown fields; redact unnecessary PII; no secrets; recheck on fetch/export/execute
+admin,team_analytics,conditional,explicit_business_grants_not_role_name,resource-specific permission + column mask,deny unknown fields; redact unnecessary PII; no secrets; recheck on fetch/export/execute
+admin,shop_finance,conditional,explicit_business_grants_not_role_name,resource-specific permission + column mask,deny unknown fields; redact unnecessary PII; no secrets; recheck on fetch/export/execute
+admin,public_bestsellers,conditional,published_approved_aggregate_only,catalog.bestsellers.read,deny unknown fields; redact unnecessary PII; no secrets; recheck on fetch/export/execute
+admin,contest_uzcoin_charity,conditional,explicit_business_grants_not_role_name,resource-specific permission + column mask,deny unknown fields; redact unnecessary PII; no secrets; recheck on fetch/export/execute
+admin,report_export,conditional,subset_of_current_report_read_scope,reports.export,deny unknown fields; redact unnecessary PII; no secrets; recheck on fetch/export/execute
+admin,assignment_command,preview_then_confirmation,explicit_business_grants,orders.assign + resource versions + confirmation,deny unknown fields; redact unnecessary PII; no secrets; recheck on fetch/export/execute
+admin,financial_command,dedicated_workflow_handoff_only,explicit_business_grants,finance permission + independent approval; no LLM ledger tool,deny unknown fields; redact unnecessary PII; no secrets; recheck on fetch/export/execute
+admin,other_users_chats,deny,none,none,deny unknown fields; redact unnecessary PII; no secrets; recheck on fetch/export/execute
+admin,secrets,deny,none,none,deny unknown fields; redact unnecessary PII; no secrets; recheck on fetch/export/execute
+superadmin,business_ai,allow,active_workspace,ai.use,deny unknown fields; redact unnecessary PII; no secrets; recheck on fetch/export/execute
+superadmin,own_partner_analytics,conditional,explicit_business_grants_not_role_name,resource-specific permission + column mask,deny unknown fields; redact unnecessary PII; no secrets; recheck on fetch/export/execute
+superadmin,assigned_order_pii,conditional,explicit_business_grants_not_role_name,resource-specific permission + column mask,deny unknown fields; redact unnecessary PII; no secrets; recheck on fetch/export/execute
+superadmin,team_analytics,conditional,explicit_business_grants_not_role_name,resource-specific permission + column mask,deny unknown fields; redact unnecessary PII; no secrets; recheck on fetch/export/execute
+superadmin,shop_finance,conditional,explicit_business_grants_not_role_name,resource-specific permission + column mask,deny unknown fields; redact unnecessary PII; no secrets; recheck on fetch/export/execute
+superadmin,public_bestsellers,conditional,published_approved_aggregate_only,catalog.bestsellers.read,deny unknown fields; redact unnecessary PII; no secrets; recheck on fetch/export/execute
+superadmin,contest_uzcoin_charity,conditional,explicit_business_grants_not_role_name,resource-specific permission + column mask,deny unknown fields; redact unnecessary PII; no secrets; recheck on fetch/export/execute
+superadmin,report_export,conditional,subset_of_current_report_read_scope,reports.export,deny unknown fields; redact unnecessary PII; no secrets; recheck on fetch/export/execute
+superadmin,assignment_command,preview_then_confirmation,explicit_business_grants,orders.assign + resource versions + confirmation,deny unknown fields; redact unnecessary PII; no secrets; recheck on fetch/export/execute
+superadmin,financial_command,dedicated_workflow_handoff_only,explicit_business_grants,finance permission + independent approval; no LLM ledger tool,deny unknown fields; redact unnecessary PII; no secrets; recheck on fetch/export/execute
+superadmin,other_users_chats,deny,none,none,deny unknown fields; redact unnecessary PII; no secrets; recheck on fetch/export/execute
+superadmin,secrets,deny,none,none,deny unknown fields; redact unnecessary PII; no secrets; recheck on fetch/export/execute

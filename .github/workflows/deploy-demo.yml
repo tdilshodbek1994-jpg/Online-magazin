@@ -1,0 +1,58 @@
+name: deploy-demo
+# MANUAL ONLY. Builds images on the GitHub runner (enough RAM), ships them to the DEMO server over SSH
+# and starts the stack. Nothing runs automatically. Requires repository secrets:
+#   DEMO_SSH_HOST (e.g. 192.248.191.30), DEMO_SSH_USER (e.g. om), DEMO_SSH_KEY (private deploy key),
+#   DEMO_SSH_KNOWN_HOSTS (output of `ssh-keyscan -t ed25519 <host>` verified against the Vultr console),
+#   DEMO_ENV (full contents of the server .env file)
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type DEPLOY-DEMO to confirm deployment to the DEMO server'
+        required: true
+      seed_demo_data:
+        description: 'Load synthetic DEMO data (first run only)'
+        type: boolean
+        default: false
+permissions: { contents: read }
+concurrency: { group: deploy-demo, cancel-in-progress: false }
+jobs:
+  deploy:
+    if: ${{ inputs.confirm == 'DEPLOY-DEMO' }}
+    runs-on: ubuntu-24.04
+    environment: demo
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build images on the runner
+        run: |
+          docker build -f infra/docker/api.Dockerfile -t om-api:dev .
+          docker build --build-arg API_INTERNAL_URL=http://om-api:4000 -f infra/docker/web.Dockerfile -t om-web:dev .
+      - name: SSH setup (pinned host key, no TOFU)
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "${{ secrets.DEMO_SSH_KEY }}" > ~/.ssh/id_ed25519 && chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "${{ secrets.DEMO_SSH_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+      - name: Pre-flight checks on server (memory, disk, docker)
+        run: ssh ${{ secrets.DEMO_SSH_USER }}@${{ secrets.DEMO_SSH_HOST }} 'free -m; df -h /; docker version --format "{{.Server.Version}}"'
+      - name: Ship images and compose files
+        run: |
+          docker save om-api:dev om-web:dev | gzip -1 | ssh ${{ secrets.DEMO_SSH_USER }}@${{ secrets.DEMO_SSH_HOST }} 'gunzip | docker load'
+          ssh ${{ secrets.DEMO_SSH_USER }}@${{ secrets.DEMO_SSH_HOST }} 'mkdir -p ~/online-magazin/infra/caddy ~/online-magazin/scripts'
+          scp docker-compose.yml docker-compose.prod.yml docker-compose.demo.yml ${{ secrets.DEMO_SSH_USER }}@${{ secrets.DEMO_SSH_HOST }}:online-magazin/
+          scp infra/caddy/Caddyfile infra/caddy/Caddyfile.staging ${{ secrets.DEMO_SSH_USER }}@${{ secrets.DEMO_SSH_HOST }}:online-magazin/infra/caddy/
+          scp scripts/backup.sh ${{ secrets.DEMO_SSH_USER }}@${{ secrets.DEMO_SSH_HOST }}:online-magazin/scripts/
+          printf '%s\n' "${{ secrets.DEMO_ENV }}" | ssh ${{ secrets.DEMO_SSH_USER }}@${{ secrets.DEMO_SSH_HOST }} 'umask 077; cat > ~/online-magazin/.env'
+      - name: Backup before change (keeps existing data)
+        run: ssh ${{ secrets.DEMO_SSH_USER }}@${{ secrets.DEMO_SSH_HOST }} 'cd ~/online-magazin && if docker compose ps -q om-postgres | grep -q .; then mkdir -p ~/backups && docker compose exec -T om-postgres pg_dump -U om_app -Fc online_magazin > ~/backups/pre-deploy-$(date +%Y%m%d%H%M%S).dump; fi'
+      - name: Start DEMO stack
+        run: ssh ${{ secrets.DEMO_SSH_USER }}@${{ secrets.DEMO_SSH_HOST }} 'cd ~/online-magazin && docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.demo.yml up -d --no-build --remove-orphans'
+      - name: Seed synthetic DEMO data
+        if: ${{ inputs.seed_demo_data }}
+        run: ssh ${{ secrets.DEMO_SSH_USER }}@${{ secrets.DEMO_SSH_HOST }} 'cd ~/online-magazin && docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.demo.yml exec -T om-api node dist/seed.js'
+      - name: Health check
+        run: |
+          for i in $(seq 1 30); do
+            ssh ${{ secrets.DEMO_SSH_USER }}@${{ secrets.DEMO_SSH_HOST }} 'cd ~/online-magazin && docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.demo.yml exec -T om-api node -e "fetch(\"http://localhost:4000/health/ready\").then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"' && { echo ready; break; }
+            sleep 5
+          done
+          ssh ${{ secrets.DEMO_SSH_USER }}@${{ secrets.DEMO_SSH_HOST }} 'docker stats --no-stream --format "{{.Name}} {{.MemUsage}} {{.CPUPerc}}"; free -m'

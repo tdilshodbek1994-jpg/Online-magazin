@@ -1,0 +1,37 @@
+# Production overlay: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+# Adds Caddy (ports 80/443, automatic TLS) and closes direct API/web ports.
+services:
+  om-caddy:
+    image: caddy:2.8.4
+    environment:
+      OM_DOMAIN: ${OM_DOMAIN:?set OM_DOMAIN in .env (e.g. uzshop.net)}
+      OM_STAGE_USER: ${OM_STAGE_USER:-owner}
+      OM_STAGE_HASH: ${OM_STAGE_HASH:-}
+    ports: ["80:80", "443:443", "443:443/udp"]
+    volumes:
+      - ./infra/caddy/${OM_CADDYFILE:-Caddyfile}:/etc/caddy/Caddyfile:ro
+      - om_caddy_data:/data
+      - om_caddy_config:/config
+    depends_on: [om-web, om-api]
+    networks: [om_net]
+    restart: unless-stopped
+  om-api:
+    ports: !reset []
+    environment:
+      NODE_ENV: ${OM_NODE_ENV:-production}
+      PUBLIC_WEB_URL: https://${OM_DOMAIN}
+    restart: unless-stopped
+  om-web:
+    ports: !reset []
+    restart: unless-stopped
+  om-worker:
+    environment: { NODE_ENV: "${OM_NODE_ENV:-production}" }
+    restart: unless-stopped
+  om-migrate:
+    environment: { NODE_ENV: "${OM_NODE_ENV:-production}" }
+  om-postgres:
+    ports: !reset []
+    restart: unless-stopped
+volumes:
+  om_caddy_data: { name: om_caddy_data }
+  om_caddy_config: { name: om_caddy_config }

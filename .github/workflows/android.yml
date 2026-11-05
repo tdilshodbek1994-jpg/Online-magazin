@@ -1,0 +1,53 @@
+name: android
+# Builds the UzShop Android app (Capacitor shell in mobile/). Debug APK on every push that touches the app;
+# a signed release bundle (AAB for Google Play) only when the signing secrets exist.
+on:
+  push:
+    paths: ["mobile/**", ".github/workflows/android.yml"]
+  workflow_dispatch:
+permissions: { contents: read }
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    env:
+      HAS_SIGNING: ${{ secrets.UZSHOP_KEYSTORE_BASE64 != '' }}
+    defaults: { run: { working-directory: mobile } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: "21" }
+      # ubuntu-24.04 runners already ship the Android SDK (ANDROID_HOME) with accepted licenses.
+      - run: echo "sdk.dir=$ANDROID_HOME" > android/local.properties
+      - run: npm ci --no-audit --no-fund
+      # Push needs Firebase: with the GOOGLE_SERVICES_JSON secret the app is built with it and says so in its user agent
+      # («push»), so the website asks for push permission only in builds that can actually receive it.
+      - name: Firebase config (optional)
+        env: { GSJ: "${{ secrets.GOOGLE_SERVICES_JSON }}" }
+        run: |
+          if [ -n "$GSJ" ]; then
+            printf '%s' "$GSJ" > android/app/google-services.json
+            sed -i 's#"appendUserAgent": "UzShopApp/1.0"#"appendUserAgent": "UzShopApp/1.0 push"#' capacitor.config.json
+            echo "Firebase: on"
+          else echo "Firebase: off (no GOOGLE_SERVICES_JSON secret) — app builds without push"; fi
+      - run: npx cap sync android
+      - name: Debug APK (install on a phone for testing)
+        run: cd android && chmod +x gradlew && ./gradlew --no-daemon assembleDebug
+      - uses: actions/upload-artifact@v4
+        with: { name: uzshop-debug-apk, path: mobile/android/app/build/outputs/apk/debug/*.apk, retention-days: 14 }
+      - name: Signed release bundle (Google Play)
+        if: ${{ env.HAS_SIGNING == 'true' }}
+        env:
+          KS: ${{ secrets.UZSHOP_KEYSTORE_BASE64 }}
+          UZSHOP_KEYSTORE_PASSWORD: ${{ secrets.UZSHOP_KEYSTORE_PASSWORD }}
+          UZSHOP_KEY_ALIAS: ${{ secrets.UZSHOP_KEY_ALIAS }}
+          UZSHOP_KEY_PASSWORD: ${{ secrets.UZSHOP_KEY_PASSWORD }}
+          UZSHOP_VERSION_CODE: ${{ github.run_number }}
+        run: |
+          echo "$KS" | base64 -d > "$RUNNER_TEMP/uzshop.jks"
+          export UZSHOP_KEYSTORE="$RUNNER_TEMP/uzshop.jks"
+          cd android && ./gradlew --no-daemon bundleRelease
+      - uses: actions/upload-artifact@v4
+        if: ${{ hashFiles('mobile/android/app/build/outputs/bundle/release/*.aab') != '' }}
+        with: { name: uzshop-release-aab, path: mobile/android/app/build/outputs/bundle/release/*.aab, retention-days: 30 }

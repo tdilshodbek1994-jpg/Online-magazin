@@ -1,0 +1,24 @@
+# DEMO overlay for a 1 vCPU / 2 GB RAM server (e.g. Vultr 192.248.191.30):
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.demo.yml up -d
+# - worker runs inside the API process (separate worker container disabled)
+# - PostgreSQL tuned for small RAM, memory limits on every service
+# - Redis: not used by this project (PostgreSQL is the queue/source of truth), nothing to disable
+# - AI: no local model; optional external Claude API via AI_PROVIDER=anthropic + ANTHROPIC_API_KEY
+services:
+  om-postgres:
+    command: ["postgres", "-c", "shared_buffers=128MB", "-c", "effective_cache_size=384MB", "-c", "work_mem=4MB",
+              "-c", "maintenance_work_mem=64MB", "-c", "max_connections=40", "-c", "wal_buffers=4MB", "-c", "max_wal_size=512MB"]
+    deploy: { resources: { limits: { memory: 448m } } }
+  om-api:
+    environment:
+      RUN_WORKER_IN_API: "true"
+      DB_POOL_MAX: "10"
+      NODE_OPTIONS: "--max-old-space-size=256"
+    deploy: { resources: { limits: { memory: 384m } } }
+  om-worker:
+    profiles: ["full"]   # not started in DEMO
+  om-web:
+    environment: { NODE_OPTIONS: "--max-old-space-size=192" }
+    deploy: { resources: { limits: { memory: 320m } } }
+  om-caddy:
+    deploy: { resources: { limits: { memory: 96m } } }

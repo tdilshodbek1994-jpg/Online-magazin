@@ -1,0 +1,55 @@
+# Online Magazin only. Own project name, network, volume, DB user and ports — nothing shared with TAQVIM (§05, T001).
+name: online-magazin
+services:
+  om-postgres:
+    image: postgres:16.6-bookworm
+    environment:
+      POSTGRES_DB: online_magazin
+      POSTGRES_USER: om_app
+      POSTGRES_PASSWORD: ${OM_DB_PASSWORD:?set OM_DB_PASSWORD in .env}
+    volumes: [om_pgdata:/var/lib/postgresql/data]
+    networks: [om_net]
+    ports: ["127.0.0.1:5433:5432"]
+    healthcheck: { test: ["CMD-SHELL", "pg_isready -U om_app -d online_magazin"], interval: 5s, retries: 20 }
+    deploy: { resources: { limits: { memory: 1g } } }
+  om-migrate:
+    image: om-api:dev
+    build: { context: ., dockerfile: infra/docker/api.Dockerfile }
+    command: ["node", "dist/platform/migrate-cli.js"]
+    env_file: [.env]
+    environment: { DATABASE_URL: "postgres://om_app:${OM_DB_PASSWORD}@om-postgres:5432/${OM_DB_NAME:-online_magazin}" }
+    depends_on: { om-postgres: { condition: service_healthy } }
+    networks: [om_net]
+  om-api:
+    image: om-api:dev
+    build: { context: ., dockerfile: infra/docker/api.Dockerfile }
+    env_file: [.env]
+    environment: { DATABASE_URL: "postgres://om_app:${OM_DB_PASSWORD}@om-postgres:5432/${OM_DB_NAME:-online_magazin}", PORT: "4000", MEDIA_DIR: /data/media }
+    volumes: [om_media:/data/media]
+    depends_on: { om-migrate: { condition: service_completed_successfully } }
+    networks: [om_net]
+    ports: ["127.0.0.1:4000:4000"]
+    stop_grace_period: 20s
+    deploy: { resources: { limits: { memory: 512m } } }
+  om-worker:
+    image: om-api:dev
+    build: { context: ., dockerfile: infra/docker/api.Dockerfile }
+    command: ["node", "dist/worker-main.js"]
+    healthcheck: { disable: true } # worker has no HTTP port; liveness = process supervision
+    env_file: [.env]
+    environment: { DATABASE_URL: "postgres://om_app:${OM_DB_PASSWORD}@om-postgres:5432/${OM_DB_NAME:-online_magazin}" }
+    depends_on: { om-migrate: { condition: service_completed_successfully } }
+    networks: [om_net]
+    deploy: { resources: { limits: { memory: 256m } } }
+  om-web:
+    image: om-web:dev
+    build: { context: ., dockerfile: infra/docker/web.Dockerfile, args: { API_INTERNAL_URL: "http://om-api:4000" } }
+    environment: { API_INTERNAL_URL: "http://om-api:4000" }
+    depends_on: [om-api]
+    networks: [om_net]
+    ports: ["127.0.0.1:3000:3000"]
+networks:
+  om_net: { name: om_net }
+volumes:
+  om_pgdata: { name: om_pgdata }
+  om_media: { name: om_media }

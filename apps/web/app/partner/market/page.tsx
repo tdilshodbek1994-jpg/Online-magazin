@@ -55,7 +55,6 @@ function MarketCard({ p, onCreated }: { p: any; onCreated: () => void }) {
             <LinkBox url={streamUrl} shareText={`${name} — ${som(p.price_minor)}`} />
             <div className="row" style={{ gap: 8, marginTop: 8 }}>
               <button type="button" className="btn secondary sm" onClick={async () => { if (await copyText(postText(name, som(p.price_minor), streamUrl))) { setPostCopied(true); setTimeout(() => setPostCopied(false), 1500); } }}>{postCopied ? 'Post nusxalandi ✓' : '👉 Post matnini nusxalash'}</button>
-              {p.image && <a className="btn secondary sm" href={p.image.replace(/-w640\.webp$/, '-w1200.webp')} download={`${p.slug}.webp`}>Rasmni yuklab olish</a>}
             </div>
           </>
         ) : open ? (

@@ -29,7 +29,7 @@ export const BUCKET_SQL = `CASE
   ELSE 'new' END`;
 export const BUCKETS = ['new', 'accepted', 'shipping', 'delivered', 'returned', 'cancelled'] as const;
 
-const zPeriod = z.enum(['today', 'yesterday', 'week', 'month', 'half_year', 'all']).default('all');
+const zPeriod = z.enum(['today', 'yesterday', 'week', 'd30', 'month', 'half_year', 'all']).default('all');
 type Period = z.infer<typeof zPeriod>;
 const TZ = `'Asia/Tashkent'`;
 const dayStart = `(date_trunc('day', now() AT TIME ZONE ${TZ}) AT TIME ZONE ${TZ})`;
@@ -39,6 +39,7 @@ export function periodSql(col: string, p: Period): string {
     case 'today': return `${col} >= ${dayStart}`;
     case 'yesterday': return `${col} >= ${dayStart} - interval '1 day' AND ${col} < ${dayStart}`;
     case 'week': return `${col} >= now() - interval '7 days'`;
+    case 'd30': return `${col} >= now() - interval '30 days'`; // same window as the quality metrics
     case 'month': return `${col} >= (date_trunc('month', now() AT TIME ZONE ${TZ}) AT TIME ZONE ${TZ})`;
     case 'half_year': return `${col} >= now() - interval '182 days'`;
     default: return 'true';

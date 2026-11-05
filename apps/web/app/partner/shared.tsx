@@ -10,7 +10,7 @@ export const PARTNER_TABS: [string, string, string[]][] = [
   ['/partner/market', 'Mahsulotlar', ['/partner/streams']], ['/partner/wallet', 'Hamyon', ['/partner/payouts']], ['/partner/stats', 'Statistika', []],
 ];
 
-export const PERIODS: [string, string][] = [['today', 'Bugun'], ['yesterday', 'Kecha'], ['week', 'Hafta'], ['month', 'Shu oy'], ['half_year', 'Yarim yil'], ['all', 'Hammasi']];
+export const PERIODS: [string, string][] = [['today', 'Bugun'], ['yesterday', 'Kecha'], ['week', 'Hafta'], ['d30', '30 kun'], ['month', 'Shu oy'], ['half_year', 'Yarim yil'], ['all', 'Hammasi']];
 
 export const BUCKET_LABEL: Record<string, string> = { new: 'Yangi', accepted: 'Qabul qilindi', shipping: 'Yetkazilmoqda', delivered: 'Yetkazildi', returned: 'Qaytdi', cancelled: 'Bekor qilingan' };
 export const BUCKET_ORDER = ['new', 'accepted', 'shipping', 'delivered', 'returned', 'cancelled'];

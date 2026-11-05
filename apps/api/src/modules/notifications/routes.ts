@@ -119,7 +119,7 @@ export function registerMessaging(app: FastifyInstance, deps: Deps): void {
       `SELECT o.id, o.number, (SELECT string_agg((ol.product_snapshot->'name'->>'uz-Latn') || ' × ' || ol.qty, ', ') FROM order_lines ol WHERE ol.order_id=o.id) AS products
          FROM orders o WHERE o.id = ANY($1::uuid[]) AND EXISTS (SELECT 1 FROM commission_accruals c WHERE c.order_id=o.id AND c.partner_id=$2)`, [[...new Set(orderIds)], partner.id]) : [];
     const ordMap = new Map(ords.map((o) => [o.id, o]));
-    const STATIC: Record<string, string> = { 'partner.payout_paid': '/partner/payouts', 'partner.bonus': '/partner/wallet', 'partner.penalty': '/partner/programs', 'partner.contest_prize': '/partner/contests', 'partner.level_up': '/partner/level', 'partner.coupon_issued': '/partner/level' };
+    const STATIC: Record<string, string> = { 'partner.payout_paid': '/partner/payouts', 'partner.bonus': '/partner/wallet', 'partner.penalty': '/partner/wallet', 'partner.contest_prize': '/partner/contests', 'partner.level_up': '/partner/level', 'partner.coupon_issued': '/partner/level' };
     return { items: rows.map((r) => {
       const k = keyOf(r);
       const p: Record<string, unknown> = { ...(r.params ?? {}) };

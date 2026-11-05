@@ -44,7 +44,7 @@ function cell(col: string, v: string | number): string {
   if (col === 'Urinish') return `${v} urinish`;
   return String(v);
 }
-const ICON: Record<string, string> = { ok: '✓', zero: '0', partial: '…', forbidden: '🔒', unsupported: '?', unknown: '—' };
+const ICON: Record<string, string> = { ok: '💬', zero: '0', partial: '…', forbidden: '🔒', unsupported: '?', unknown: '—' };
 
 function AnswerCard({ c, canExport }: { c: Card; canExport?: boolean }) {
   const [sent, setSent] = useState(false);

@@ -325,3 +325,14 @@ describe('CSV export of a stored report', () => {
     await t.db.query(`UPDATE feature_flags SET enabled=true WHERE key='ai.business.export'`);
   });
 });
+
+describe('small talk', () => {
+  it('«Qalesan» / «Rahmat» get a polite answer, no report, no data read', async () => {
+    const g = await ask(A, 'Qalesan');
+    expect(g.json).toMatchObject({ status: 'ok', result: null, report_id: null });
+    expect(g.json.summary).toContain('Assalomu alaykum');
+    expect(g.json.suggestions.length).toBeGreaterThan(0);
+    expect((await ask(A, 'Rahmat')).json.summary).toContain('Arzimaydi');
+    expect((await ask(A, 'Салом')).json.status).toBe('ok');
+  });
+});

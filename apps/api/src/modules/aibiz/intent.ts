@@ -14,6 +14,7 @@ export type Intent =
   | { kind: 'tool'; tool: Tool; metric?: string; status?: string; channel?: string; followup?: boolean }
   | { kind: 'forbidden'; reason: 'other_partner' | 'customer_pii' | 'secrets' }
   | { kind: 'unsupported'; reason: string }
+  | { kind: 'smalltalk'; reason: 'greeting' | 'thanks' | 'help' }
   | { kind: 'unknown' };
 
 const CHANNEL: [RegExp, string][] = [[/telegram|\btg\b/, 'telegram'], [/instagram|insta|\big\b/, 'instagram'], [/facebook|\bfb\b/, 'facebook'], [/youtube/, 'youtube'], [/tiktok/, 'tiktok']];
@@ -26,6 +27,10 @@ export function classify(text: string): Intent {
   if (/(boshqa|ikkinchi|begona|falon\w*|hamma|barcha|qolgan)\s+hamkor|hamkorlar\w*\s+(daromad|pul|buyurtma|balans|komissiya|ismi|telefon)|partner_?id|\bp-\d{3,}/.test(t)) return { kind: 'forbidden', reason: 'other_partner' };
   if (/mijoz\w*\s+(telefon|raqam|nomer|manzil|adres|pasport)|telefon raqam\w* (ber|ko.?rsat|chiqar)/.test(t)) return { kind: 'forbidden', reason: 'customer_pii' };
 
+  // Small talk: answer politely without reading any data.
+  if (/^(assalomu? ?alaykum|salom|qalesan|qalaysan|qalaysiz|qandaysiz|yaxshimisiz|ishlar qalay|privet|zdravstvuyte|hi|hello)\b/.test(t) && t.split(' ').length <= 4) return { kind: 'smalltalk', reason: 'greeting' };
+  if (/^(rahmat|raxmat|katta rahmat|spasibo|barakalla|zor|ok|xop|xo.?p)\b/.test(t) && t.split(' ').length <= 4) return { kind: 'smalltalk', reason: 'thanks' };
+  if (/^(nima qila olasan|nima qilasan|yordam|help|nimalarni bilasan|qanday ishlaysan)/.test(t)) return { kind: 'smalltalk', reason: 'help' };
   const ch = channelOf(t);
   if (/^(endi )?faqat\b|^(endi )?(telegram|instagram)(dan|ni)?( bo.?yicha)?$/.test(t) && ch) return { kind: 'tool', tool: 'partner_earnings_summary', channel: ch, followup: true };
   if (/foyda|sof daromad|reklamadan keyin/.test(t)) return { kind: 'tool', tool: 'partner_earnings_summary', metric: 'partner_after_ad_result' };

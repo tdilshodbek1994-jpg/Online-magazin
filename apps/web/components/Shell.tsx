@@ -18,18 +18,19 @@ export function BottomNav() {
   const [logged, setLogged] = useState(false);
   useEffect(() => { setLogged(!!getToken()); }, [path]);
   if (path.startsWith('/partner')) {
-    // V2 §02: five things a partner does daily; the big middle button starts a customer order.
+    // V2 §02: five things a partner does daily. Owner (2026-11-05): the big middle button opens the AI assistant;
+    // a new customer order starts from «Buyurtmalar» (+ Buyurtma) and the home page.
     const pItems: [string, string, React.ReactNode, boolean][] = [
       ['/partner', 'Bosh sahifa', <IconHome key="d" />, path === '/partner'],
       ['/partner/orders', 'Buyurtmalar', <IconBag key="o" />, path.startsWith('/partner/orders') || path.startsWith('/partner/requests')],
-      ['/partner/new', 'Buyurtma', <span key="n" className="bn-plus" aria-hidden>+</span>, path.startsWith('/partner/new') || path.startsWith('/partner/order')],
+      ['/partner/ai', 'AI yordamchi', <span key="n" className="bn-plus bn-ai" aria-hidden>🤖</span>, path.startsWith('/partner/ai')],
       ['/partner/market', 'Mahsulotlar', <IconStore key="m" />, path.startsWith('/partner/market') || path.startsWith('/partner/streams')],
       ['/partner/wallet', 'Hamyon', <IconWallet key="w" />, path.startsWith('/partner/wallet') || path.startsWith('/partner/payouts')],
     ];
     return (
       <nav className="bottom-nav five" aria-label="Hamkor menyusi">
         {pItems.map(([href, label, icon, on]) => (
-          <Link key={href} href={href} className={`${on ? 'on' : ''} ${href === '/partner/new' ? 'bn-cta' : ''}`} aria-current={on ? 'page' : undefined}><span className="bn-icon">{icon}</span><span>{href === '/partner/new' ? '+ Buyurtma' : label}</span></Link>
+          <Link key={href} href={href} className={`${on ? 'on' : ''} ${href === '/partner/ai' ? 'bn-cta' : ''}`} aria-current={on ? 'page' : undefined}><span className="bn-icon">{icon}</span><span>{href === '/partner/ai' ? 'AI' : label}</span></Link>
         ))}
       </nav>
     );

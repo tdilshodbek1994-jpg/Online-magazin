@@ -1910,3 +1910,5 @@ a.ai-row .ai-rt { color: #1d6fd1; }
 .ai-disc { text-align: center; }
 .ai-staff .ai-input { bottom: calc(12px + env(safe-area-inset-bottom)); }
 @media (prefers-reduced-motion: reduce) { .ai-q, .ai-u { transition: none; } }
+
+.bn-plus.bn-ai { font-size: 18px; background: radial-gradient(120% 140% at 0% 0%, #1f6feb 0%, #0e4b8f 55%, #0b2a52 100%); }

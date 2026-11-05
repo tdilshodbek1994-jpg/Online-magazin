@@ -238,6 +238,14 @@ export function registerAiBiz(app: FastifyInstance, deps: Deps): void {
     const base = classify(body.text);
     if (base.kind === 'forbidden' && (pr.workspace === 'partner' || base.reason !== 'other_partner')) return reply('forbidden', REFUSAL[base.reason]!, `forbidden:${base.reason}`);
 
+    if (base.kind === 'smalltalk') {
+      const T2: Record<string, string> = {
+        greeting: `Assalomu alaykum! Yaxshi, rahmat 🙂 Men ${pr.workspace === 'partner' ? 'pulingiz, buyurtmalaringiz, balans, oqimlar, UzCoin va konkurslar' : 'sizga ruxsat etilgan hisobotlar'} bo‘yicha aniq raqam bilan javob beraman. Nima bilmoqchisiz?`,
+        thanks: 'Arzimaydi! Yana savol bo‘lsa yozing.',
+        help: `Men faqat hisobot bo‘yicha javob beraman — raqamlar to‘g‘ridan-to‘g‘ri hisobingizdan olinadi. Davrni ham yozing: «bugun», «kecha», «shu oy», «25-oktabr». Masalan:`,
+      };
+      return reply('ok', T2[base.reason]!, `smalltalk:${base.reason}`, base.reason === 'thanks' ? {} : { suggestions: quick.slice(0, 6) });
+    }
     // 2) «kechagisi bilan solishtir»: same report, previous equal period (equal elapsed part if still running).
     if (/solishtir|taqqosla|sravn/.test(matchForm(body.text))) {
       const c = ses.context;

@@ -1953,3 +1953,15 @@ body.menu-open { overflow: hidden; }
 .stp-ava { width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; background: #e6f4ec; color: #137a43; flex: none; }
 .stp-acts { list-style: none; margin: 0; padding: 0; display: grid; } .stp-acts li { display: flex; justify-content: space-between; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
 .btn.secondary.danger-t { color: #b42318; border-color: #f3c2bd; }
+
+/* ===== Admin order cards (tidy) ===== */
+a.ocard { gap: 6px; }
+.oc-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; min-width: 0; }
+.oc-top .ocard-items { min-width: 0; flex: 1; font-size: 15.5px; }
+.oc-st { flex: none; white-space: nowrap; font-size: 12.5px; font-weight: 800; padding: 3px 10px; border-radius: 999px; background: #eef1f4; color: #4b5563; }
+.oc-new { background: #e6f4ec; color: #137a43; } .oc-accepted { background: #efeafd; color: #5b2bbf; } .oc-shipping { background: #e8f1fd; color: #1d6fd1; }
+.oc-delivered { background: #dff3e6; color: #0d5c33; } .oc-returned { background: #fff4d6; color: #8a5a00; } .oc-cancelled { background: #eef1f4; color: #6b7280; }
+.oc-mid { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.oc-sum { color: #137a43; font-size: 16px; } .oc-date { color: var(--muted); font-size: 13px; white-space: nowrap; }
+.oc-meta { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12.5px; color: var(--muted); }
+.oc-none { color: #b45309; } .oc-num { margin-left: auto; font-variant-numeric: tabular-nums; }

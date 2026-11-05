@@ -43,7 +43,7 @@ export function registerAdminOverview(app: FastifyInstance, deps: Deps): void {
              o.contact_snapshot->>'name' AS customer_name, coalesce(o.customer_phone, o.contact_snapshot->>'phone') AS customer_phone,
              o.address_snapshot, o.callback_at, o.problem_reason, o.cancel_reason,
              pa.code AS partner_code, pa.display_name AS partner_name, l.name AS stream_name, u.display_name AS operator_name,
-             (SELECT json_agg(json_build_object('name', ol.product_snapshot->'name', 'variant', ol.product_snapshot->'variant', 'sku', ol.product_snapshot->>'sku_code', 'qty', ol.qty - ol.canceled_qty) ORDER BY ol.id) FROM order_lines ol WHERE ol.order_id=o.id AND ol.qty > ol.canceled_qty) AS items
+             (SELECT json_agg(json_build_object('name', ol.product_snapshot->'name', 'variant', ol.product_snapshot->'variant', 'sku', ol.product_snapshot->>'sku_code', 'qty', CASE WHEN o.commercial_status='cancelled' THEN ol.qty ELSE ol.qty - ol.canceled_qty END) ORDER BY ol.id) FROM order_lines ol WHERE ol.order_id=o.id AND (ol.qty > ol.canceled_qty OR o.commercial_status='cancelled')) AS items
         FROM orders o LEFT JOIN partners pa ON pa.id=o.attributed_partner_id LEFT JOIN referral_links l ON l.id::text = o.attribution->>'link_id' LEFT JOIN users u ON u.id=o.assigned_operator_id
        WHERE ${where.join(' AND ')} ORDER BY o.created_at DESC LIMIT $${p2.length - 1} OFFSET $${p2.length}`, p2);
     return { counts: { ...c, total: Object.values(c).reduce((a, b) => a + b, 0) }, items: rows };

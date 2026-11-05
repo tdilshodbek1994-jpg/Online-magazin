@@ -6,6 +6,10 @@ import { errText } from '@/lib/errors';
 
 export const BUCKETS_UZ: [string, string][] = [['all', 'Barchasi'], ['new', 'Yangi'], ['accepted', 'Qabul qilindi'], ['shipping', 'Yetkazilmoqda'], ['delivered', 'Yetkazildi'], ['returned', 'Qaytdi'], ['cancelled', 'Bekor qilingan']];
 const LABEL = Object.fromEntries(BUCKETS_UZ) as Record<string, string>;
+const MON = ['yan', 'fev', 'mar', 'apr', 'may', 'iyun', 'iyul', 'avg', 'sen', 'okt', 'noy', 'dek'];
+/** «3-noy, 07:35» in Tashkent time (no ambiguous 03/11). */
+const when = (iso: string) => { const d = new Date(new Date(iso).getTime() + 5 * 3600e3); return `${d.getUTCDate()}-${MON[d.getUTCMonth()]}, ${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`; };
+const itemsText = (o: any, lang: any) => { const it = o.items ?? []; if (!it.length) return 'Mahsulot ko‘rsatilmagan'; const first = `${pick(it[0].name, lang)}${it[0].qty > 1 ? ` × ${it[0].qty}` : ''}`; return it.length > 1 ? `${first} va yana ${it.length - 1} ta` : first; };
 
 /**
  * Supervisor order list (same look as the partner list): product, status, sum, customer and date on one card.
@@ -44,15 +48,20 @@ export function AdminOrderList({ filter = '', period = 'all', initialStatus = 'a
       <div className="slist">
         {data?.items.map((o: any) => (
           <a key={o.id} href={`/ops?order=${o.id}`} className="scard ocard">
-            <div className="spread">
-              <b className="ocard-items">{(o.items ?? []).map((i: any) => `${pick(i.name, lang)}${i.qty > 1 ? ` × ${i.qty}` : ''}`).join(', ') || o.number}</b>
-              <span className={`pill b-${o.bucket}`}>{LABEL[o.bucket] ?? o.bucket}</span>
+            <div className="oc-top">
+              <b className="ocard-items">{itemsText(o, lang)}</b>
+              <span className={`oc-st oc-${o.bucket}`}>{LABEL[o.bucket] ?? o.bucket}</span>
             </div>
-            <div className="spread small">
-              <b className="ok-t">{som(o.payable_minor)}</b>
-              <span className="muted">{o.customer_name ?? '—'} · {new Date(o.created_at).toLocaleString('uz-UZ', { timeZone: 'Asia/Tashkent', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })} ›</span>
+            <div className="oc-mid">
+              <b className="oc-sum">{som(o.payable_minor)}</b>
+              <span className="oc-date">{when(o.created_at)} ›</span>
             </div>
-            <div className="small muted">{o.number}{o.partner_code ? ` · 🤝 ${o.partner_code}` : ''} · 🎧 {o.operator_name ?? 'operator olmagan'}</div>
+            <div className="oc-meta">
+              <span>👤 {o.customer_name ?? '—'}</span>
+              {o.partner_code && <span>🤝 {o.partner_code}</span>}
+              <span className={o.operator_name ? '' : 'oc-none'}>🎧 {o.operator_name ?? 'operator yo‘q'}</span>
+              <span className="oc-num">{o.number}</span>
+            </div>
           </a>
         ))}
       </div>

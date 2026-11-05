@@ -169,3 +169,23 @@ describe('replenishment (M22)', () => {
     expect(await stock()).toBe(before + 5);
   });
 });
+
+describe('global search (M29)', () => {
+  it('finds orders/products/partners within permissions; phones masked; customers get nothing', async () => {
+    const c = await mkUser(t);
+    expect((await api(t, 'GET', '/admin/search?q=OM', { token: c.token })).status).toBe(403);
+    const prod = await mkProduct(t, { prices: [10_000], stock: [3] });
+    const sku = (await t.db.query(`SELECT sku_code FROM skus WHERE id=$1`, [prod.skuIds[0]])).rows[0].sku_code;
+    const o = await placeOrder(t, { token: c.token, phone: c.phone }, [{ sku_id: prod.skuIds[0]!, qty: 1 }]);
+    const num = (await t.db.query(`SELECT number FROM orders WHERE id=$1`, [o.json.order_id])).rows[0].number;
+    const byNum = await api(t, 'GET', `/admin/search?q=${num}`, { token: s.owner.token });
+    expect(byNum.json.items.find((i: any) => i.type === 'order').href).toBe(`/ops?order=${o.json.order_id}`);
+    const byPhone = await api(t, 'GET', `/admin/search?q=${c.phone.slice(-7)}`, { token: s.operator.token });
+    const hit = byPhone.json.items.find((i: any) => i.type === 'order');
+    expect(hit).toBeTruthy();
+    expect(JSON.stringify(byPhone.json)).not.toContain(c.phone);
+    expect(byPhone.json.items.some((i: any) => i.type === 'product' || i.type === 'partner')).toBe(false); // operator: orders only
+    const byProd = await api(t, 'GET', `/admin/search?q=${sku}`, { token: s.owner.token });
+    expect(byProd.json.items.some((i: any) => i.type === 'product')).toBe(true);
+  });
+});

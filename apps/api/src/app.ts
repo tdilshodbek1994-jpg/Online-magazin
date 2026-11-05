@@ -50,6 +50,7 @@ import { registerHealth } from './modules/admin/health.js';
 import { registerStaffProfile } from './modules/admin/staffprofile.js';
 import { registerPickScan } from './modules/fulfillment/pickscan.js';
 import { registerReplenishment } from './modules/inventory/replenishment.js';
+import { registerSearch } from './modules/admin/search.js';
 import { registerReturns } from './modules/returns/routes.js';
 import { registerPayments } from './modules/payments/routes.js';
 import { registerSupport } from './modules/support/routes.js';
@@ -214,6 +215,7 @@ export async function buildApp(cfg: AppConfig, db: Db): Promise<FastifyInstance>
       registerStaffProfile(api, deps);
       registerPickScan(api, deps);
       registerReplenishment(api, deps);
+      registerSearch(api, deps);
     },
     { prefix: '/api/v1' },
   );

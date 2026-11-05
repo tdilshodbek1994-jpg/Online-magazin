@@ -46,7 +46,7 @@ export function Podium({ rows, boxLabel = 'Natija' }: { rows: PodiumRow[]; boxLa
       </div>
       {rest.length > 0 && (
         <ol className="pod-rest">
-          {rest.map((r) => <li key={`${r.rank}-${r.name}`} className={r.me ? 'me' : ''}><span className="pr-rank">#{r.rank}</span><span className="pr-name">{r.name}{r.me ? ' (siz)' : ''}</span><b>{r.value}</b></li>)}
+          {rest.map((r) => <li key={`${r.rank}-${r.name}`} className={r.me ? 'me' : ''}><span className="pr-rank">#{r.rank}</span><Ava src={r.avatar} cls="xs" /><span className="pr-name">{r.name}{r.me ? ' (siz)' : ''}</span><b>{r.value}</b></li>)}
         </ol>
       )}
     </div>

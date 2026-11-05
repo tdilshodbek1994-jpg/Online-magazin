@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { Chips, TelegramConnect } from '../shared';
 import { errText } from '@/lib/errors';
+import { Podium } from '@/components/Podium';
 
 export default function PartnerTop() {
   const [period, setPeriod] = useState('month');
@@ -17,17 +18,8 @@ export default function PartnerTop() {
       <TelegramConnect />
       <Chips items={[['today', 'Bugun'], ['week', 'Hafta'], ['month', 'Shu oy']]} value={period} onChange={setPeriod} label="Davr" />
       {err && <div className="notice" role="alert">{errText(err)}</div>}
-      {data?.me && <div className="rank-card"><div className="rank-badge">#{data.me.rank}</div><div><b>Sizning o‘rningiz</b><div className="muted">{data.me.delivered} ta yetkazilgan</div></div></div>}
       {data && data.items.length === 0 && <div className="empty">Bu davrda hali natija yo‘q — birinchi bo‘ling!</div>}
-      <ol className="top-list">
-        {data?.items.map((r: any) => (
-          <li key={`${r.rank}-${r.name}`} className={r.me ? 'me' : ''}>
-            <span className="top-rank">{medal(r.rank)}</span>
-            <span className="top-name">{r.name}{r.me ? ' (siz)' : ''}</span>
-            <span className="top-val"><b>{r.delivered}</b> <span className="muted small">yetkazilgan / {r.total}</span></span>
-          </li>
-        ))}
-      </ol>
+      {data && data.items.length > 0 && <Podium boxLabel="Yetkazilgan" rows={data.items.map((r: any) => ({ rank: r.rank, name: r.name, value: String(r.delivered), num: r.delivered, sub: `${r.total} ta buyurtma`, me: r.me, avatar: r.avatar }))} />}
       <p className="muted small">Reyting yetkazilgan buyurtmalar soni bo‘yicha. Konkurs va sovrinlar egasi tomonidan e’lon qilinadi.</p>
     </>
   );

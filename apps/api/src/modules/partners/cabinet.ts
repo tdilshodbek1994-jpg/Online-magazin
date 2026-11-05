@@ -289,18 +289,17 @@ export function registerPartnerCabinet(app: FastifyInstance, deps: Deps): void {
     return { counts: { ...tally, ...extra }, items: rows.map(({ cname, cphone, ...r }) => ({ ...r, customer: maskName(cname), customer_phone: maskTail(cphone) })) };
   });
 
-  route(app, deps, { method: 'GET', url: '/partner/leaderboard', tags: T, summary: 'Top partners by delivered orders (names masked)', query: z.object({ period: z.enum(['today', 'week', 'month']).default('month') }) },
+  route(app, deps, { method: 'GET', url: '/partner/leaderboard', tags: T, summary: 'Top partners by delivered orders (real names + profile photo — owner decision)', query: z.object({ period: z.enum(['today', 'week', 'month']).default('month') }) },
     async ({ actor, db, query }) => {
       const p = await myPartner(db, actor, false);
-      const rows = await many<{ pid: string; display_name: string; delivered: number; total: number; rank: number }>(db, `
+      const rows = await many<{ pid: string; display_name: string; avatar_key: string | null; delivered: number; total: number; rank: number }>(db, `
         WITH r AS (SELECT o.attributed_partner_id AS pid, COUNT(*) FILTER (WHERE ${BUCKET_SQL}='delivered')::int AS delivered, COUNT(*)::int AS total
                      FROM orders o WHERE o.attributed_partner_id IS NOT NULL AND ${periodSql('o.created_at', query.period)} GROUP BY 1)
-        SELECT r.pid, pa.display_name, r.delivered, r.total, RANK() OVER (ORDER BY r.delivered DESC, r.total DESC)::int AS rank FROM r JOIN partners pa ON pa.id=r.pid ORDER BY rank`);
-      const mask = (s: string) => { const a = Array.from(s.trim()); return a.length <= 2 ? `${a[0] ?? ''}*` : `${a.slice(0, 2).join('')}${'*'.repeat(Math.min(4, a.length - 2))}`; };
+        SELECT r.pid, pa.display_name, pa.avatar_key, r.delivered, r.total, RANK() OVER (ORDER BY r.delivered DESC, r.total DESC)::int AS rank FROM r JOIN partners pa ON pa.id=r.pid ORDER BY rank`);
       return {
         period: query.period,
         // Top 10 plus the partner's own row when they are further down — everyone sees where they stand.
-        items: [...rows.slice(0, 10), ...rows.slice(10).filter((r) => r.pid === p.id)].map((r) => ({ rank: r.rank, name: r.pid === p.id ? r.display_name : mask(r.display_name), delivered: r.delivered, total: r.total, me: r.pid === p.id })),
+        items: [...rows.slice(0, 10), ...rows.slice(10).filter((r) => r.pid === p.id)].map((r) => ({ rank: r.rank, name: r.display_name, avatar: r.avatar_key ? `/media/${r.avatar_key}` : null, delivered: r.delivered, total: r.total, me: r.pid === p.id })),
         me: rows.find((r) => r.pid === p.id) ? { rank: rows.find((r) => r.pid === p.id)!.rank, delivered: rows.find((r) => r.pid === p.id)!.delivered } : null,
       };
     });

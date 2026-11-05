@@ -1699,3 +1699,5 @@ img.t3-ava { object-fit: cover; display: block; }
 .lvl-tick, .lvl-lock { position: absolute; right: 0; top: 10px; font-style: normal; font-size: 11px; width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; }
 .lvl-tick { background: var(--lc); color: #fff; font-weight: 900; border: 2px solid var(--surface); }
 .lvl-lock { background: var(--surface); border: 1px solid var(--border); }
+.t3-ava.xs { width: 30px; height: 30px; flex: none; border-width: 1px; }
+.pod-rest li { grid-template-columns: 40px 30px minmax(0, 1fr) auto; }

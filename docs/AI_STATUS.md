@@ -59,7 +59,10 @@ Tests now 36 in `zn-aibiz` (+ operator isolation, operator denied shop sales, ow
 | CSV export of a stored report revision (`GET /ai/biz/reports/:id/export.csv`): same facts as the screen, metadata (metric/period/timezone/as_of/scope/method/limits), re-authorised at download, formula-safe cells, BOM for Excel; flag `ai.business.export` on (migration 0040) | done |
 | Compact answer card (meta line, one big number, ≤3 facts, ≤5 rows linked to orders/products, details folded) | done |
 
-Tests: `zn-aibiz` 38 passed.
+| Rule questions («UzCoin nima?», «qaytarishda komissiya nima bo‘ladi?», «pul qachon yechishga o‘tadi?», payout, level, quality, charity, contest, attribution, commission) answered from the implemented rules with live values (coin rate, hold policy — draft/demo values are said so); own-data questions still go to reports | done |
+| Small talk (greeting/thanks/help) without reading data; partner bottom bar centre button → AI | done |
+
+Tests: `zn-aibiz` 40 passed; full suite 39 files / 335 tests (local).
 
 ## Not done yet (honest)
 

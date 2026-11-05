@@ -336,3 +336,16 @@ describe('small talk', () => {
     expect((await ask(A, 'Салом')).json.status).toBe('ok');
   });
 });
+
+describe('rule questions (how the system works)', () => {
+  it('answers from implemented rules with live values; own-data questions still go to reports', async () => {
+    const u = await ask(A, 'UzCoin nima?');
+    expect(u.json).toMatchObject({ status: 'ok', result: null });
+    expect(u.json.summary).toMatch(/1 coin = [\d ]+ so‘m/);
+    expect((await ask(A, 'Qaytarishda komissiya nima bo‘ladi?')).json.summary).toContain('qarz');
+    expect((await ask(A, 'Pul qachon yechishga o‘tadi?')).json.summary).toContain('Kutish muddati');
+    expect((await ask(A, 'Buyurtma qanday qilib meniki hisoblanadi?')).json.status).toBe('ok');
+    const own = await ask(A, 'UzCoin balansim qancha?');
+    expect(own.json.result.tool).toBe('partner_uzcoin_summary');
+  });
+});

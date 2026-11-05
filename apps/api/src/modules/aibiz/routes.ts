@@ -7,6 +7,7 @@ import { AppError, notFound } from '../../platform/errors.js';
 import { type Deps, route, zIdParam } from '../../platform/http.js';
 import { explicitPeriod, lastDays, localDay, previousPeriod, resolvePeriod, todayPeriod, ymd, type Period } from './dates.js';
 import { channelOf, classify, PARTNER_QUICK, type Tool } from './intent.js';
+import { policyAnswer, policyTopic } from './knowledge.js';
 import { getIntentClient } from './llm.js';
 import * as S from './staff.js';
 import { classifyStaff, STAFF_QUICK, staffTools, type StaffTool } from './staff.js';
@@ -246,6 +247,9 @@ export function registerAiBiz(app: FastifyInstance, deps: Deps): void {
       };
       return reply('ok', T2[base.reason]!, `smalltalk:${base.reason}`, base.reason === 'thanks' ? {} : { suggestions: quick.slice(0, 6) });
     }
+    // «UzCoin nima?» — how the implemented rules work, with live values; no personal data is read.
+    const topic = pr.workspace === 'partner' && base.kind !== 'forbidden' ? policyTopic(body.text) : null;
+    if (topic) return reply('ok', await policyAnswer(db, topic), `policy:${topic}`);
     // 2) «kechagisi bilan solishtir»: same report, previous equal period (equal elapsed part if still running).
     if (/solishtir|taqqosla|sravn/.test(matchForm(body.text))) {
       const c = ses.context;

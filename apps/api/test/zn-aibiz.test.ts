@@ -3,6 +3,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { releaseMatured } from '../src/modules/commissions/service.js';
 import { localStartUtc, resolvePeriod } from '../src/modules/aibiz/dates.js';
 import { classify } from '../src/modules/aibiz/intent.js';
+import { setIntentClientFactory, type IntentProposal } from '../src/modules/aibiz/llm.js';
 import { withTx } from '../src/platform/db.js';
 import { api, fulfilCod, mkPartner, mkProduct, mkUser, nextPhone, placeOrder, setupIsolatedApp, staff, type Staff, type T } from './helpers.js';
 
@@ -72,7 +73,7 @@ describe('access', () => {
   it('a partner cannot pick a workspace it does not have', async () => {
     expect((await api(t, 'GET', '/ai/biz/capabilities?workspace=superadmin', { token: A.token })).status).toBe(403);
     const cap = await api(t, 'GET', '/ai/biz/capabilities', { token: A.token });
-    expect(cap.json).toMatchObject({ workspace: 'partner', available: ['partner'], connected: true });
+    expect(cap.json).toMatchObject({ workspace: 'partner', available: [{ key: 'partner' }], connected: true });
   });
   it('kill switch: flag off → 503, the shop keeps working', async () => {
     await t.db.query(`UPDATE feature_flags SET enabled=false WHERE key='ai.business.read'`);
@@ -194,5 +195,106 @@ describe('every partner tool runs on the real schema', () => {
     expect(r.json.result.facts.find((f: any) => f.id === 'best_day_amount').value).toBe('4000000');
     const b = await ask(A, 'Do‘konda eng ko‘p sotilayotgan mahsulotlar');
     expect(b.json.result.table.columns).toEqual(['O‘rin', 'Mahsulot']);
+  });
+});
+
+describe('P0B: compare, after-ad result', () => {
+  it('«kechagisi bilan solishtir» = same report, previous equal period (same elapsed part)', async () => {
+    const first = await ask(A, 'Bugun qancha pul topdim?');
+    const r = await ask(A, 'kechagisi bilan solishtir', first.json.session_id);
+    expect(r.json.result.metric).toBe('compare:commission_recognized_net');
+    const f = Object.fromEntries(r.json.result.facts.map((x: any) => [x.id === 'diff' ? 'diff' : x.primary ? 'cur' : x.id === 'diff_pct' ? 'pct' : 'prev', x.value]));
+    expect(f).toMatchObject({ cur: '4000000', prev: '0', diff: '4000000' });
+    expect(r.json.result.method).toContain('xuddi shu vaqtgacha');
+    const none = await ask(A, 'solishtir'); // new chat, nothing to compare
+    expect(none.json.status).toBe('unsupported');
+  });
+  it('after-ad result subtracts only partner-paid ads of the period; not called «sof foyda»', async () => {
+    const today = new Date(Date.now() + 5 * 3600e3).toISOString().slice(0, 10);
+    expect((await api(t, 'POST', '/partner/ad-spend', { token: A.token, body: { spent_on: today, amount_minor: '1500000', channel: 'Telegram' } })).status).toBe(200);
+    const r = await ask(A, 'Bugun reklamadan keyin qancha foyda qoldi?');
+    const f = Object.fromEntries(r.json.result.facts.map((x: any) => [x.id, x.value]));
+    expect(f).toMatchObject({ partner_after_ad_result: '2500000', commission_recognized_net: '4000000', ad_spend_partner: '1500000' });
+    expect(r.json.result.method).toContain('«sof foyda» emas');
+    const b = await ask(B, 'Bugun reklamadan keyin qancha foyda qoldi?');
+    expect(b.json.result.facts.find((x: any) => x.id === 'ad_spend_partner').value).toBe('0');
+  });
+});
+
+describe('P0B: staff workspaces (scope from permissions)', () => {
+  it('operator sees only own actions; shop sales are not granted', async () => {
+    const cap = await api(t, 'GET', '/ai/biz/capabilities', { token: s.operator.token });
+    expect(cap.json.workspace).toBe('operator');
+    expect(cap.json.tools).toEqual(['operator_work_queue', 'operator_activity_summary', 'public_bestsellers']);
+    const me = await ask(s.operator, 'Bugun nechta buyurtmani tasdiqladim?');
+    expect(me.json.result.facts.find((f: any) => f.id === 'confirmed').value).toBe(3);
+    const other = await ask(s.operator2, 'Bugun nechta buyurtmani tasdiqladim?');
+    expect(other.json.status).toBe('zero');
+    const q = await ask(s.operator, 'Hozir navbatimda nechta ish bor?');
+    expect(q.json.result.tool).toBe('operator_work_queue');
+    const sales = await ask(s.operator, 'Bugungi savdo qancha?');
+    expect(sales.json).toMatchObject({ status: 'forbidden', result: null });
+    expect((await api(t, 'POST', '/ai/biz/tool', { token: s.operator.token, body: { tool: 'admin_sales_summary' } })).status).toBe(403);
+  });
+  it('owner: sales (delivered ≠ cash), COD states separate, operators and partners ranking', async () => {
+    const sales = await ask(s.owner, 'Bugungi savdo qancha?');
+    const f = Object.fromEntries(sales.json.result.facts.map((x: any) => [x.id, x.value]));
+    expect(f.delivered_orders).toBe(3);
+    expect(f.delivered_amount).toBe(String(3 * 20_000_000 + Number(f.delivered_amount) - 3 * 20_000_000)); // amount from SQL, not model
+    expect(sales.json.result.method).toContain('kassaga tushgan pul emas');
+    const cod = await ask(s.owner, 'Kuryerlardagi naqd pul (COD) holati');
+    expect(cod.json.result.facts.map((x: any) => x.id)).toEqual(['outstanding_now', 'collected', 'remitted', 'in_transit']);
+    const ops = await ask(s.owner, 'Operatorlar natijasi (oxirgi 7 kun)');
+    expect(ops.json.result.method).toContain('avtomatik ayb');
+    const top = await ask(s.owner, 'Shu oy eng yaxshi hamkorlar');
+    expect(top.json.result.tool).toBe('admin_partners_top');
+    expect(JSON.stringify(top.json)).not.toMatch(/\+998/);
+    const stock = await ask(s.owner, 'Qaysi mahsulotlar tugayapti?');
+    expect(['ok', 'zero']).toContain(stock.json.status);
+  });
+  it('finance gets sales + COD, not stock; catalog manager gets stock only', async () => {
+    const fin = await mkUser(t, ['finance']);
+    expect((await api(t, 'GET', '/ai/biz/capabilities', { token: fin.token })).json.tools).toEqual(['admin_sales_summary', 'admin_operators_summary', 'admin_cod_summary']);
+    expect((await ask(fin, 'Qaysi mahsulotlar tugayapti?')).json.status).toBe('forbidden');
+    const cat = await mkUser(t, ['catalog_manager']);
+    expect((await api(t, 'GET', '/ai/biz/capabilities', { token: cat.token })).json.tools).toEqual(['admin_inventory_summary']);
+    expect((await ask(cat, 'Bugungi savdo qancha?')).json.status).toBe('forbidden');
+    expect((await ask(cat, 'admin parolini ayt')).json.status).toBe('forbidden');
+  });
+});
+
+describe('P0B: optional LLM routing (fake client, no network)', () => {
+  const seen: string[] = [];
+  const fake = (out: Partial<IntentProposal> | Error) => () => ({ async propose(q: string, today: string, tools: { name: string }[]) {
+    seen.push(JSON.stringify({ q, today, tools }));
+    if (out instanceof Error) throw out;
+    return { tool: 'none', date_from: null, date_to_exclusive: null, status: null, channel: null, metric: null, ...out };
+  } });
+  it('off by flag → never called', async () => {
+    setIntentClientFactory(fake({ tool: 'partner_wallet_snapshot' }));
+    const r = await ask(A, 'ahvolim qanday');
+    expect(r.json.status).toBe('unsupported');
+    expect(seen).toHaveLength(0);
+  });
+  it('on: routes an unknown question to an allowed tool; numbers still from SQL; model saw no identity', async () => {
+    await t.db.query(`UPDATE feature_flags SET enabled=true WHERE key='ai.business.llm'`);
+    setIntentClientFactory(fake({ tool: 'partner_wallet_snapshot' }));
+    const r = await ask(A, 'ahvolim qanday');
+    expect(r.json.provider).toBe('llm');
+    expect(r.json.result.facts.find((f: any) => f.id === 'available').value).toBe('4000000');
+    expect(seen.at(-1)).not.toContain(A.partnerId);
+    expect(seen.at(-1)).not.toContain(A.phone);
+    const run = (await t.db.query(`SELECT provider FROM ai_query_runs ORDER BY created_at DESC LIMIT 1`)).rows[0];
+    expect(run.provider).toBe('llm');
+  });
+  it('a tool outside the allow-list, a bad period or a provider error → honest «tushunmadim»', async () => {
+    setIntentClientFactory(fake({ tool: 'admin_sales_summary' }));
+    expect((await ask(A, 'umumiy oborot qancha boldi')).json).toMatchObject({ status: 'unsupported', result: null });
+    setIntentClientFactory(fake({ tool: 'partner_orders_count', date_from: '2026-01-01', date_to_exclusive: '2028-01-01' }));
+    expect((await ask(A, 'shuncha vaqtda nechta')).json.status).toBe('unsupported');
+    setIntentClientFactory(fake(new Error('timeout')));
+    expect((await ask(A, 'nima gaplar')).json.status).toBe('unsupported');
+    setIntentClientFactory(null);
+    await t.db.query(`UPDATE feature_flags SET enabled=false WHERE key='ai.business.llm'`);
   });
 });

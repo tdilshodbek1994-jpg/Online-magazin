@@ -1856,6 +1856,9 @@ img.t3-ava { object-fit: cover; display: block; }
 .ai-hero p { margin: 2px 0 0; font-size: 13px; opacity: .85; }
 .ai-bot { width: 52px; height: 52px; flex: none; display: grid; place-items: center; font-size: 28px; border-radius: 16px; background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.25); }
 .ai-quick { display: grid; gap: 8px; }
+.ai-ws { display: flex; gap: 6px; overflow-x: auto; }
+.ai-ws button { padding: 8px 14px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); font-weight: 700; white-space: nowrap; cursor: pointer; color: var(--text); }
+.ai-ws button.on { background: #0e4b8f; color: #fff; border-color: #0e4b8f; }
 .ai-q-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .ai-q { text-align: left; padding: 12px; border-radius: 14px; border: 1px solid #cfe3fb; background: #eef6ff; color: #0e3a6b; font-weight: 700; font-size: 14px; line-height: 1.3; cursor: pointer; }
 .ai-q:hover { background: #e2efff; }
@@ -1893,4 +1896,5 @@ img.t3-ava { object-fit: cover; display: block; }
 .ai-input input { flex: 1; min-width: 0; border: 0; background: transparent; font-size: 16px; padding: 8px; outline: none; color: var(--text); }
 .ai-input .btn { border-radius: 14px; min-width: 48px; }
 .ai-disc { text-align: center; }
+.ai-staff .ai-input { bottom: calc(12px + env(safe-area-inset-bottom)); }
 @media (prefers-reduced-motion: reduce) { .ai-q, .ai-u { transition: none; } }

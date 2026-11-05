@@ -36,17 +36,30 @@ Branch `claude/online-marketplace-platform-sdtv52`. Not merged to main, not depl
 
 Tests: `apps/api/test/zn-aibiz.test.ts` (own DB `om_test_aibiz`, real PostgreSQL, real auth) — 28 tests: dates/intent units, customer denial, workspace denial, kill switch, first vertical (ledger = wallet, only own evidence, Cyrillic = Latin, partner B isolation), follow-up filter, refusal stores no report and reads nothing, strict schema rejects identity fields, report IDOR 404, cohort buckets sum, rejection by event, future date, unknown question, redacted history, every tool on the real schema.
 
+## P0B — done
+
+| Item | State |
+|---|---|
+| Operator workspace: own queue now (open, overdue, callbacks due, 3+ attempts; backend priority order), own actions in a period (confirmed/cancelled by me, my recorded calls by outcome) — `aibiz/staff.ts` | done |
+| Admin workspace by permission: `reports.read` → sales + operators; `payments.read`/`cod.confirm` → COD; `inventory.write` → stock. Superadmin (owner) additionally gets partner ranking (names, no contacts) | done |
+| Sales: delivered amount/orders/units by delivery date + created cohort states; explicitly «not cash yet». COD: outstanding now / collected / remitted / in transit kept separate | done |
+| Operators view: calls, called orders (denominator), confirmed, cancelled — with the «not a fault/penalty» note | done |
+| Compare «kechagisi bilan solishtir»: same tool, previous equal period; while the current period runs, only the same elapsed part of the previous one | done |
+| «Reklamadan keyingi natija»: recognized net commission − partner-paid active ads prorated to the period's days; FX-missing rows reported, never counted as 0; not called «sof foyda» | done |
+| LLM routing (`aibiz/llm.ts`): only when rules do not understand; Claude (official SDK, structured output, effort low, server-side refusal fallback `fallbacks: "default"`); sees question (PII-masked), today and allowed tool names only; output re-validated (allow-list, period ≤ 366 days, no future); any error → honest «tushunmadim». Needs `AI_PROVIDER=anthropic` + `ANTHROPIC_API_KEY` on the server AND flag `ai.business.llm` on | done (off until the owner sets the key and the flag) |
+| Web: shared `components/AiChat.tsx`; `/admin/ai` (owner/finance/catalog/warehouse), `/ops/ai` (operator), workspace switch for multi-role users; staff bar link «🤖 AI»; partner home card | done |
+
+Tests now 36 in `zn-aibiz` (+ operator isolation, operator denied shop sales, owner reports, finance/catalog permission split, compare, after-ad, LLM off/on/allow-list/bad period/provider error with a fake client — no network). Full suite: 39 files, 331 tests passed (local).
+
 ## Not done yet (honest)
 
 | Item | Why / next |
 |---|---|
-| Operator, operator lead, admin, superadmin reports | P0B. Workspaces are detected; `/ask` answers «keyingi bosqichda ulanadi», no numbers |
-| LLM intent (Claude via existing adapter) | P0B; flag `ai.business.llm` off; needs owner OK on provider/budget/data policy (D14, D17) |
-| «Reklamadan keyingi natija» (commission − partner-paid allocated ads) | needs mapping to `ad_expenses`/`expense_allocations` proration; answered as «ulanmagan» |
-| Compare periods, forecast | P1/P2; answered as unsupported |
-| Contest rank in answer | wire `cc_rankings`; currently partial with link |
-| Export, voice, action drafts, scheduled reports | P1/P2 (flags off) |
-| `docs/ai/tests/acceptance_cases.json` | all still `not_run` in the file; mapping to code tests comes with P0B |
+| Operator lead («Jamoa») workspace | there is no team-membership model with effective_from/to in the schema yet; owner sees all operators instead |
+| Contest rank in the partner answer | wire `cc_rankings` |
+| Export (XLSX/CSV/PDF), voice, action drafts, scheduled summaries, forecasts | P1/P2, flags off |
+| Real LLM run | not executed by Claude: no key here and no paid provider was turned on |
+| `docs/ai/tests/acceptance_cases.json` | still `not_run` in the file; code tests cover the P0 paths listed above |
 
 ## Metric decisions (proposals, owner to confirm — D07/D15)
 

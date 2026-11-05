@@ -12,13 +12,17 @@
 ## Commands run (local, real PostgreSQL 16)
 - `npx tsc --noEmit` (api, web) — exit 0
 - `npx vitest run test/zn-aibiz.test.ts` — 28 passed
-- full `npx vitest run` — 39 files, 323 tests passed, exit 0
+- P0B: `npx vitest run test/zn-aibiz.test.ts` — 36 passed; full `npx vitest run` — 39 files, 331 tests passed, exit 0
 - `npm run build` (web) — compiled; manual phone-width check of `/partner/ai` (quick questions, Cyrillic question, refusal card)
 
 CI was not run by Claude for this change; local results are not CI.
 
-## Next exact task (P0B)
-1. Operator workspace: own queue (`ops_tasks` assigned to me, overdue callbacks, attempts from `call_logs`), own accept/reject stats.
-2. Superadmin/admin: sales summary (orders/units/revenue by state), COD pending vs collected vs remitted, inventory health — gated by existing permissions (`reports.read`, `payments.read`, …).
-3. LLM intent via `modules/ai/claude.ts` pattern: structured output limited to the registry tool names and argument schema; numbers still only from tools; flag `ai.business.llm`.
-4. Map `docs/ai/tests/acceptance_cases.json` to code tests.
+## Turning on the real AI (owner, on the server — never paste the key in chat)
+1. In the server environment file add `AI_PROVIDER=anthropic` and `ANTHROPIC_API_KEY=<key>` (optional `AI_BIZ_MODEL`, default `claude-opus-5-5`), restart via the normal deploy script.
+2. Admin → feature flags → turn on `ai.business.llm`.
+3. Kill switch: turn off `ai.business.llm` (AI routing) or `ai.business.read` (whole assistant); the shop keeps working.
+
+## Next exact task
+1. Contest rank from `cc_rankings` in `partner_contest_status`.
+2. Team model (lead workspace) if the owner wants operator leads.
+3. P1: export of a stored report revision (same numbers as the screen), voice transcript preview.

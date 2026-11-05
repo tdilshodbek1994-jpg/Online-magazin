@@ -9,7 +9,7 @@ import { matchForm } from './text.js';
 export const TZ = 'Asia/Tashkent';
 const OFFSET_MIN = 5 * 60;
 
-export interface Period { from: string; to: string; label: string; kind: string; partial_today: boolean; future: boolean }
+export interface Period { from: string; to: string; label: string; kind: string; partial_today: boolean; future: boolean; startUtc?: string; endUtc?: string }
 
 const pad = (n: number) => String(n).padStart(2, '0');
 export const ymd = (d: Date) => `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
@@ -103,4 +103,22 @@ export function explicitPeriod(from: string, to: string, now: Date): Period | nu
   const last = new Date(Date.UTC(Number(to.slice(0, 4)), Number(to.slice(5, 7)) - 1, Number(to.slice(8, 10))) - 86_400_000);
   const label = from === ymd(last) ? human(from) : `${human(from)} — ${human(ymd(last))}`;
   return mk(new Date(Date.UTC(Number(from.slice(0, 4)), Number(from.slice(5, 7)) - 1, Number(from.slice(8, 10)))), new Date(last.getTime() + 86_400_000), label, 'custom', today);
+}
+
+/**
+ * Baseline for «solishtir»: the period of equal length right before. When the current period is still running, only the
+ * same elapsed part of the previous one is used (half of today is never compared with all of yesterday).
+ */
+export function previousPeriod(p: Period, now: Date): Period {
+  const start = localStartUtc(p.from).getTime();
+  const end = localStartUtc(p.to).getTime();
+  const len = end - start;
+  const pStart = new Date(start - len);
+  const elapsed = p.partial_today ? Math.max(0, Math.min(len, now.getTime() - start)) : len;
+  const pEnd = new Date(pStart.getTime() + elapsed);
+  const from = ymd(new Date(pStart.getTime() + OFFSET_MIN * 60_000));
+  const to = ymd(new Date(start + OFFSET_MIN * 60_000));
+  const days = Math.round(len / 86_400_000);
+  const label = days === 1 ? human(from) : `${human(from)} — ${human(ymd(new Date(start + OFFSET_MIN * 60_000 - 86_400_000)))}`;
+  return { from, to, label: p.partial_today ? `${label} (xuddi shu vaqtgacha)` : label, kind: 'previous', partial_today: false, future: false, startUtc: pStart.toISOString(), endUtc: pEnd.toISOString() };
 }

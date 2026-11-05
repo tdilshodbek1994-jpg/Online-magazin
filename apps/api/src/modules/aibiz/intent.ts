@@ -28,8 +28,7 @@ export function classify(text: string): Intent {
 
   const ch = channelOf(t);
   if (/^(endi )?faqat\b|^(endi )?(telegram|instagram)(dan|ni)?( bo.?yicha)?$/.test(t) && ch) return { kind: 'tool', tool: 'partner_earnings_summary', channel: ch, followup: true };
-  if (/solishtir|taqqosla|sravn/.test(t)) return { kind: 'unsupported', reason: 'compare' };
-  if (/foyda|sof daromad|reklamadan keyin/.test(t)) return { kind: 'unsupported', reason: 'after_ad_result' };
+  if (/foyda|sof daromad|reklamadan keyin/.test(t)) return { kind: 'tool', tool: 'partner_earnings_summary', metric: 'partner_after_ad_result' };
   if (/prognoz|bashorat|keyingi oy\w* qancha/.test(t)) return { kind: 'unsupported', reason: 'forecast' };
 
   if (/eng (kop|yaxshi|daromadli|zor|baland)\w* kun|qaysi kun\w* eng/.test(t)) return { kind: 'tool', tool: 'partner_best_day' };

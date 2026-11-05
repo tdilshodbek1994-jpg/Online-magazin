@@ -49,6 +49,8 @@ export function Header() {
   if (roles.includes('partner')) staff.push(['/partner', t('partner')]);
   if (perms.includes('orders.read_all')) staff.push(['/ops', t('ops')]);
   if (perms.includes('catalog.write') || perms.includes('reports.read') || perms.includes('payouts.prepare')) staff.push(['/admin', t('admin')]);
+  if (roles.some((r: string) => ['owner', 'finance', 'catalog_manager', 'warehouse'].includes(r))) staff.push(['/admin/ai', '🤖 AI']);
+  else if (roles.includes('operator')) staff.push(['/ops/ai', '🤖 AI']);
   if (roles.includes('courier')) staff.push(['/courier', 'Kuryer']);
   if (roles.includes('owner') || roles.includes('finance')) staff.push(['/account/security', 'MFA']);
   const logout = async () => { await api('/auth/logout', { method: 'POST' }).catch(() => {}); setToken(null); location.href = '/'; };

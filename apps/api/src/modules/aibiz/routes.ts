@@ -5,22 +5,30 @@ import { requireUser, type Actor } from '../../platform/auth.js';
 import { many, maybeOne, one, type Db } from '../../platform/db.js';
 import { AppError, notFound } from '../../platform/errors.js';
 import { type Deps, route, zIdParam } from '../../platform/http.js';
-import { explicitPeriod, lastDays, resolvePeriod, todayPeriod, type Period } from './dates.js';
-import { channelOf, classify, PARTNER_QUICK, type Intent, type Tool } from './intent.js';
-import { redact } from './text.js';
+import { explicitPeriod, lastDays, localDay, previousPeriod, resolvePeriod, todayPeriod, ymd, type Period } from './dates.js';
+import { channelOf, classify, PARTNER_QUICK, type Tool } from './intent.js';
+import { getIntentClient } from './llm.js';
+import * as S from './staff.js';
+import { classifyStaff, STAFF_QUICK, staffTools, type StaffTool } from './staff.js';
+import { matchForm, redact } from './text.js';
 import * as T from './tools.js';
 import type { ToolResult } from './tools.js';
 
 /**
- * AI Business Assistant — P0 read-only gateway.
- * auth → workspace (server-derived) → intent/date resolution → policy → allow-listed tool → facts → deterministic
- * summary → stored report revision. The model never supplies identity or scope; there is no SQL/eval/shell path.
+ * AI Business Assistant — read-only gateway for every business workspace.
+ * auth → workspace (server-derived) → refusals → intent/date resolution (deterministic; optional LLM routing) →
+ * allow-list for THIS principal → tool → facts → deterministic summary → stored report revision.
+ * The model never supplies identity or scope; there is no SQL/eval/shell path; no tool writes anything.
  */
 type Workspace = 'partner' | 'operator' | 'operator_lead' | 'admin' | 'superadmin';
-interface Principal { userId: string; workspace: Workspace; available: Workspace[]; partnerId: string | null; scopeHash: string }
+type AnyTool = Tool | StaffTool;
+interface Principal { userId: string; workspace: Workspace; available: Workspace[]; partnerId: string | null; perms: Set<string>; scopeHash: string }
 
 const DAILY_QUOTA = Number(process.env.AI_BIZ_DAILY_QUOTA ?? 300);
-const CONNECTED: Workspace[] = ['partner'];          // P0A: partner reports; the other workspaces are wired next
+const PARTNER_TOOLS: Tool[] = ['partner_earnings_summary', 'partner_orders_count', 'partner_rejections', 'partner_wallet_snapshot', 'partner_best_day', 'partner_top_products', 'partner_flows_performance', 'partner_uzcoin_summary', 'partner_level', 'partner_quality_cases', 'partner_charity_summary', 'partner_contest_status', 'public_bestsellers'];
+const ALL_TOOLS = [...PARTNER_TOOLS, 'operator_work_queue', 'operator_activity_summary', 'admin_sales_summary', 'admin_cod_summary', 'admin_inventory_summary', 'admin_operators_summary', 'admin_partners_top'] as const;
+const CHANNEL_TOOLS: AnyTool[] = ['partner_earnings_summary', 'partner_orders_count', 'partner_rejections', 'partner_flows_performance'];
+const COMPARABLE: AnyTool[] = ['partner_earnings_summary', 'partner_orders_count', 'partner_rejections', 'admin_sales_summary', 'operator_activity_summary', 'admin_cod_summary'];
 
 async function principal(db: Db, actor: Actor, wanted?: string): Promise<Principal> {
   requireUser(actor);
@@ -28,6 +36,7 @@ async function principal(db: Db, actor: Actor, wanted?: string): Promise<Princip
   if (!flag?.enabled) throw new AppError(503, 'AI_DISABLED', {}, false, { fallback: 'use_cabinet_reports' });
   const p = await maybeOne<{ id: string; status: string }>(db, `SELECT id, status FROM partners WHERE user_id=$1`, [actor.userId]);
   const roles = new Set(actor.grants.map((g) => g.role));
+  const perms = new Set(actor.perms.keys());
   const available: Workspace[] = [];
   if (p?.status === 'active') available.push('partner');
   if (roles.has('owner')) available.push('superadmin');
@@ -38,9 +47,20 @@ async function principal(db: Db, actor: Actor, wanted?: string): Promise<Princip
   const workspace = (wanted && available.includes(wanted as Workspace) ? wanted : wanted ? null : available[0]) as Workspace | null;
   if (!workspace) throw new AppError(403, 'AI_WORKSPACE_FORBIDDEN');
   const partnerId = workspace === 'partner' ? p!.id : null;
-  const scopeHash = createHash('sha256').update(JSON.stringify({ u: actor.userId, w: workspace, p: partnerId, r: [...roles].sort() })).digest('hex').slice(0, 32);
-  return { userId: actor.userId, workspace, available, partnerId, scopeHash };
+  const scopeHash = createHash('sha256').update(JSON.stringify({ u: actor.userId, w: workspace, p: partnerId, r: [...roles].sort(), g: [...perms].sort() })).digest('hex').slice(0, 32);
+  return { userId: actor.userId, workspace, available, partnerId, perms, scopeHash };
 }
+
+const staffScope = (pr: Principal): S.StaffScope => ({ userId: pr.userId, workspace: pr.workspace as S.StaffScope['workspace'], perms: pr.perms });
+/** Tools this principal may run — computed from the server context only. */
+function allowedTools(pr: Principal): AnyTool[] {
+  if (pr.workspace === 'partner') return PARTNER_TOOLS;
+  const st = staffTools(staffScope(pr));
+  return pr.workspace === 'operator' ? [...st, 'public_bestsellers'] : st;
+}
+const quickFor = (pr: Principal) => pr.workspace === 'partner' ? PARTNER_QUICK : staffTools(staffScope(pr)).map((t) => STAFF_QUICK[t]);
+const WS_LABEL: Record<Workspace, string> = { partner: 'Hamkor kabineti', operator: 'Operator', operator_lead: 'Jamoa', admin: 'Admin', superadmin: 'Do‘kon egasi' };
+const SCOPE_LABEL: Record<Workspace, string> = { partner: 'Faqat sizning maʼlumotlaringiz', operator: 'Faqat sizga biriktirilgan ishlar', operator_lead: 'Vakolat berilgan jamoa', admin: 'Sizga berilgan bo‘limlar', superadmin: 'Butun do‘kon (maxfiy kalitlarsiz)' };
 
 const som = (minor: string | number | null) => { try { return `${(BigInt(String(minor ?? 0)) / 100n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} so‘m`; } catch { return '—'; } };
 export function fmtFact(f: { value: string | number | null; unit: string }): string {
@@ -60,8 +80,12 @@ export function fmtFact(f: { value: string | number | null; unit: string }): str
 export function summarize(r: ToolResult): string {
   const p = r.facts.find((f) => f.primary) ?? r.facts[0];
   const when = r.period ? `${r.period.label}: ` : '';
+  if (r.metric.startsWith('compare:')) {
+    const [c, b, d] = r.facts;
+    return c && b && d ? `${c.label}: ${fmtFact(c)} · ${b.label}: ${fmtFact(b)} · farq ${String(d.value).startsWith('-') ? '' : '+'}${fmtFact(d)}.` : r.title;
+  }
   if (!p) return r.status === 'zero' ? `${when}bu davrda yozuv yo‘q (natija 0).` : `${when}${r.title}`;
-  if (r.status === 'zero') return `${when}${p.label.toLowerCase()} — ${fmtFact(p)} (bu davrda yozuv yo‘q).`;
+  if (r.status === 'zero') return r.period ? `${when}${p.label.toLowerCase()} — ${fmtFact(p)} (bu davrda yozuv yo‘q).` : `${p.label} — ${fmtFact(p)} (hozir).`;
   return `${when}${p.label.toLowerCase()} — ${fmtFact(p)}.`;
 }
 
@@ -69,23 +93,37 @@ const REFUSAL: Record<string, string> = {
   other_partner: 'Boshqa hamkorlarning daromadi, buyurtmasi yoki shaxsiy maʼlumotini ko‘rsata olmayman. Faqat o‘zingizning natijalaringiz va do‘konning umumiy reytingi ochiq.',
   customer_pii: 'Mijozning telefoni, manzili va ichki izohlari AI orqali ochilmaydi. Buyurtma kartasida ruxsat etilgan qismi (yashirilgan holda) ko‘rinadi.',
   secrets: 'Parol, kod, token va tizim kalitlari hech qachon ko‘rsatilmaydi.',
+  not_granted: 'Bu hisobot sizning vakolatingizga kirmaydi. Kerak bo‘lsa do‘kon egasidan ruxsat so‘rang.',
 };
 const UNSUPPORTED: Record<string, string> = {
-  compare: 'Solishtirish keyingi bosqichda qo‘shiladi. Hozircha har bir davrni alohida so‘rang, masalan «kecha qancha pul topdim?» va «bugun qancha pul topdim?».',
-  after_ad_result: '«Reklamadan keyingi natija» (komissiya − o‘zingiz to‘lagan reklama) hali ulanmagan. Hozir komissiyani so‘rashingiz mumkin: «shu oy qancha pul topdim?». Reklama xarajatlari «Reklama» bo‘limida.',
+  compare: 'Solishtirish uchun avval bitta hisobot so‘rang (masalan «bugun qancha pul topdim?»), keyin «kechagisi bilan solishtir» deb yozing.',
   forecast: 'Prognoz hozircha yo‘q: yetarli tarix va tekshiruvsiz taxmin qilmayman.',
-  workspace: 'Bu ish muhiti uchun AI hisobotlari keyingi bosqichda ulanadi. Hozircha oddiy panel hisobotlaridan foydalaning.',
   channel_followup: 'Avval biror hisobot so‘rang (masalan «bugun qancha pul topdim?»), keyin «faqat Telegram» deb filtr qo‘shing.',
   future: 'Bu sana hali kelmagan — u kun uchun natija bo‘lishi mumkin emas.',
+  unknown: 'Bu savolni hali tushunmadim. Quyidagilardan birini tanlang yoki davr va ko‘rsatkichni aniq yozing.',
 };
 
-interface Ctx { tool?: Tool; metric?: string; status?: string; channel?: string; period?: { from: string; to: string }; year?: number }
+interface Ctx { tool?: AnyTool; metric?: string; status?: string; channel?: string; period?: { from: string; to: string }; year?: number }
 
-async function runTool(db: Db, pr: Principal, tool: Tool, a: { period?: Period; metric?: string; status?: string; channel?: string }, now: Date): Promise<ToolResult> {
-  const s = { partnerId: pr.partnerId! };
+async function runTool(db: Db, pr: Principal, tool: AnyTool, a: { period?: Period; metric?: string; status?: string; channel?: string }, now: Date): Promise<ToolResult> {
   const p = a.period;
+  if (pr.workspace !== 'partner') {
+    const s = staffScope(pr);
+    switch (tool) {
+      case 'operator_work_queue': return S.operatorQueue(db, s);
+      case 'operator_activity_summary': return S.operatorActivity(db, s, p ?? todayPeriod(now));
+      case 'admin_sales_summary': return S.salesSummary(db, p ?? todayPeriod(now));
+      case 'admin_cod_summary': return S.codSummary(db, p ?? todayPeriod(now));
+      case 'admin_inventory_summary': return S.inventorySummary(db);
+      case 'admin_operators_summary': return S.operatorsSummary(db, p ?? lastDays(now, 7));
+      case 'admin_partners_top': return S.partnersTop(db, p ?? lastDays(now, 30));
+      case 'public_bestsellers': return T.bestsellers(db, p ?? lastDays(now, 30));
+      default: throw new AppError(403, 'AI_TOOL_FORBIDDEN');
+    }
+  }
+  const s = { partnerId: pr.partnerId! };
   switch (tool) {
-    case 'partner_earnings_summary': return T.earnings(db, s, p ?? todayPeriod(now), (a.metric as 'payout_paid') ?? 'commission_recognized_net', a.channel);
+    case 'partner_earnings_summary': return a.metric === 'partner_after_ad_result' ? T.afterAd(db, s, p ?? resolvePeriod('shu oy', now)!) : T.earnings(db, s, p ?? todayPeriod(now), (a.metric as 'payout_paid') ?? 'commission_recognized_net', a.channel);
     case 'partner_orders_count': return T.ordersCount(db, s, p ?? todayPeriod(now), a.status, a.channel);
     case 'partner_rejections': return T.rejections(db, s, p ?? todayPeriod(now), a.channel);
     case 'partner_wallet_snapshot': return T.wallet(db, s);
@@ -98,7 +136,30 @@ async function runTool(db: Db, pr: Principal, tool: Tool, a: { period?: Period; 
     case 'partner_quality_cases': return T.quality(db, s);
     case 'partner_charity_summary': return T.charity(db, s, p ?? resolvePeriod('shu oy', now)!);
     case 'partner_contest_status': return T.contests(db, s);
+    default: throw new AppError(403, 'AI_TOOL_FORBIDDEN');
   }
+}
+
+/** Two runs of the same tool → current vs. baseline (equal elapsed part when the current period is still running). */
+function compareResults(cur: ToolResult, prev: ToolResult): ToolResult {
+  const c = cur.facts.find((f) => f.primary) ?? cur.facts[0];
+  const b = prev.facts.find((f) => f.id === c?.id) ?? prev.facts.find((f) => f.primary);
+  const num = (v: unknown) => { try { return BigInt(String(v ?? 0)); } catch { return null; } };
+  const cv = num(c?.value), bv = num(b?.value);
+  if (!c || !b || cv === null || bv === null || !['som', 'orders', 'count', 'units'].includes(c.unit)) {
+    return { ...cur, status: 'unsupported', metric: `compare:${cur.metric}`, title: 'Bu ko‘rsatkichni solishtirib bo‘lmaydi', facts: [], partial_reasons: [] };
+  }
+  const diff = cv - bv;
+  const pct = bv !== 0n ? Number((diff * 1000n) / bv) / 10 : null;
+  return {
+    ...cur, metric: `compare:${cur.metric}`, title: `Solishtirish: ${cur.title}`,
+    facts: [{ ...c, label: cur.period?.label ?? 'Hozir', primary: true }, { ...b, label: prev.period?.label ?? 'Oldingi', primary: false },
+      { id: 'diff', label: 'Farq', value: c.unit === 'som' ? diff.toString() : Number(diff), unit: c.unit, kind: 'computed' },
+      ...(pct === null ? [] : [{ id: 'diff_pct', label: 'Farq (%)', value: pct, unit: 'percent' as const, kind: 'computed' as const }])],
+    table: undefined,
+    method: `${cur.method} Solishtirish: xuddi shu ko‘rsatkich oldingi teng davr bilan${cur.period?.partial_today ? '; joriy davr tugamagani uchun oldingi davrning xuddi shu vaqtgacha bo‘lgan qismi olindi' : ''}.`,
+    partial_reasons: [...cur.partial_reasons.filter((x) => !x.startsWith('Davr hali')), ...(bv === 0n ? ['Oldingi davr 0 — foiz hisoblanmadi.'] : [])],
+  };
 }
 
 async function quota(db: Db, userId: string) {
@@ -115,7 +176,7 @@ async function session(db: Db, pr: Principal, id?: string | null): Promise<{ id:
   return one(db, `INSERT INTO ai_sessions (user_id, workspace) VALUES ($1,$2) RETURNING id, context`, [pr.userId, pr.workspace]);
 }
 
-async function store(db: Db, pr: Principal, sessionId: string | null, question: string | null, tool: string, args: unknown, result: ToolResult | null, status: string, summary: string, trace: string, started: number, intent: string) {
+async function store(db: Db, pr: Principal, sessionId: string | null, question: string | null, tool: string, args: unknown, result: ToolResult | null, status: string, summary: string, trace: string, started: number, intent: string, provider = 'deterministic') {
   const rep = result ? await one<{ id: string; as_of: string }>(db, `INSERT INTO ai_report_snapshots (user_id, workspace, scope_hash, tool, arguments, result, metric_version) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id, as_of`,
     [pr.userId, pr.workspace, pr.scopeHash, tool, JSON.stringify(args ?? {}), JSON.stringify(result), result.metric_version]) : null;
   if (sessionId) {
@@ -123,25 +184,32 @@ async function store(db: Db, pr: Principal, sessionId: string | null, question: 
     await db.query(`INSERT INTO ai_messages (session_id, role, text, report_id, status) VALUES ($1,'assistant',$2,$3,$4)`, [sessionId, summary, rep?.id ?? null, status]);
     await db.query(`UPDATE ai_sessions SET updated_at=now(), title=COALESCE(title, $2) WHERE id=$1`, [sessionId, question ? redact(question).slice(0, 80) : null]);
   }
-  await db.query(`INSERT INTO ai_query_runs (trace_id, user_id, workspace, intent, tool, status, duration_ms) VALUES ($1,$2,$3,$4,$5,$6,$7)`, [trace, pr.userId, pr.workspace, intent, tool || null, status, Date.now() - started]);
+  await db.query(`INSERT INTO ai_query_runs (trace_id, user_id, workspace, intent, tool, status, duration_ms, provider) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`, [trace, pr.userId, pr.workspace, intent, tool || null, status, Date.now() - started, provider]);
   return rep;
 }
 
 const card = (rep: { id: string; as_of: string } | null, status: string, summary: string, result: ToolResult | null, pr: Principal, sessionId: string | null, extra: Record<string, unknown> = {}) =>
-  ({ report_id: rep?.id ?? null, session_id: sessionId, status, summary, result, as_of: rep?.as_of ?? new Date().toISOString(), workspace: pr.workspace, scope_label: pr.workspace === 'partner' ? 'Faqat sizning maʼlumotlaringiz' : pr.workspace, provider: 'deterministic', ...extra });
+  ({ report_id: rep?.id ?? null, session_id: sessionId, status, summary, result, as_of: rep?.as_of ?? new Date().toISOString(), workspace: pr.workspace, workspace_label: WS_LABEL[pr.workspace], scope_label: SCOPE_LABEL[pr.workspace], provider: 'deterministic', ...extra });
 
-const CHANNEL_TOOLS: Tool[] = ['partner_earnings_summary', 'partner_orders_count', 'partner_rejections', 'partner_flows_performance'];
 const zDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+const LLM_HINT: Record<string, string> = {
+  partner_earnings_summary: 'my earned commission / payouts / result after ads for a period', partner_orders_count: 'how many orders I received in a period', partner_rejections: 'cancelled/rejected orders in a period',
+  partner_wallet_snapshot: 'my balance now', partner_best_day: 'my best earning day', partner_top_products: 'my best-selling products', partner_flows_performance: 'my referral links (flows) results',
+  partner_uzcoin_summary: 'my UzCoin balance', partner_level: 'my level and coupon', partner_quality_cases: 'quality checks and warnings about me', partner_charity_summary: 'my charity donations',
+  partner_contest_status: 'running contests', public_bestsellers: 'shop-wide best-selling products (rank only)', operator_work_queue: 'my open work queue now', operator_activity_summary: 'what I (operator) did in a period',
+  admin_sales_summary: 'shop sales in a period', admin_cod_summary: 'cash on delivery collected/remitted', admin_inventory_summary: 'low / out-of-stock products', admin_operators_summary: 'operators activity', admin_partners_top: 'top partners',
+};
 
 export function registerAiBiz(app: FastifyInstance, deps: Deps): void {
   route(app, deps, { method: 'GET', url: '/ai/biz/capabilities', tags: ['ai-biz'], summary: 'Workspaces, quick questions and connected reports for the current user', query: z.object({ workspace: z.string().max(20).optional() }) },
     async ({ actor, db, query }) => {
       const pr = await principal(db, actor, query.workspace);
       const llm = await maybeOne<{ enabled: boolean }>(db, `SELECT enabled FROM feature_flags WHERE key='ai.business.llm'`);
+      const llmOn = !!llm?.enabled && !!getIntentClient();
       return {
-        workspace: pr.workspace, available: pr.available, connected: CONNECTED.includes(pr.workspace),
-        quick_questions: pr.workspace === 'partner' ? PARTNER_QUICK : [],
-        llm: { enabled: !!llm?.enabled, note: llm?.enabled ? null : 'Savollar tayyor qoidalar bilan tushuniladi (tashqi AI o‘chiq).' },
+        workspace: pr.workspace, workspace_label: WS_LABEL[pr.workspace], available: pr.available.map((w) => ({ key: w, label: WS_LABEL[w] })), connected: allowedTools(pr).length > 0,
+        tools: allowedTools(pr), quick_questions: quickFor(pr),
+        llm: { enabled: llmOn, note: llmOn ? 'Erkin savollarni AI tushunadi; raqamlar faqat hisobotlardan.' : 'Savollar tayyor qoidalar bilan tushuniladi (tashqi AI o‘chiq).' },
         voice: false, export: false, actions: false, timezone: 'Asia/Tashkent',
       };
     });
@@ -153,44 +221,91 @@ export function registerAiBiz(app: FastifyInstance, deps: Deps): void {
     const pr = await principal(db, actor, body.workspace);
     await quota(db, pr.userId);
     const ses = await session(db, pr, body.session_id);
+    const quick = quickFor(pr);
+    const allowed = allowedTools(pr);
     const reply = async (status: string, summary: string, intent: string, extra: Record<string, unknown> = {}) => {
       await store(db, pr, ses.id, body.text, '', null, null, status, summary, trace, started, intent);
       return card(null, status, summary, null, pr, ses.id, extra);
     };
-    if (!CONNECTED.includes(pr.workspace)) return reply('unsupported', UNSUPPORTED.workspace!, 'workspace');
-    const intent: Intent = classify(body.text);
-    if (intent.kind === 'forbidden') return reply('forbidden', REFUSAL[intent.reason]!, `forbidden:${intent.reason}`);
-    if (intent.kind === 'unsupported') return reply('unsupported', UNSUPPORTED[intent.reason]!, `unsupported:${intent.reason}`, { suggestions: PARTNER_QUICK.slice(0, 4) });
-    if (intent.kind === 'unknown') return reply('unsupported', 'Bu savolni hali tushunmadim. Quyidagilardan birini tanlang yoki davr va ko‘rsatkichni aniq yozing (masalan «25-oktabrda nechta buyurtma oldim?»).', 'unknown', { suggestions: PARTNER_QUICK });
+    const finish = async (tool: AnyTool, args: Record<string, unknown>, result: ToolResult, ctx: Ctx, provider: string) => {
+      const summary = summarize(result);
+      await db.query(`UPDATE ai_sessions SET context=$2 WHERE id=$1`, [ses.id, JSON.stringify(ctx)]);
+      const rep = await store(db, pr, ses.id, body.text, tool, args, result, result.status, summary, trace, started, tool, provider);
+      return card(rep, result.status, summary, result, pr, ses.id, { provider });
+    };
 
-    let tool = intent.tool; let metric = intent.metric; let status = intent.status; let channel = intent.channel;
+    // 1) refusals before anything is read. Partners may not ask about other partners; staff rankings are permission-gated.
+    const base = classify(body.text);
+    if (base.kind === 'forbidden' && (pr.workspace === 'partner' || base.reason !== 'other_partner')) return reply('forbidden', REFUSAL[base.reason]!, `forbidden:${base.reason}`);
+
+    // 2) «kechagisi bilan solishtir»: same report, previous equal period (equal elapsed part if still running).
+    if (/solishtir|taqqosla|sravn/.test(matchForm(body.text))) {
+      const c = ses.context;
+      if (!c.tool || !COMPARABLE.includes(c.tool) || !c.period || !allowed.includes(c.tool)) return reply('unsupported', UNSUPPORTED.compare!, 'compare:no_context', { suggestions: quick.slice(0, 4) });
+      const curP = explicitPeriod(c.period.from, c.period.to, now)!;
+      const a = { metric: c.metric, status: c.status, channel: c.channel };
+      const cur = await runTool(db, pr, c.tool, { ...a, period: curP }, now);
+      const prev = await runTool(db, pr, c.tool, { ...a, period: previousPeriod(curP, now) }, now);
+      return finish(c.tool, { ...a, compare: true, period: c.period }, compareResults(cur, prev), c, 'deterministic');
+    }
+
+    let tool: AnyTool | undefined; let metric: string | undefined; let status: string | undefined; let channel: string | undefined; let followup = false;
     let period = resolvePeriod(body.text, now, ses.context.year ?? null);
-    if (intent.followup) {
+    let provider = 'deterministic';
+    if (pr.workspace === 'partner') {
+      if (base.kind === 'unsupported') return reply('unsupported', UNSUPPORTED[base.reason] ?? UNSUPPORTED.unknown!, `unsupported:${base.reason}`, { suggestions: quick.slice(0, 4) });
+      if (base.kind === 'tool') ({ tool, metric, status, channel } = base), followup = !!base.followup;
+    } else {
+      tool = classifyStaff(body.text) ?? (base.kind === 'tool' && base.tool === 'public_bestsellers' ? 'public_bestsellers' : undefined);
+    }
+
+    // 3) optional LLM routing for questions the rules did not understand (no data, no identity sent; output re-validated).
+    if (!tool) {
+      const flag = await maybeOne<{ enabled: boolean }>(db, `SELECT enabled FROM feature_flags WHERE key='ai.business.llm'`);
+      const ai = flag?.enabled ? getIntentClient() : null;
+      if (ai) {
+        try {
+          const prop = await ai.propose(body.text, ymd(localDay(now)), allowed.map((n) => ({ name: n, hint: LLM_HINT[n] ?? n })));
+          if (prop.tool !== 'none' && (allowed as string[]).includes(prop.tool)) {
+            tool = prop.tool as AnyTool; provider = 'llm';
+            status = prop.status ?? undefined; channel = prop.channel ?? undefined;
+            metric = tool === 'partner_earnings_summary' ? prop.metric ?? undefined : undefined;
+            if (prop.date_from && prop.date_to_exclusive) {
+              const p = explicitPeriod(prop.date_from, prop.date_to_exclusive, now);
+              if (!p) return reply('unsupported', 'Davrni aniqlay olmadim. Masalan «25-oktabr» yoki «shu oy» deb yozing.', 'llm:bad_period', { provider: 'llm' });
+              period = p;
+            }
+          }
+        } catch { /* provider error → same honest answer as without AI */ }
+      }
+    }
+    if (!tool) return reply('unsupported', UNSUPPORTED.unknown!, 'unknown', { suggestions: quick });
+    if (!allowed.includes(tool)) return reply('forbidden', REFUSAL.not_granted!, `forbidden:not_granted:${tool}`);
+
+    if (followup) {
       // «endi faqat Telegram»: same report and period, one extra allowed filter — the scope stays the server's.
       if (!ses.context.tool || !CHANNEL_TOOLS.includes(ses.context.tool)) return reply('unsupported', UNSUPPORTED.channel_followup!, 'followup');
       tool = ses.context.tool; metric = ses.context.metric; status = ses.context.status; channel = channelOf(body.text);
       period = ses.context.period ? explicitPeriod(ses.context.period.from, ses.context.period.to, now) : period;
     }
     if (period?.future) return reply('zero', UNSUPPORTED.future!, 'future');
-    const result = await runTool(db, pr, tool, { period: period ?? undefined, metric, status, channel: CHANNEL_TOOLS.includes(tool) ? channel : undefined }, now);
-    const summary = summarize(result);
-    const ctx: Ctx = { tool, metric, status, channel, period: result.period ? { from: result.period.from, to: result.period.to_exclusive } : undefined, year: period && ['day', 'month'].includes(period.kind) ? Number(period.from.slice(0, 4)) : ses.context.year };
-    await db.query(`UPDATE ai_sessions SET context=$2 WHERE id=$1`, [ses.id, JSON.stringify(ctx)]);
-    const rep = await store(db, pr, ses.id, body.text, tool, { metric, status, channel, period: ctx.period }, result, result.status, summary, trace, started, tool);
-    return card(rep, result.status, summary, result, pr, ses.id);
+    const ch = CHANNEL_TOOLS.includes(tool) ? channel : undefined;
+    const result = await runTool(db, pr, tool, { period: period ?? undefined, metric, status, channel: ch }, now);
+    const ctx: Ctx = { tool, metric, status, channel: ch, period: result.period ? { from: result.period.from, to: result.period.to_exclusive } : undefined, year: period && ['day', 'month'].includes(period.kind) ? Number(period.from.slice(0, 4)) : ses.context.year };
+    return finish(tool, { metric, status, channel: ch, period: ctx.period }, result, ctx, provider);
   });
 
   // Structured call used by quick cards and «Filtrni o‘zgartirish»: same tools, strict schema, no identity fields.
   route(app, deps, { method: 'POST', url: '/ai/biz/tool', tags: ['ai-biz'], summary: 'Run one allow-listed report tool with explicit arguments',
     body: z.object({
-      tool: z.enum(['partner_earnings_summary', 'partner_orders_count', 'partner_rejections', 'partner_wallet_snapshot', 'partner_best_day', 'partner_top_products', 'partner_flows_performance', 'partner_uzcoin_summary', 'partner_level', 'partner_quality_cases', 'partner_charity_summary', 'partner_contest_status', 'public_bestsellers']),
-      arguments: z.object({ date_from: zDate.optional(), date_to_exclusive: zDate.optional(), metric: z.enum(['commission_recognized_net', 'payout_paid']).optional(), status: z.enum(['new', 'accepted', 'shipping', 'delivered', 'returned', 'cancelled']).optional(), channel: z.enum(['telegram', 'instagram', 'facebook', 'youtube', 'tiktok']).optional() }).strict().default({}),
+      tool: z.enum(ALL_TOOLS),
+      arguments: z.object({ date_from: zDate.optional(), date_to_exclusive: zDate.optional(), metric: z.enum(['commission_recognized_net', 'payout_paid', 'partner_after_ad_result']).optional(), status: z.enum(['new', 'accepted', 'shipping', 'delivered', 'returned', 'cancelled']).optional(), channel: z.enum(['telegram', 'instagram', 'facebook', 'youtube', 'tiktok']).optional() }).strict().default({}),
       session_id: z.string().uuid().nullish(), workspace: z.string().max(20).optional(),
     }).strict() },
   async ({ actor, db, body }) => {
     const started = Date.now(); const trace = randomUUID(); const now = new Date();
     const pr = await principal(db, actor, body.workspace);
-    if (!CONNECTED.includes(pr.workspace)) throw new AppError(403, 'AI_TOOL_FORBIDDEN');
+    if (!allowedTools(pr).includes(body.tool)) throw new AppError(403, 'AI_TOOL_FORBIDDEN');
     await quota(db, pr.userId);
     const a = body.arguments;
     let period: Period | undefined;

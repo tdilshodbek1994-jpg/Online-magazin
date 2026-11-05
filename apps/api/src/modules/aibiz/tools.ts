@@ -33,7 +33,7 @@ export interface ToolResult {
 
 export interface Scope { partnerId: string }
 const TZ = 'Asia/Tashkent';
-const range = (p: Period) => [localStartUtc(p.from).toISOString(), localStartUtc(p.to).toISOString()];
+const range = (p: Period) => [p.startUtc ?? localStartUtc(p.from).toISOString(), p.endUtc ?? localStartUtc(p.to).toISOString()];
 const per = (p: Period) => ({ from: p.from, to_exclusive: p.to, label: p.label, timezone: TZ, partial_today: p.partial_today });
 const mask = (n: string) => `OM-***${n.slice(-3)}`;
 const pname = (j: Record<string, string> | null) => (j?.['uz-Latn'] ?? j?.['uz-Cyrl'] ?? Object.values(j ?? {})[0] ?? '—');
@@ -340,5 +340,33 @@ export async function contests(q: Queryable, s: Scope): Promise<ToolResult> {
     evidence: [{ type: 'page', label: 'Konkurs markazi', href: '/partner/contests' }],
     method: 'E’lon qilingan konkurslar ro‘yxati va tugash sanasi. O‘rin va sovrin holati faqat Konkurs markazidagi rasmiy reytingdan olinadi.',
     partial_reasons: all.length ? ['O‘rningiz bu javobga hali ulanmagan — Konkurs markazida ko‘ring.'] : [], open: { label: 'Konkurs markazini ochish', href: '/partner/contests' },
+  };
+}
+
+// ---------------------------------------------------------------------------------------------------------- after-ad result
+/**
+ * «Reklamadan keyingi natija» = recognized net commission − ads the PARTNER paid, prorated to the days of the period that
+ * the ad service covered. Store-paid ads are never subtracted. Not called «sof foyda»: taxes and other costs are unknown.
+ */
+export async function afterAd(q: Queryable, s: Scope, p: Period): Promise<ToolResult> {
+  const base = await earnings(q, s, p, 'commission_recognized_net');
+  const net = BigInt(String(base.facts.find((f) => f.id === 'commission_recognized_net')?.value ?? 0));
+  const ads = await one<{ spend: string; n: number; no_fx: number }>(q, `
+    SELECT COALESCE(SUM(CASE WHEN fx_status='ok' THEN amount_uzs_minor * (LEAST(service_to, ($3::date - 1)) - GREATEST(service_from, $2::date) + 1) / (service_to - service_from + 1) END),0)::bigint::text AS spend,
+           COUNT(*) FILTER (WHERE fx_status='ok')::int AS n, COUNT(*) FILTER (WHERE fx_status <> 'ok')::int AS no_fx
+      FROM ad_expenses WHERE partner_id=$1 AND status='active' AND payer='partner' AND kind IN ('actual','adjustment')
+       AND service_from < $3::date AND service_to >= $2::date`, [s.partnerId, p.from, p.to]);
+  const spend = BigInt(ads.spend);
+  return {
+    status: net || spend ? 'ok' : 'zero', tool: 'partner_earnings_summary', metric: 'partner_after_ad_result', metric_version: 1,
+    title: 'Reklamadan keyingi natija = sof komissiya − o‘zingiz to‘lagan reklama', period: base.period,
+    facts: [{ id: 'partner_after_ad_result', label: 'Reklamadan keyingi natija', value: (net - spend).toString(), unit: 'som', kind: 'computed', primary: true },
+      { id: 'commission_recognized_net', label: 'Tan olingan sof komissiya', value: net.toString(), unit: 'som', kind: 'observed' },
+      { id: 'ad_spend_partner', label: 'Siz to‘lagan reklama (davrga taqsimlangan)', value: spend.toString(), unit: 'som', kind: 'computed' },
+      { id: 'ad_records', label: 'Hisobga olingan xarajat yozuvlari', value: ads.n, unit: 'count', kind: 'observed' }],
+    evidence: [{ type: 'page', label: 'Reklama xarajatlari', href: '/partner/expenses' }, ...base.evidence.slice(0, 10)],
+    method: 'Komissiya — hisob daftaridan (yuqoridagi «pul topdim» bilan bir xil). Reklama — faqat siz to‘lagan va faol xarajatlar; bir necha kunlik xarajat kunlar bo‘yicha taqsimlanib, faqat shu davrga tushgan qismi olinadi. Do‘kon to‘lagan reklama ayirilmaydi. Soliq va boshqa xarajatlar kiritilmagani uchun bu «sof foyda» emas.',
+    partial_reasons: [...base.partial_reasons, ...(ads.no_fx ? [`${ads.no_fx} ta xarajatda valyuta kursi yo‘q — hisobga olinmadi (0 deb olinmadi).`] : [])],
+    open: { label: 'Reklama xarajatlarini ochish', href: '/partner/expenses' },
   };
 }

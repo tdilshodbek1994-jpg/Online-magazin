@@ -12,7 +12,7 @@
 ## Commands run (local, real PostgreSQL 16)
 - `npx tsc --noEmit` (api, web) — exit 0
 - `npx vitest run test/zn-aibiz.test.ts` — 28 passed
-- full `npx vitest run` — see the commit message / AI_STATUS for the latest count
+- full `npx vitest run` — 39 files, 323 tests passed, exit 0
 - `npm run build` (web) — compiled; manual phone-width check of `/partner/ai` (quick questions, Cyrillic question, refusal card)
 
 CI was not run by Claude for this change; local results are not CI.

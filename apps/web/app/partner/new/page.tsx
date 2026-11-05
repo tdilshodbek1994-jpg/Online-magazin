@@ -306,7 +306,7 @@ function HoldBox({ draft, onChange }: { draft: any; onChange: () => void }) {
   return (
     <div className="hold-box">
       <button className="btn secondary full" disabled={busy} onClick={() => act(() => api(`/partner/drafts/${draft.id}/hold`, { method: 'POST' }))}>🔒 Mijoz o‘ylab turguncha bron qilish</button>
-      <small className="muted">Mahsulot qisqa vaqtga (DEMO: 15 daqiqa) faqat siz uchun ushlab turiladi.</small>
+      <small className="muted">Mahsulot qisqa vaqtga (15 daqiqa) faqat siz uchun ushlab turiladi.</small>
       {err && <div className="field-error" role="alert">{err}</div>}
     </div>
   );

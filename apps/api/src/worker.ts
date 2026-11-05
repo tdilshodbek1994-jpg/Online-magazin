@@ -8,6 +8,8 @@ import { renderText, sendTelegram } from './modules/notifications/telegram.js';
 import { dispatchTracking } from './modules/tracking/service.js';
 import { runAdSafety } from './modules/target/safety.js';
 import { loadConfig } from './config.js';
+import { decrypt } from './platform/mfa.js';
+import { otpText, sendSms, SmsError, smsConfigured } from './modules/notifications/sms.js';
 
 /**
  * Durable worker (ADR-005). Jobs are claimed with FOR UPDATE SKIP LOCKED; scheduled tasks run under a
@@ -27,9 +29,24 @@ export async function runJobsOnce(db: Db, workerId: string, limit = 20): Promise
     try {
       await withTx(db, async (tx) => {
         if (j.kind === 'notification.send') {
-          const n = (await tx.query(`SELECT n.id, n.channel, n.template, n.params, n.status, tl.chat_id FROM notifications n LEFT JOIN telegram_links tl ON tl.user_id=n.user_id WHERE n.id=$1 FOR UPDATE OF n`, [j.payload.id])).rows[0];
+          const n = (await tx.query(`SELECT n.id, n.channel, n.template, n.purpose, n.phone_e164, n.params, n.status, tl.chat_id, (n.created_at < now() - interval '10 minutes') AS stale
+              FROM notifications n LEFT JOIN telegram_links tl ON tl.user_id=n.user_id WHERE n.id=$1 FOR UPDATE OF n`, [j.payload.id])).rows[0];
           const token = process.env.TELEGRAM_BOT_TOKEN;
-          if (n && n.status === 'queued' && n.channel === 'telegram' && token && n.chat_id) {
+          if (n && n.status === 'queued' && n.channel === 'sms' && n.purpose === 'otp' && smsConfigured() && n.params?.code_enc) {
+            // The code is stored only encrypted and is wiped from the row after the attempt, sent or not.
+            const wipe = `UPDATE notifications SET params = params - 'code_enc', attempts=attempts+1, status=$2, provider_ref=$3, sent_at=CASE WHEN $2='sent' THEN now() ELSE sent_at END WHERE id=$1`;
+            if (n.stale) await tx.query(wipe, [n.id, 'suppressed', 'otp_expired_before_send']);
+            else {
+              try {
+                const code = decrypt(String(n.params.code_enc), process.env.MFA_ENC_KEY || 'dev-only-mfa-key');
+                const ref = await sendSms(String(n.phone_e164), otpText(code));
+                await tx.query(wipe, [n.id, 'sent', `eskiz:${ref}`]);
+              } catch (e) {
+                if (e instanceof SmsError && !e.permanent) throw e; // network / 5xx: job retries with backoff
+                await tx.query(wipe, [n.id, 'failed', String((e as Error).message).slice(0, 120)]);
+              }
+            }
+          } else if (n && n.status === 'queued' && n.channel === 'telegram' && token && n.chat_id) {
             try {
               const ref = await sendTelegram(token, n.chat_id, renderText(n.template, n.params ?? {}));
               await tx.query(`UPDATE notifications SET status='sent', provider_ref=$2, attempts=attempts+1 WHERE id=$1`, [n.id, `tg:${ref}`]);
@@ -39,8 +56,8 @@ export async function runJobsOnce(db: Db, workerId: string, limit = 20): Promise
             }
           } else if (n && n.status === 'queued') {
             // No provider/link configured (SMS adapter is dev-only): never reported as delivered (§23, AC-M17-2).
-            const why = n.channel === 'telegram' ? (token ? 'no_telegram_link' : 'telegram_not_configured') : 'dev_log_only';
-            await tx.query(`UPDATE notifications SET status='suppressed', provider_ref=$2, attempts=attempts+1 WHERE id=$1`, [n.id, why]);
+            const why = n.channel === 'telegram' ? (token ? 'no_telegram_link' : 'telegram_not_configured') : n.channel === 'sms' && smsConfigured() ? 'sms_otp_only' : 'dev_log_only';
+            await tx.query(`UPDATE notifications SET status='suppressed', provider_ref=$2, attempts=attempts+1, params = params - 'code_enc' WHERE id=$1`, [n.id, why]);
           }
         }
         await tx.query(`UPDATE jobs SET status='done', finished_at=now() WHERE id=$1`, [j.id]);

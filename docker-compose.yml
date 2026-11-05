@@ -17,14 +17,14 @@ services:
     build: { context: ., dockerfile: infra/docker/api.Dockerfile }
     command: ["node", "dist/platform/migrate-cli.js"]
     env_file: [.env]
-    environment: { DATABASE_URL: "postgres://om_app:${OM_DB_PASSWORD}@om-postgres:5432/online_magazin" }
+    environment: { DATABASE_URL: "postgres://om_app:${OM_DB_PASSWORD}@om-postgres:5432/${OM_DB_NAME:-online_magazin}" }
     depends_on: { om-postgres: { condition: service_healthy } }
     networks: [om_net]
   om-api:
     image: om-api:dev
     build: { context: ., dockerfile: infra/docker/api.Dockerfile }
     env_file: [.env]
-    environment: { DATABASE_URL: "postgres://om_app:${OM_DB_PASSWORD}@om-postgres:5432/online_magazin", PORT: "4000", MEDIA_DIR: /data/media }
+    environment: { DATABASE_URL: "postgres://om_app:${OM_DB_PASSWORD}@om-postgres:5432/${OM_DB_NAME:-online_magazin}", PORT: "4000", MEDIA_DIR: /data/media }
     volumes: [om_media:/data/media]
     depends_on: { om-migrate: { condition: service_completed_successfully } }
     networks: [om_net]
@@ -37,7 +37,7 @@ services:
     command: ["node", "dist/worker-main.js"]
     healthcheck: { disable: true } # worker has no HTTP port; liveness = process supervision
     env_file: [.env]
-    environment: { DATABASE_URL: "postgres://om_app:${OM_DB_PASSWORD}@om-postgres:5432/online_magazin" }
+    environment: { DATABASE_URL: "postgres://om_app:${OM_DB_PASSWORD}@om-postgres:5432/${OM_DB_NAME:-online_magazin}" }
     depends_on: { om-migrate: { condition: service_completed_successfully } }
     networks: [om_net]
     deploy: { resources: { limits: { memory: 256m } } }

@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useCartCount } from '@/components/Header';
 import { IconBag, IconCart, IconGrid, IconHome, IconPlay, IconStore, IconUser, IconWallet } from '@/components/Icons';
-import { getToken } from '@/lib/api';
+import { api, getToken } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
 import { useEffect, useState } from 'react';
 
@@ -60,6 +60,8 @@ export function BottomNav() {
 export function Footer() {
   const { t } = useI18n();
   const path = usePathname() ?? '/';
+  const [demo, setDemo] = useState(false);
+  useEffect(() => { api('/features').then((f) => setDemo(!!f.demo)).catch(() => {}); }, []);
   if (isWorkPath(path)) return null;
   return (
     <footer className="site-foot">
@@ -67,7 +69,7 @@ export function Footer() {
         <div>
           <div className="brand"><span className="logo-mark"><IconBag size={20} /></span><span>Uz<b>Shop</b></span></div>
           <p className="muted">{t('aboutShop')}</p>
-          <p className="badge test">{t('demoNote')}</p>
+          {demo && <p className="badge test">{t('demoNote')}</p>}
         </div>
         <div>
           <h3>{t('catalog')}</h3>

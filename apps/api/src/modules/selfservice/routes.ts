@@ -3,6 +3,7 @@ import { randomBytes, randomInt, timingSafeEqual } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { audit } from '../../platform/audit.js';
+import { encrypt } from '../../platform/mfa.js';
 import { hashToken, requirePerm, requireStepUp, requireUser, type Actor } from '../../platform/auth.js';
 import { many, maybeOne, one, type Queryable, withTx } from '../../platform/db.js';
 import { AppError, badRequest, conflict, notFound } from '../../platform/errors.js';
@@ -112,7 +113,7 @@ export function registerSelfService(app: FastifyInstance, deps: Deps): void {
           const ch = await one<{ id: string }>(tx, `INSERT INTO otp_challenges (phone_e164, purpose, code_hash, max_attempts, expires_at, ip, user_id)
               VALUES ($1,$2,'\\x00',$3, now() + make_interval(secs => $4), $5, $6) RETURNING id`, [phone, purpose, cfg.otp.maxAttempts, cfg.otp.ttlSeconds, req.ip, actor.userId]);
           await tx.query('UPDATE otp_challenges SET code_hash=$2 WHERE id=$1', [ch.id, codeHash(ch.id, code)]);
-          await queueNotification(tx, { phone, channel: 'sms', purpose: 'otp', template: 'otp_login', locale: 'uz-Latn', params: { code_ref: ch.id }, dedupeKey: `otp:${ch.id}` });
+          await queueNotification(tx, { phone, channel: 'sms', purpose: 'otp', template: 'otp_login', locale: 'uz-Latn', params: { code_ref: ch.id, code_enc: encrypt(code, cfg.mfaKey) }, dedupeKey: `otp:${ch.id}` });
           const k = purpose === 'phone_change_old' ? 'current' : 'new';
           out[k] = { challenge_id: ch.id, phone_masked: maskPhone(phone), ...(cfg.otp.devEcho ? { dev_code: code } : {}) };
         }

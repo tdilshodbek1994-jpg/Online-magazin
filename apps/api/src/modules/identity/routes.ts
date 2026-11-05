@@ -38,7 +38,7 @@ export function registerIdentity(app: FastifyInstance, deps: Deps): void {
         const ch = await one<{ id: string }>(tx, `INSERT INTO otp_challenges (phone_e164, purpose, code_hash, max_attempts, expires_at, ip)
             VALUES ($1,$2,'\\x00',$3, now() + make_interval(secs => $4), $5) RETURNING id`, [phone, body.purpose, cfg.otp.maxAttempts, cfg.otp.ttlSeconds, req.ip]);
         await tx.query('UPDATE otp_challenges SET code_hash=$2 WHERE id=$1', [ch.id, codeHash(ch.id, code)]);
-        await queueNotification(tx, { phone, channel: 'sms', purpose: 'otp', template: 'otp_login', locale: body.locale ?? DEFAULT_LOCALE, params: { code_ref: ch.id }, dedupeKey: `otp:${ch.id}` });
+        await queueNotification(tx, { phone, channel: 'sms', purpose: 'otp', template: 'otp_login', locale: body.locale ?? DEFAULT_LOCALE, params: { code_ref: ch.id, code_enc: encrypt(code, cfg.mfaKey) }, dedupeKey: `otp:${ch.id}` });
         return {
           challenge_id: ch.id,
           phone_masked: maskPhone(phone),

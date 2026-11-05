@@ -3,6 +3,7 @@ import { requirePerm } from '../../platform/auth.js';
 import { maybeOne, one } from '../../platform/db.js';
 import { type Deps, route } from '../../platform/http.js';
 import { getIntentClient } from '../aibiz/llm.js';
+import { smsConfigured } from '../notifications/sms.js';
 
 /**
  * Integration & service health from REAL signals (not just «container alive»): database round-trip, job queue age and
@@ -42,8 +43,10 @@ export function registerHealth(app: FastifyInstance, deps: Deps): void {
     const tgAppOn = !!(process.env.TELEGRAM_PARTNER_BOT_TOKEN && process.env.TELEGRAM_PARTNER_BOT_USERNAME);
     checks.push({ key: 'telegram_partner_app', label: 'Telegram hamkor ilovasi', state: tgAppOn ? 'ok' : 'not_configured',
       detail: tgAppOn ? `@${process.env.TELEGRAM_PARTNER_BOT_USERNAME}: ulangan hamkorlar ${tgApp.links}, 24 soatda kirganlar ${tgApp.logins_24h}` : 'Hamkor boti ulanmagan — kabinet faqat saytda.', action: tgAppOn ? undefined : 'Serverda: bash scripts/server/telegram-app-setup.sh partner' });
-    const sms = await one<{ n: number }>(db, `SELECT COUNT(*)::int AS n FROM notifications WHERE channel='sms' AND created_at > now() - interval '24 hours'`);
-    checks.push({ key: 'sms', label: 'SMS', state: 'not_configured', detail: `SMS provayder ulanmagan (24 soatda ${sms.n} ta xabar faqat jurnalga yozildi, yuborilmadi).`, action: 'SMS provayder shartnomasi va kaliti kerak.' });
+    const sms = await one<{ n: number; sent: number; failed: number }>(db, `SELECT COUNT(*)::int AS n, COUNT(*) FILTER (WHERE status='sent')::int AS sent, COUNT(*) FILTER (WHERE status='failed')::int AS failed FROM notifications WHERE channel='sms' AND created_at > now() - interval '24 hours'`);
+    checks.push(smsConfigured()
+      ? { key: 'sms', label: 'SMS (Eskiz)', state: sms.failed > sms.sent && sms.failed > 0 ? 'degraded' : 'ok', detail: `24 soat: yuborildi ${sms.sent}, xato ${sms.failed}. «Yuborildi» = Eskiz qabul qildi.`, action: sms.failed > sms.sent && sms.failed > 0 ? 'Eskiz kabinetida balans va SMS matni tasdiqlanganini tekshiring.' : undefined }
+      : { key: 'sms', label: 'SMS', state: 'not_configured', detail: `SMS provayder ulanmagan (24 soatda ${sms.n} ta xabar faqat jurnalga yozildi, yuborilmadi).`, action: 'Serverda: bash scripts/server/sms-setup.sh' });
 
     const pay = await one<{ unknown: number }>(db, `SELECT (SELECT COUNT(*)::int FROM refunds WHERE status='unknown_result') + (SELECT COUNT(*)::int FROM payout_requests WHERE status='processing_unknown') AS unknown`);
     for (const [k, l, m] of [['payme', 'Payme', cfg.payments.payme.mode], ['click', 'Click', cfg.payments.click.mode]] as const) {

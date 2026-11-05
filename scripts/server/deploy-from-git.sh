@@ -19,7 +19,8 @@ git log --oneline -1
 
 echo "== backup current database (if running)"
 if $C ps -q om-postgres 2>/dev/null | grep -q .; then
-  mkdir -p ~/backups && $C exec -T om-postgres pg_dump -U om_app -Fc online_magazin > ~/backups/pre-deploy-$(date +%Y%m%d%H%M%S).dump && ls -1t ~/backups | head -3
+  DBN=$(grep -E '^OM_DB_NAME=' .env | tail -n1 | cut -d= -f2-); DBN=${DBN:-online_magazin}
+  mkdir -p ~/backups && $C exec -T om-postgres pg_dump -U om_app -Fc "$DBN" > ~/backups/pre-deploy-$DBN-$(date +%Y%m%d%H%M%S).dump && ls -1t ~/backups | head -3
 fi
 
 echo "== build images (one at a time to limit memory)"

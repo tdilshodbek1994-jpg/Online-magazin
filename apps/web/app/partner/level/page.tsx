@@ -49,9 +49,32 @@ export default function LevelPage() {
         <p className="small muted">50% faqat admin belgilagan mahsulotlarga va marja yetarli bo‘lsa qo‘llanadi{d.benefit_products.length ? `: ${d.benefit_products.slice(0, 5).map((p: any) => p.name?.['uz-Latn']).join(', ')}${d.benefit_products.length > 5 ? '…' : ''}` : ' (hozircha mahsulot belgilanmagan)'}.</p>
       </div>
       {adv && <div className="card"><b>🤖 Keyingi darajaga tavsiya</b><ul className="small" style={{ paddingLeft: 18 }}>{adv.tips.map((t: string) => <li key={t}>{t}</li>)}</ul><p className="small muted">{adv.note}</p></div>}
-      <details className="card pp-more"><summary>Barcha darajalar va imtiyozlar</summary>
-        <table className="tr-table"><tbody>{d.defs.map((x: any) => <tr key={x.level} style={{ opacity: d.units >= x.threshold ? 1 : 0.55 }}><td>{x.badge} {x.name}</td><td>{n(x.threshold)}</td><td>{x.gift_discount_bps / 100}%</td><td className="small">{x.perks ?? ''}</td></tr>)}</tbody></table>
-      </details>
+      <section className="card lvl-road-card">
+        <div className="spread"><b>🗺️ Darajalar yo‘li</b><span className="small muted">{d.defs.filter((x: any) => d.units >= x.threshold).length}/{d.defs.length} ochilgan</span></div>
+        <ol className="lvl-road">
+          {d.defs.map((x: any, i: number) => {
+            const done = d.units >= x.threshold && x.level !== L.level;
+            const cur = x.level === L.level;
+            const nextDef = d.defs[i + 1];
+            const pct = cur && nextDef ? Math.min(100, Math.max(0, ((d.units - x.threshold) / (nextDef.threshold - x.threshold)) * 100)) : done ? 100 : 0;
+            return (
+              <li key={x.level} className={`lvl-step ${done ? 'done' : cur ? 'cur' : 'locked'}`} style={{ ['--lc' as any]: x.color }}>
+                <div className="lvl-rail"><span className="lvl-dot">{done ? '✓' : cur ? x.badge : '🔒'}</span>{i < d.defs.length - 1 && <span className="lvl-line"><i style={{ height: `${pct}%` }} /></span>}</div>
+                <div className="lvl-body">
+                  <div className="lvl-row1"><span className="lvl-emoji" aria-hidden>{x.badge}</span><b className="lvl-name">{x.name}</b>{cur && <span className="lvl-you">Siz shu yerdasiz</span>}</div>
+                  <div className="lvl-row2">
+                    <span className="lvl-chip">🎯 {n(x.threshold)} sotuv</span>
+                    {x.gift_discount_bps > 0 && <span className="lvl-chip gift">🎁 −{x.gift_discount_bps / 100}% sovg‘a</span>}
+                    {x.perks && <span className="lvl-chip perk">⭐ {x.perks}</span>}
+                  </div>
+                  {cur && nextDef && <div className="lvl-mini"><span style={{ width: `${pct}%` }} /></div>}
+                  {!done && !cur && <div className="small muted">yana {n(x.threshold - d.units)} ta sotuv</div>}
+                </div>
+              </li>
+            );
+          })}
+        </ol>
+      </section>
       {d.history.length > 0 && <details className="card pp-more"><summary>Darajalar tarixi</summary>{d.history.map((h: any, i: number) => <div key={i} className="spread small"><span>{h.from_level} → {h.to_level} ({n(h.units)} dona)</span><span>{new Date(h.created_at).toLocaleDateString('uz')}</span></div>)}</details>}
       <Link className="btn secondary sm" href="/partner/uzcoin">🪙 Sovg‘alar do‘koni</Link>
     </section>

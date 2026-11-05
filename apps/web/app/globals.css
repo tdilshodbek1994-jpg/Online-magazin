@@ -1664,3 +1664,30 @@ img.t3-ava { object-fit: cover; display: block; }
 .fin-sum small { font-size: 11px; color: var(--muted); overflow-wrap: anywhere; }
 .fin-list { display: grid; gap: 8px; }
 .fin-card { display: grid; gap: 6px; padding: 12px; }
+/* Level road */
+.lvl-road-card { padding: 14px; }
+.lvl-road { list-style: none; margin: 10px 0 0; padding: 0; }
+.lvl-step { display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 10px; }
+.lvl-rail { display: flex; flex-direction: column; align-items: center; }
+.lvl-dot { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-size: 15px; font-weight: 800; flex: none; background: var(--surface-2); color: var(--muted); border: 2px solid var(--border); }
+.lvl-line { flex: 1; width: 3px; min-height: 18px; background: var(--border); border-radius: 3px; overflow: hidden; margin: 2px 0; }
+.lvl-line i { display: block; width: 100%; background: var(--lc); }
+.lvl-step.done .lvl-dot { background: var(--lc); color: #fff; border-color: var(--lc); }
+.lvl-step.cur .lvl-dot { background: #fff; border: 3px solid var(--lc); font-size: 18px; box-shadow: 0 0 0 5px color-mix(in srgb, var(--lc) 22%, transparent); animation: lvl-pulse 2.4s ease-in-out infinite; }
+@keyframes lvl-pulse { 50% { box-shadow: 0 0 0 9px color-mix(in srgb, var(--lc) 10%, transparent); } }
+@media (prefers-reduced-motion: reduce) { .lvl-step.cur .lvl-dot { animation: none; } }
+.lvl-body { padding: 4px 0 16px; min-width: 0; display: grid; gap: 6px; }
+.lvl-step.cur .lvl-body { background: color-mix(in srgb, var(--lc) 9%, var(--surface)); border: 1px solid color-mix(in srgb, var(--lc) 35%, transparent); border-radius: 14px; padding: 10px 12px; margin-bottom: 12px; }
+.lvl-row1 { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.lvl-emoji { font-size: 18px; }
+.lvl-name { font-size: 15px; }
+.lvl-step.done .lvl-name { color: var(--lc); }
+.lvl-step.locked .lvl-name, .lvl-step.locked .lvl-emoji { opacity: .55; }
+.lvl-you { font-size: 11px; font-weight: 700; color: #fff; background: var(--lc); padding: 2px 8px; border-radius: 999px; }
+.lvl-row2 { display: flex; gap: 6px; flex-wrap: wrap; }
+.lvl-chip { font-size: 12px; padding: 3px 8px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--border); white-space: nowrap; }
+.lvl-chip.gift { background: color-mix(in srgb, #f59e0b 14%, var(--surface)); border-color: color-mix(in srgb, #f59e0b 35%, transparent); }
+.lvl-chip.perk { background: color-mix(in srgb, var(--lc) 14%, var(--surface)); border-color: color-mix(in srgb, var(--lc) 40%, transparent); font-weight: 700; white-space: normal; }
+.lvl-step.locked .lvl-chip { opacity: .7; }
+.lvl-mini { height: 6px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
+.lvl-mini span { display: block; height: 100%; background: var(--lc); border-radius: 999px; }

@@ -23,9 +23,9 @@ export default function PartnerPrograms() {
         <Link href="/partner/uzcoin" className="hub-link">🪙 <span>UzCoin</span><small>tanga va sovg‘alar ›</small></Link>
       </div>
 
-      <section id="bonus" className="rail">
+      {/* Lower sections only when there is something real to show (owner: empty lists are noise). */}
+      {(d.bonus_rules.length > 0 || d.bonuses.length > 0) && <section id="bonus" className="rail">
         <h2>🎁 Bonus rejalari</h2>
-        {d.bonus_rules.length === 0 && <div className="empty small">Hozircha bonus rejasi yo‘q.</div>}
         <div className="slist">
           {d.bonus_rules.map((r: any) => {
             const pct = Math.min(100, Math.round((r.delivered / r.threshold_delivered) * 100));
@@ -39,20 +39,20 @@ export default function PartnerPrograms() {
             );
           })}
         </div>
-        <h3 style={{ marginTop: 16 }}>Bonuslar tarixi</h3>
-        {d.bonuses.length === 0 ? <p className="muted small">Hali bonus yo‘q.</p> : (
+        {d.bonuses.length > 0 && <>
+          <h3 style={{ marginTop: 16 }}>Bonuslar tarixi</h3>
           <div className="slist">{d.bonuses.map((b: any) => <div key={b.id} className="scard spread"><div><b>{b.source === 'contest' ? '🏆' : '🎁'} {b.reason}</b><div className="muted small">{fmtDate(b.created_at)}</div></div><b className="ok-t">+{som(b.amount_minor)}</b></div>)}</div>
-        )}
-      </section>
+        </>}
+      </section>}
 
-      <section id="jarima" className="rail">
+      {d.penalties.length > 0 && <section id="jarima" className="rail">
         <h2>⚠️ Jarimalar</h2>
         {d.penalty_reasons.length > 0 && (
           <div className="card small"><b>Qoidalar — jarima qaysi holatlarda:</b>
             <ul>{d.penalty_reasons.map((r: any, i: number) => <li key={i}>{r.name}{r.default_amount_minor ? ` — ${som(r.default_amount_minor)}` : ''}{r.description ? <div className="muted">{r.description}</div> : null}</li>)}</ul>
           </div>
         )}
-        {d.penalties.length === 0 ? <p className="muted small" style={{ marginTop: 8 }}>Sizda jarima yo‘q 👍</p> : (
+        {(
           <div className="slist">{d.penalties.map((p: any) => (
             <div key={p.id} className="scard">
               <div className="spread"><b>{p.reason_text}</b><b className={p.status === 'cancelled' ? 'muted' : 'no-t'}>{p.status === 'cancelled' ? <s>−{som(p.amount_minor)}</s> : `−${som(p.amount_minor)}`}</b></div>
@@ -60,7 +60,7 @@ export default function PartnerPrograms() {
             </div>
           ))}</div>
         )}
-      </section>
+      </section>}
 
     </>
   );

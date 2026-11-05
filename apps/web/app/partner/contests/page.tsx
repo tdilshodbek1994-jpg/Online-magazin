@@ -26,18 +26,14 @@ export default function ContestCenter() {
       {err && <div className="notice" role="alert">{errText(err)}</div>}
       {items === null && !err && <div className="loading" role="status"><span className="spinner" aria-hidden />Yuklanmoqda…</div>}
       {items?.length === 0 && legacy.length === 0 && <div className="empty">Hozircha konkurs yo‘q.</div>}
-      {legacy.filter((c) => c.status === 'active').length > 0 && (
-        <section>
-          <h2 className="an-h2">Davom etmoqda</h2>
-          {legacy.filter((c) => c.status === 'active').map((c) => <ContestCard key={c.id} c={c} />)}
-        </section>
-      )}
       {groups.map(([title, sts]) => {
         const list = (items ?? []).filter((c) => sts.includes(c.status));
-        if (!list.length) return null;
+        const old = sts.includes('active') ? legacy.filter((c) => c.status === 'active') : [];
+        if (!list.length && !old.length) return null;
         return (
           <section key={title}>
             <h2 className="an-h2">{title}</h2>
+            {old.map((c) => <ContestCard key={c.id} c={c} />)}
             <div className="slist">
               {list.map((c) => (
                 <Link key={c.id} href={`/partner/contests/${c.id}`} className="scard cc-card">

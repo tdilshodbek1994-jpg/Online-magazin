@@ -1786,3 +1786,6 @@ img.t3-ava { object-fit: cover; display: block; }
 .pp-moves li:first-child { border-top: 0; }
 .ms .ms-list li.done .ms-time { color: var(--primary-600); }
 .pp-bonus2 span { white-space: nowrap; font-size: 13px; } .pp-bonus2 b { font-size: clamp(20px, 6.5vw, 26px); }
+.rules { display: grid; gap: 4px; }
+.rules-t { margin: 0; white-space: pre-line; font-size: 14px; line-height: 1.5; }
+.rules-t.clamp { display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden; }

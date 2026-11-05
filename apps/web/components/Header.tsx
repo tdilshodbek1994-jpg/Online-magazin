@@ -64,7 +64,7 @@ export function Header() {
             <span>Uz<b>Shop</b> <small className="ptop-sub">Hamkor</small></span>
           </Link>
           <Link href="/partner/new" className="btn sm ptop-new">+ Buyurtma</Link>
-          <details className="pmenu" ref={menu}>
+          <details className="pmenu" ref={menu} onToggle={(e) => document.body.classList.toggle('menu-open', (e.currentTarget as HTMLDetailsElement).open)}>
             <summary aria-label="Profil menyusi"><IconUser /></summary>
             <div className="pmenu-pop" onClick={(e) => { if ((e.target as HTMLElement).closest('a')) closeMenu(); }}>
               <Link href="/partner/orders" aria-current={path === '/partner/orders' ? 'page' : undefined}>Buyurtmalar</Link>
@@ -108,7 +108,7 @@ export function Header() {
           <nav className="stop-nav" aria-label="Xodim bo‘limlari">
             {staff.filter(([h]) => h !== '/partner' && h !== '/account/security').map(([href, label]) => <Link key={href} href={href} className={path?.startsWith(href) ? 'on' : ''} aria-current={path?.startsWith(href) ? 'page' : undefined}>{label}</Link>)}
           </nav>
-          <details className="pmenu" ref={menu}>
+          <details className="pmenu" ref={menu} onToggle={(e) => document.body.classList.toggle('menu-open', (e.currentTarget as HTMLDetailsElement).open)}>
             <summary aria-label="Profil menyusi"><IconUser /></summary>
             <div className="pmenu-pop" onClick={(e) => { if ((e.target as HTMLElement).closest('a')) closeMenu(); }}>
               {staff.map(([href, label]) => <Link key={href} href={href}>{label}</Link>)}

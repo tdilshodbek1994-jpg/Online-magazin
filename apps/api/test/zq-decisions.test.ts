@@ -55,3 +55,33 @@ describe('daily finance close (M25)', () => {
     expect(hist.json.closes.map((x: any) => x.version)).toEqual([2, 1]);
   });
 });
+
+describe('integration health (M35)', () => {
+  it('real signals per service; unconfigured providers are said so, never shown as healthy zero', async () => {
+    delete process.env.TELEGRAM_BOT_TOKEN;
+    expect((await api(t, 'GET', '/admin/integrations/health', { token: s.operator.token })).status).toBe(403);
+    const h = await api(t, 'GET', '/admin/integrations/health', { token: s.owner.token });
+    expect(h.status).toBe(200);
+    const by = Object.fromEntries(h.json.checks.map((c: any) => [c.key, c]));
+    expect(Object.keys(by)).toEqual(expect.arrayContaining(['database', 'worker', 'outbox', 'telegram', 'sms', 'payme', 'click', 'money_unknown', 'ai', 'ads', 'fiscal']));
+    expect(by.database.state).toBe('ok');
+    expect(by.telegram.state).toBe('not_configured');
+    expect(by.sms.state).toBe('not_configured');
+    expect(by.fiscal.detail).toContain('PDF fiskal chek emas');
+    expect(['ok', 'degraded', 'down']).toContain(h.json.overall);
+  });
+});
+
+describe('role revocation takes effect immediately (G02)', () => {
+  it('a revoked operator loses the ops queue and old AI reports on the next request', async () => {
+    const op = await mkUser(t, ['operator']);
+    expect((await api(t, 'GET', '/ops/center', { token: op.token })).status).toBe(200);
+    const rep = await api(t, 'POST', '/ai/biz/ask', { token: op.token, body: { text: 'Hozir navbatimda nechta ish bor?' } });
+    expect(rep.status).toBe(200);
+    const rv = await api(t, 'POST', `/admin/staff/${op.id}/revoke`, { token: s.owner.token, body: { role: 'operator', reason: 'ishdan ketdi' } });
+    expect(rv.status).toBe(200);
+    expect((await api(t, 'GET', '/ops/center', { token: op.token })).status).toBe(403);
+    expect((await api(t, 'GET', `/ai/biz/reports/${rep.json.report_id}`, { token: op.token })).status).toBe(404);
+    expect((await api(t, 'POST', '/ai/biz/ask', { token: op.token, body: { text: 'navbatim' } })).status).toBe(403);
+  });
+});

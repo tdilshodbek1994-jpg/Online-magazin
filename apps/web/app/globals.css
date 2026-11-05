@@ -487,6 +487,9 @@ a.chip { text-decoration: none; }
 .pmenu-pop a:hover { background: var(--surface-2); }
 .pmenu-pop .lang { margin-top: 6px; }
 .pmenu-pop .link-btn { text-align: left; color: var(--danger); }
+/* Long menu: scrolls inside itself (header + bottom bar stay visible); the page behind does not move. */
+.pmenu-pop { max-height: calc(100dvh - 190px); overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+@supports not (height: 100dvh) { .pmenu-pop { max-height: calc(100vh - 190px); } }
 .bn-plus { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 999px; background: var(--primary); color: var(--primary-text); font-size: 22px; font-weight: 700; line-height: 1; }
 .bottom-nav a.bn-cta { color: var(--primary-600); font-weight: 700; }
 .btn.full { width: 100%; }
@@ -1934,3 +1937,10 @@ a.ai-row .ai-rt { color: #1d6fd1; }
 .dec-meta { font-size: 13px; color: var(--muted); } .dec-hint { font-size: 13px; }
 .dec-day { display: grid; gap: 10px; }
 .dec-fig { margin: 0; display: grid; gap: 4px; } .dec-fig > div { display: flex; justify-content: space-between; gap: 10px; font-size: 14px; } .dec-fig dt { color: var(--muted); } .dec-fig dd { margin: 0; font-weight: 700; white-space: nowrap; }
+
+.h-list { display: grid; gap: 8px; margin-top: 8px; }
+.h-item { display: grid; gap: 3px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; }
+.h-st { justify-self: start; font-size: 11.5px; font-weight: 800; padding: 2px 9px; border-radius: 999px; }
+.h-ok { background: #e6f4ec; color: #137a43; } .h-warn { background: #fff4d6; color: #8a5a00; } .h-down { background: #fde8e8; color: #a61b1b; } .h-off { background: #eef1f4; color: #4b5563; }
+
+body.menu-open { overflow: hidden; }

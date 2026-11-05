@@ -1850,7 +1850,8 @@ img.t3-ava { object-fit: cover; display: block; }
 @media (prefers-reduced-motion: reduce) { .kc-chev { transition: none; } }
 
 /* ===== AI yordamchi (partner) ===== */
-.ai-page { display: grid; gap: 12px; padding-bottom: 8px; }
+.ai-page { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; padding-bottom: 8px; min-width: 0; max-width: 100%; overflow-x: hidden; }
+.ai-page > *, .ai-thread > *, .ai-thread > div > * { min-width: 0; max-width: 100%; }
 .ai-hero { display: flex; gap: 12px; align-items: center; padding: 16px; border-radius: 22px; color: #fff; background: radial-gradient(120% 140% at 0% 0%, #1f6feb 0%, #0e4b8f 45%, #0b2a52 100%); box-shadow: 0 10px 30px -14px rgba(14,75,143,.6); }
 .ai-hero h1 { margin: 0; font-size: 22px; color: #fff; }
 .ai-hero p { margin: 2px 0 0; font-size: 13px; opacity: .85; }
@@ -1863,8 +1864,9 @@ img.t3-ava { object-fit: cover; display: block; }
 .ai-q { text-align: left; padding: 12px; border-radius: 14px; border: 1px solid #cfe3fb; background: #eef6ff; color: #0e3a6b; font-weight: 700; font-size: 14px; line-height: 1.3; cursor: pointer; }
 .ai-q:hover { background: #e2efff; }
 .ai-q.sm { padding: 7px 11px; font-size: 13px; border-radius: 999px; white-space: nowrap; }
-.ai-sugg, .ai-more { display: flex; gap: 6px; overflow-x: auto; padding: 4px 0; scrollbar-width: none; }
-.ai-thread { display: grid; gap: 10px; }
+.ai-sugg, .ai-more { display: flex; gap: 6px; overflow-x: auto; padding: 4px 0; scrollbar-width: none; max-width: 100%; min-width: 0; }
+.ai-sum { overflow-wrap: anywhere; }
+.ai-thread { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; min-width: 0; }
 .ai-u { justify-self: end; max-width: 85%; padding: 10px 14px; border-radius: 18px 18px 4px 18px; background: #137a43; color: #fff; font-weight: 600; overflow-wrap: anywhere; }
 .ai-wait { display: flex; gap: 8px; align-items: center; color: var(--muted); font-size: 14px; }
 .ai-card { border: 1px solid var(--border); border-radius: 18px; padding: 12px 14px; background: var(--surface); display: grid; gap: 8px; }

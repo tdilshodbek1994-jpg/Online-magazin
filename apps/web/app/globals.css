@@ -1691,3 +1691,11 @@ img.t3-ava { object-fit: cover; display: block; }
 .lvl-step.locked .lvl-chip { opacity: .7; }
 .lvl-mini { height: 6px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
 .lvl-mini span { display: block; height: 100%; background: var(--lc); border-radius: 999px; }
+/* SVG level medals */
+.lvl-badge-big { flex: none; filter: drop-shadow(0 6px 14px rgba(0,0,0,.35)); }
+.lvl-step { grid-template-columns: 60px minmax(0, 1fr); }
+.lvl-medal { position: relative; display: grid; place-items: center; width: 60px; flex: none; }
+.lvl-step.cur .lvl-medal { filter: drop-shadow(0 0 10px color-mix(in srgb, var(--lc) 60%, transparent)); }
+.lvl-tick, .lvl-lock { position: absolute; right: 0; top: 10px; font-style: normal; font-size: 11px; width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; }
+.lvl-tick { background: var(--lc); color: #fff; font-weight: 900; border: 2px solid var(--surface); }
+.lvl-lock { background: var(--surface); border: 1px solid var(--border); }

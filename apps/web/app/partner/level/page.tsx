@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { errText } from '@/lib/errors';
 import { toast } from '@/lib/toast';
+import { LevelBadge } from '@/components/LevelBadge';
 
 const n = (v: number | string) => String(v).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
 const CP: Record<string, string> = { available: 'Tayyor — faollashtiring', armed: 'Keyingi mos buyurtmaga qo‘llanadi', reserved: 'Buyurtmaga band qilingan (yakunlanishini kutmoqda)', used: 'Ishlatilgan', void: 'Faol emas (sotuvlar chegaradan pastga tushgan)' };
@@ -21,7 +22,7 @@ export default function LevelPage() {
   return (
     <section className="lvl-page">
       <div className="lvl-hero" style={{ background: `linear-gradient(135deg, ${L.color}, #0b1f17)` }}>
-        <div className="lvl-badge" aria-hidden>{L.badge}</div>
+        <div className="lvl-badge-big"><LevelBadge level={L.level} color={L.color} symbol={L.badge} size={92} /></div>
         <div>
           <div className="small" style={{ opacity: 0.85 }}>{L.level > 0 ? `${L.level}-daraja` : 'Boshlang‘ich'}</div>
           <h1>{L.name}</h1>
@@ -59,9 +60,9 @@ export default function LevelPage() {
             const pct = cur && nextDef ? Math.min(100, Math.max(0, ((d.units - x.threshold) / (nextDef.threshold - x.threshold)) * 100)) : done ? 100 : 0;
             return (
               <li key={x.level} className={`lvl-step ${done ? 'done' : cur ? 'cur' : 'locked'}`} style={{ ['--lc' as any]: x.color }}>
-                <div className="lvl-rail"><span className="lvl-dot">{done ? '✓' : cur ? x.badge : '🔒'}</span>{i < d.defs.length - 1 && <span className="lvl-line"><i style={{ height: `${pct}%` }} /></span>}</div>
+                <div className="lvl-rail"><span className="lvl-medal"><LevelBadge level={x.level} color={x.color} symbol={x.badge} size={cur ? 56 : 46} locked={!done && !cur} />{done && <i className="lvl-tick">✓</i>}{!done && !cur && <i className="lvl-lock">🔒</i>}</span>{i < d.defs.length - 1 && <span className="lvl-line"><i style={{ height: `${pct}%` }} /></span>}</div>
                 <div className="lvl-body">
-                  <div className="lvl-row1"><span className="lvl-emoji" aria-hidden>{x.badge}</span><b className="lvl-name">{x.name}</b>{cur && <span className="lvl-you">Siz shu yerdasiz</span>}</div>
+                  <div className="lvl-row1"><b className="lvl-name">{x.name}</b>{cur && <span className="lvl-you">Siz shu yerdasiz</span>}</div>
                   <div className="lvl-row2">
                     <span className="lvl-chip">🎯 {n(x.threshold)} sotuv</span>
                     {x.gift_discount_bps > 0 && <span className="lvl-chip gift">🎁 −{x.gift_discount_bps / 100}% sovg‘a</span>}

@@ -1730,3 +1730,14 @@ img.t3-ava { object-fit: cover; display: block; }
 .hub-link { display: grid; gap: 2px; padding: 12px; border-radius: 14px; border: 1px solid var(--border); background: var(--surface); text-decoration: none; color: inherit; font-size: 20px; }
 .hub-link span { font-size: 15px; font-weight: 800; }
 .hub-link small { font-size: 12px; color: var(--primary-600); }
+/* Large-font safety: two-column form rows and row inputs may shrink */
+.ed-two > * { min-width: 0; }
+.ed-two input, .ed-two select { width: 100%; min-width: 0; }
+.row > input, .row > select { min-width: 0; }
+/* Admin section buttons: compact 3-column icon grid on phones */
+@media (max-width: 760px) {
+  .admin-tabs { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+  .admin-tab { flex-direction: column; justify-content: center; text-align: center; gap: 2px; min-height: 64px; padding: 6px 4px; font-size: 12px; line-height: 1.2; min-width: 0; overflow-wrap: anywhere; }
+  .admin-tab span { font-size: 20px; }
+}
+.notice { overflow-wrap: anywhere; }

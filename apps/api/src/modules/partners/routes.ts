@@ -59,6 +59,9 @@ export async function createAssistedOrder(tx: Tx, cfg: AppConfig, actor: Actor, 
   // On-behalf order: the partner's cookie/IP/UA/fbp/fbc are never sent as the customer's; no Lead from the partner's session.
   await captureOrderContext(tx, actor, order.id, undefined, { onBehalf: true });
   await tx.query(`INSERT INTO order_notes (order_id, author_id, body, internal) VALUES ($1,$2,$3,true)`, [order.id, p.user_id, `Partner note: ${o.note}`]);
+  // Owner decision: no SMS code by default — the operator calls the customer and confirms (independent of the partner).
+  const sms = await maybeOne<{ enabled: boolean }>(tx, `SELECT enabled FROM feature_flags WHERE key='partner.customer_sms_confirm'`);
+  if (!sms?.enabled) return { order_id: order.id, number: order.number, status: 'awaiting_operator_call', customer_phone_masked: maskPhone(phone) };
   // One-time, short-lived confirmation link + code to the customer's phone. Never shown to the partner (T043).
   const ttl = (await getPolicy<{ hours: number }>(tx, POLICY.partnerConfirmTtlHours, cfg.env))?.value.hours ?? 24;
   const conf = await one<{ id: string }>(tx, `INSERT INTO order_confirmations (order_id, method, status, expires_at, shown_total_minor, shown_quote_hash)

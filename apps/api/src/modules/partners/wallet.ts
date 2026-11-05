@@ -160,13 +160,14 @@ export function registerPartnerWallet(app: FastifyInstance, deps: Deps): void {
       returned_at: first((e) => e.dimension === 'fulfillment' && ['returned', 'failed'].includes(e.to_status)),
     };
     const entries = await many(db, `SELECT from_bucket, to_bucket, amount_minor::text, reason, created_at FROM partner_ledger WHERE partner_id=$1 AND source_type='accrual' AND source_id IN (SELECT id::text FROM commission_accruals WHERE order_id=$2) ORDER BY id`, [p.id, params.id]);
+    const smsPending = !!(await maybeOne(db, `SELECT 1 FROM order_confirmations WHERE order_id=$1 AND method='customer_otp' AND status='pending' AND expires_at > now()`, [params.id]));
     const total = accruals.reduce((s, a: Record<string, unknown>) => s + (a.state === 'reversed' ? 0n : BigInt(a.target_minor as string)), 0n);
     return {
       ...rest, customer: maskName(cname), customer_phone: maskTail(cphone), source,
       attribution: { reason: attribution?.reason ?? null, reason_label: reasonText[String(attribution?.reason)] ?? String(attribution?.reason ?? '—') },
       commission: { total_minor: total.toString(), lines: accruals.map((a: Record<string, unknown>) => ({ ...a, reason_label: REASON_LABEL[a.reason as string] ?? a.reason })) },
       timeline, entries, milestones,
-      explain: explainOrder({ bucket: String(o.bucket), channel: String(o.channel), confirmation_status: String(o.confirmation_status), payment_status: String(o.payment_status), reasons: accruals.map((a: Record<string, unknown>) => String(a.reason)), available_after: (accruals.find((a: Record<string, unknown>) => a.state === 'pending') as { available_after?: string } | undefined)?.available_after ?? null }),
+      explain: explainOrder({ sms_pending: smsPending, bucket: String(o.bucket), channel: String(o.channel), confirmation_status: String(o.confirmation_status), payment_status: String(o.payment_status), reasons: accruals.map((a: Record<string, unknown>) => String(a.reason)), available_after: (accruals.find((a: Record<string, unknown>) => a.state === 'pending') as { available_after?: string } | undefined)?.available_after ?? null }),
     };
   });
 }
@@ -175,9 +176,10 @@ export function registerPartnerWallet(app: FastifyInstance, deps: Deps): void {
  * "Nima bo'ldi va keyingi amal nima?" (V2 §18-D) — a plain explanation derived only from backend state
  * (no model guesses): what happened, whose turn it is, and the next action.
  */
-export function explainOrder(o: { bucket: string; channel: string; confirmation_status: string; payment_status: string; reasons: string[]; available_after: string | null }): { what: string; whose_turn: 'partner' | 'customer' | 'shop' | 'none'; next: string } {
+export function explainOrder(o: { bucket: string; channel: string; confirmation_status: string; payment_status: string; reasons: string[]; available_after: string | null; sms_pending?: boolean }): { what: string; whose_turn: 'partner' | 'customer' | 'shop' | 'none'; next: string } {
   if (o.reasons.includes('dispute')) return { what: 'Siz yozgan murojaat ko‘rib chiqilmoqda.', whose_turn: 'shop', next: 'Javob Hamyon va Telegram’da keladi. Qo‘shimcha dalil bo‘lsa, murojaatga yozing.' };
-  if (o.bucket === 'new' && o.channel === 'partner_assisted' && o.confirmation_status === 'pending') return { what: 'Buyurtma yaratildi, mijozga SMS kod yuborildi.', whose_turn: 'customer', next: 'Mijozga qo‘ng‘iroq qilib, SMS’dagi havolani ochib kodni kiritishini eslating.' };
+  if (o.bucket === 'new' && o.channel === 'partner_assisted' && o.confirmation_status === 'pending' && o.sms_pending) return { what: 'Buyurtma yaratildi, mijozga SMS kod yuborildi.', whose_turn: 'customer', next: 'Mijozga qo‘ng‘iroq qilib, SMS’dagi havolani ochib kodni kiritishini eslating.' };
+  if (o.bucket === 'new' && o.channel === 'partner_assisted' && o.confirmation_status === 'pending') return { what: 'Buyurtma operatorga tushdi.', whose_turn: 'shop', next: 'Operator mijozga qo‘ng‘iroq qilib tasdiqlaydi. Mijozni qo‘ng‘iroqqa tayyor bo‘lishini ogohlantiring — SMS kod so‘ralmaydi.' };
   if (o.bucket === 'new') return { what: 'Buyurtma operatorga tushdi.', whose_turn: 'shop', next: 'Operator mijozga qo‘ng‘iroq qilib tasdiqlaydi. Sizdan hozir hech narsa talab qilinmaydi.' };
   if (o.bucket === 'accepted') return { what: 'Buyurtma tasdiqlandi, omborda yig‘ilmoqda.', whose_turn: 'shop', next: 'Jo‘natilgach holat «Yo‘lda» bo‘ladi.' };
   if (o.bucket === 'shipping') return { what: 'Buyurtma kuryerda, yo‘lda.', whose_turn: 'customer', next: 'Mijozni telefonni ko‘tarishga va mahsulotni qabul qilishga tayyor bo‘lishini eslating.' };

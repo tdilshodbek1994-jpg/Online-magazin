@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { releaseMatured } from '../src/modules/commissions/service.js';
 import { withTx } from '../src/platform/db.js';
 import { address, api, balances, fulfilCod, mkPartner, mkProduct, mkUser, placeOrder, setupApp, staff, type Staff, type T, zoneId } from './helpers.js';
@@ -8,6 +8,8 @@ let t: T;
 let s: Staff;
 beforeAll(async () => {
   t = await setupApp();
+  // These tests cover the optional SMS-confirmation flow (owner turned it off by default on 2026-11-05).
+  await t.db.query(`UPDATE feature_flags SET enabled=true WHERE key='partner.customer_sms_confirm'`);
   s = await staff(t);
 });
 
@@ -392,5 +394,29 @@ describe('Commission math & payouts', () => {
       expect((await api(t, m, u, { token: p.token, body: b })).status).toBe(403);
     }
     expect((await t.db.query(`SELECT price_minor FROM offers WHERE sku_id=$1`, [prod.skuIds[0]])).rows[0].price_minor).toBe('10000000');
+  });
+});
+
+afterAll(async () => { await t.db.query(`UPDATE feature_flags SET enabled=false WHERE key='partner.customer_sms_confirm'`); });
+
+describe('Owner decision: no SMS code for partner-entered orders (flag off)', () => {
+  it('order goes straight to the operator queue; no SMS is queued; the operator call confirms it', async () => {
+    await t.db.query(`UPDATE feature_flags SET enabled=false WHERE key='partner.customer_sms_confirm'`);
+    const s = await staff(t);
+    const p = await mkPartner(t);
+    const prod = await mkProduct(t, { prices: [100_000], stock: [5], rule: { kind: 'percent', bps: 1000 } });
+    const phone = `+99893${String(Math.floor(Math.random() * 9e6) + 1e6)}`;
+    const o = await partnerOrder(p, prod.skuIds[0]!, 1, phone);
+    expect(o.status).toBe(201);
+    expect(o.json).toMatchObject({ status: 'awaiting_operator_call' });
+    expect(o.json.dev_customer_code).toBeUndefined();
+    expect((await t.db.query(`SELECT COUNT(*)::int n FROM notifications WHERE phone_e164=$1 AND template='partner_order_confirm'`, [phone])).rows[0].n).toBe(0);
+    expect((await t.db.query(`SELECT COUNT(*)::int n FROM order_confirmations WHERE order_id=$1`, [o.json.order_id])).rows[0].n).toBe(0);
+    const payable = (await t.db.query(`SELECT payable_minor::text p FROM orders WHERE id=$1`, [o.json.order_id])).rows[0].p;
+    await api(t, 'POST', `/ops/orders/${o.json.order_id}/claim`, { token: s.operator.token });
+    expect((await api(t, 'POST', `/ops/orders/${o.json.order_id}/calls`, { token: s.operator.token, body: { outcome: 'confirmed', confirmed_total_minor: payable } })).status).toBe(200);
+    expect((await t.db.query(`SELECT confirmation_status FROM orders WHERE id=$1`, [o.json.order_id])).rows[0].confirmation_status).toBe('verified');
+    // the partner still can never confirm their own order
+    await t.db.query(`UPDATE feature_flags SET enabled=true WHERE key='partner.customer_sms_confirm'`);
   });
 });

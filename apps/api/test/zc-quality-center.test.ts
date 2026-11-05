@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { rates, signalFor } from '../src/modules/quality/routes.js';
 import { address, api, fulfilCod, mkPartner, mkProduct, mkUser, nextPhone, placeOrder, setupIsolatedApp, staff, type Staff, type T, zoneId } from './helpers.js';
 
@@ -8,6 +8,8 @@ let t: T;
 let s: Staff;
 beforeAll(async () => {
   t = await setupIsolatedApp('om_test_quality');
+  // These tests cover the optional SMS-confirmation flow (owner turned it off by default on 2026-11-05).
+  await t.db.query(`UPDATE feature_flags SET enabled=true WHERE key='partner.customer_sms_confirm'`);
   s = await staff(t);
 });
 const base = { confirmed: 0, resolved: 0, pending: 0, delivered: 0, resolvedConfirmed: 0, notPartnerFault: 0, denied: 0, checked: 0, invalid: 0, investigated: 0 };
@@ -187,3 +189,5 @@ describe('Quality Center P0', () => {
     expect(kinds).not.toContain('penalty');
   });
 });
+
+afterAll(async () => { await t.db.query(`UPDATE feature_flags SET enabled=false WHERE key='partner.customer_sms_confirm'`); });

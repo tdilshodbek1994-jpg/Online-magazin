@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { currentStep, totpAt } from '../src/platform/mfa.js';
 import { api, mkUser, setupApp, staff, type Staff, type T } from './helpers.js';
 
@@ -7,6 +7,8 @@ let t: T;
 let s: Staff;
 beforeAll(async () => {
   t = await setupApp();
+  // These tests cover the optional SMS-confirmation flow (owner turned it off by default on 2026-11-05).
+  await t.db.query(`UPDATE feature_flags SET enabled=true WHERE key='partner.customer_sms_confirm'`);
   s = await staff(t);
 });
 
@@ -421,3 +423,5 @@ describe('Feature flag admin (AI kill switch)', () => {
     expect((await tt.db.query(`SELECT COUNT(*)::int n FROM audit_events WHERE action='feature_flag.changed' AND actor_user_id=$1`, [owner.id])).rows[0].n).toBe(2);
   });
 });
+
+afterAll(async () => { await t.db.query(`UPDATE feature_flags SET enabled=false WHERE key='partner.customer_sms_confirm'`); });

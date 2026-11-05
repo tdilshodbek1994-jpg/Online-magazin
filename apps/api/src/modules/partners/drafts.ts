@@ -259,7 +259,7 @@ export function registerSalesDrafts(app: FastifyInstance, deps: Deps): void {
       await audit(tx, null, 'draft.customer_filled', { type: 'sales_draft', id: d.id }, { after: { order_id: r.order_id } });
       // The customer receives the SMS code on their own phone; the response carries no code (dev echo only outside production).
       const dev = r as { dev_customer_link_token?: string; dev_customer_code?: string };
-      return { ok: true, order_number: r.number, next: 'confirm_by_sms', ...(dev.dev_customer_link_token ? { dev_customer_link_token: dev.dev_customer_link_token, dev_customer_code: dev.dev_customer_code } : {}) };
+      return { ok: true, order_number: r.number, next: dev.dev_customer_link_token ? 'confirm_by_sms' : 'operator_call', ...(dev.dev_customer_link_token ? { dev_customer_link_token: dev.dev_customer_link_token, dev_customer_code: dev.dev_customer_code } : {}) };
     });
   });
 }

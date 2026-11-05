@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { parseMessage } from '../src/modules/partners/parse.js';
 import { address, api, balances, fulfilCod, mkPartner, mkProduct, nextPhone, setupApp, staff, type Staff, type T, zoneId } from './helpers.js';
 
@@ -6,6 +6,8 @@ let t: T;
 let s: Staff;
 beforeAll(async () => {
   t = await setupApp();
+  // These tests cover the optional SMS-confirmation flow (owner turned it off by default on 2026-11-05).
+  await t.db.query(`UPDATE feature_flags SET enabled=true WHERE key='partner.customer_sms_confirm'`);
   s = await staff(t);
 });
 
@@ -189,3 +191,5 @@ describe('Hamyon — commission reasons (T20–T23)', () => {
     expect(w3.json.lines.find((l: any) => l.order_id === sub.json.order_id).reason).toBe('dispute');
   });
 });
+
+afterAll(async () => { await t.db.query(`UPDATE feature_flags SET enabled=false WHERE key='partner.customer_sms_confirm'`); });

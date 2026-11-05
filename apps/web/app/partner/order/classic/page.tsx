@@ -20,7 +20,7 @@ export default function PartnerAssistedOrder() {
   return (
     <div className="card" style={{ maxWidth: 640 }}>
       <h1>Mijoz uchun buyurtma</h1>
-      <p className="muted">Mijoz telefoniga SMS kod va havola boradi; mijoz o‘zi tasdiqlamaguncha buyurtma jo‘natilmaydi va komissiya hisoblanmaydi. Mijozning karta yoki bank kodlarini hech qachon so‘ramang.</p>
+      <p className="muted">Operator mijozga qo‘ng‘iroq qilib tasdiqlaydi (SMS kod so‘ralmaydi); tasdiqlanmaguncha buyurtma jo‘natilmaydi va komissiya hisoblanmaydi. Mijozning karta yoki bank kodlarini hech qachon so‘ramang.</p>
       {msg && <div className="notice" role="status">{msg}</div>}
       <label htmlFor="psku">Mahsulot varianti</label>
       <select id="psku" value={po.sku} onChange={(e) => { setPo({ ...po, sku: e.target.value }); setQuote(null); }}><option value="">— tanlang —</option>{products.map((p) => <ProductSkus key={p.id} slug={p.slug} name={pick(p.name, lang)} />)}</select>

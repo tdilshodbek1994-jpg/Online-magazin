@@ -266,12 +266,16 @@ for (let i = 0; i < N_ORDERS; i++) {
       const d = await call('POST', '/partner/drafts', { token: p.token, body: { lines: [{ sku_id: s.sku_id, qty }], customer_name: name, customer_phone: phone, delivery_zone_id: zone.id, address: { district: addr.district, street: addr.street, house: addr.house }, contact_time: rnd() < 0.5 ? pickOne(['Kechqurun 18:00 dan keyin', 'Ertalab', 'Tushdan keyin']) : null } });
       const sub = await call('POST', `/partner/drafts/${d.json.id}/submit`, { token: p.token });
       orderId = sub.json.order_id;
-      if (final === 'new' && rnd() < 0.6) { created.push({ id: orderId, final, partnerOrder: true }); stats['assisted:sms_pending'] = (stats['assisted:sms_pending'] ?? 0) + 1; continue; }
-      if (!sub.json.dev_customer_link_token) throw new Error('no dev confirmation echo (is OTP dev echo off?)');
+      if (sub.json.dev_customer_link_token && final === 'new' && rnd() < 0.6) { created.push({ id: orderId, final, partnerOrder: true }); stats['assisted:sms_pending'] = (stats['assisted:sms_pending'] ?? 0) + 1; continue; }
+      if (!sub.json.dev_customer_link_token) {
+        // SMS step off (owner default): the operator call below confirms or cancels like any other order.
+        if (final === 'new') { created.push({ id: orderId, final, partnerOrder: true }); stats['assisted:operator_pending'] = (stats['assisted:operator_pending'] ?? 0) + 1; continue; }
+      } else {
       const decision = final === 'cancelled' && rnd() < 0.5 ? 'reject' : 'confirm';
       await call('POST', `/confirm/${sub.json.dev_customer_link_token}`, { body: { decision, code: sub.json.dev_customer_code } });
       if (decision === 'reject') { created.push({ id: orderId, final, partnerOrder: true }); stats['cancelled'] = (stats['cancelled'] ?? 0) + 1; continue; }
       needsOperator = (await q(`SELECT commercial_status FROM orders WHERE id=$1`, [orderId]))[0].commercial_status === 'awaiting_confirmation';
+      }
     } else if (channel === 'quick') {
       const g = randomUUID() + randomUUID();
       const r = await call('POST', '/checkout/quick-order', { guest: g, idem: randomUUID(), body: { sku_id: s.sku_id, qty, name, phone, delivery_zone_id: zone.id, accept_terms: true } });

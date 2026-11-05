@@ -141,7 +141,7 @@ export default function OrderStudio() {
     <div className="card studio-done">
       <div className="sd-icon" aria-hidden>✅</div>
       <h1>Buyurtma yaratildi</h1>
-      <p>Mijozga ({result.customer_phone_masked ?? 'telefoniga'}) SMS kod va havola yuborildi. Mijoz tasdiqlagach, operator ko‘rib chiqadi va jo‘natadi.</p>
+      <p>{result.status === 'awaiting_customer_confirmation' ? <>Mijozga ({result.customer_phone_masked ?? 'telefoniga'}) SMS kod va havola yuborildi. Mijoz tasdiqlagach, operator ko‘rib chiqadi va jo‘natadi.</> : <>Buyurtma operatorga tushdi. Operator mijozga ({result.customer_phone_masked ?? 'telefoniga'}) qo‘ng‘iroq qilib tasdiqlaydi va jo‘natadi — mijozdan SMS kod so‘ralmaydi.</>}</p>
       <p className="muted small">Komissiya faqat mahsulot yetkazilib, pul tushgandan keyin «Yechish mumkin» bo‘ladi.</p>
       {result.dev_customer_link_token && <p className="badge test">DEMO: mijoz havolasi <a href={`/confirm/${result.dev_customer_link_token}`}>/confirm/…</a> · kod <code>{result.dev_customer_code}</code></p>}
       <div className="row">
@@ -205,7 +205,7 @@ export default function OrderStudio() {
           {mode === 'link' ? (
             <section className="card">
               <h2>Mijozga havola yuboring</h2>
-              <p className="muted small">Mijoz ismi, telefoni va manzilini o‘zi kiritadi, so‘ng SMS kod bilan tasdiqlaydi. Havolada shaxsiy ma’lumot yo‘q, 72 soat amal qiladi va istalgan payt bekor qilinadi.</p>
+              <p className="muted small">Mijoz ismi, telefoni va manzilini o‘zi kiritadi, so‘ng operator qo‘ng‘iroq qilib tasdiqlaydi. Havolada shaxsiy ma’lumot yo‘q, 72 soat amal qiladi va istalgan payt bekor qilinadi.</p>
               {share || draft?.fill_status === 'shared' ? (
                 <>
                   {share ? <LinkBox url={share.url} shareText="Buyurtmangizni tasdiqlash uchun ma’lumotlaringizni kiriting" /> : <p className="notice">Havola yuborilgan. Mijoz to‘ldirishini kutyapmiz.</p>}
@@ -273,7 +273,7 @@ export default function OrderStudio() {
               {missing.length > 0 && <div className="missing"><b>Yetishmayapti:</b> {missing.map((m) => MISSING_LABEL[m] ?? m).join(', ')}</div>}
               {draft && missing.length === 0 && <HoldBox draft={draft} onChange={reloadDraft} />}
               <button className="btn big full" disabled={busy || missing.length > 0} onClick={submit}>Buyurtmani yuborish</button>
-              <p className="muted small">Mijozga SMS kod boradi. Mijoz tasdiqlamaguncha buyurtma jo‘natilmaydi. Mijozdan karta yoki bank kodlarini hech qachon so‘ramang.</p>
+              <p className="muted small">Operator mijozga qo‘ng‘iroq qilib tasdiqlaydi — SMS kod kerak emas. Mijozdan karta yoki bank kodlarini hech qachon so‘ramang.</p>
             </>
           )}
           {draft && <button className="link-btn small" onClick={async () => { if (confirm('Qoralama bekor qilinsinmi?')) { await api(`/partner/drafts/${draft.id}`, { method: 'DELETE' }).catch(() => {}); location.href = '/partner/orders?tab=drafts'; } }}>Qoralamani bekor qilish</button>}

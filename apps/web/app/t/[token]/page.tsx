@@ -29,8 +29,8 @@ export default function OfferChoice({ params }: { params: Promise<{ token: strin
   if (done) return (
     <div className="card fill-card">
       <div className="sd-icon" aria-hidden>📩</div>
-      <h1>Rahmat! Endi SMS kodni kiriting</h1>
-      <p>Buyurtma <b>{done.order_number}</b> tayyorlandi. Telefoningizga SMS kod keldi — buyurtma faqat siz tasdiqlaganingizdan keyin jo‘natiladi.</p>
+      <h1>Rahmat! Buyurtmangiz qabul qilindi</h1>
+      <p>Buyurtma <b>{done.order_number}</b> tayyorlandi. Tez orada UzShop operatori sizga qo‘ng‘iroq qilib tasdiqlaydi{done.next === 'confirm_by_sms' ? ' (telefoningizga SMS havola ham yuborildi)' : ''}.</p>
       {done.dev_customer_link_token && <p className="badge test">DEMO: <a href={`/confirm/${done.dev_customer_link_token}`}>tasdiqlash sahifasi</a> · kod <code>{done.dev_customer_code}</code></p>}
     </div>
   );

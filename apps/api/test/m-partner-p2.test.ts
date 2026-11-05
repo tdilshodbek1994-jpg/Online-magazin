@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { runP2Scheduled } from '../src/modules/partners/p2.js';
 import { runScheduledOnce } from '../src/worker.js';
 import { api, mkPartner, mkProduct, nextPhone, setupApp, staff, type Staff, type T, zoneId } from './helpers.js';
@@ -7,6 +7,8 @@ let t: T;
 let s: Staff;
 beforeAll(async () => {
   t = await setupApp();
+  // These tests cover the optional SMS-confirmation flow (owner turned it off by default on 2026-11-05).
+  await t.db.query(`UPDATE feature_flags SET enabled=true WHERE key='partner.customer_sms_confirm'`);
   s = await staff(t);
 });
 const addr = { district: 'Yunusobod', street: 'Amir Temur', house: '1' };
@@ -177,3 +179,5 @@ describe('P2 — insights, ad spend and explanations', () => {
     expect(ads.json.items[0].text).toContain('100 000');
   });
 });
+
+afterAll(async () => { await t.db.query(`UPDATE feature_flags SET enabled=false WHERE key='partner.customer_sms_confirm'`); });

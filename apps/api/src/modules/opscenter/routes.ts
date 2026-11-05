@@ -41,7 +41,7 @@ export async function syncTasks(db: any): Promise<void> {
   await db.query(`
     INSERT INTO ops_tasks (order_id, type, reason, next_action, source, priority, not_before, due_at, created_at)
     SELECT o.id, 'confirm',
-           CASE WHEN o.channel='partner_assisted' THEN 'Hamkor kiritgan buyurtma — mijoz tasdig‘i kerak' ELSE 'Yangi buyurtma — mijoz bilan tasdiqlash kerak' END,
+           CASE WHEN o.channel='partner_assisted' THEN 'Hamkor kiritgan buyurtma — mijozga qo‘ng‘iroq qilib tasdiqlang' ELSE 'Yangi buyurtma — mijoz bilan tasdiqlash kerak' END,
            'Mijozga qo‘ng‘iroq qilib, tarkib va summani tasdiqlash',
            COALESCE(o.channel, 'site'), CASE WHEN o.address_snapshot->>'quick'='true' THEN 1 ELSE 0 END,
            o.callback_at, o.created_at + interval '30 minutes', o.created_at -- the customer has been waiting since the order came in

@@ -34,8 +34,8 @@ export default function CustomerFill({ params }: { params: Promise<{ token: stri
   if (done) return (
     <div className="card fill-card">
       <div className="sd-icon" aria-hidden>📩</div>
-      <h1>Rahmat! Endi SMS kodni kiriting</h1>
-      <p>Buyurtma <b>{done.order_number}</b> tayyorlandi. Telefoningizga SMS kod va tasdiqlash havolasi yuborildi — buyurtma faqat siz tasdiqlaganingizdan keyin jo‘natiladi.</p>
+      <h1>Rahmat! Buyurtmangiz qabul qilindi</h1>
+      <p>Buyurtma <b>{done.order_number}</b> tayyorlandi. Tez orada UzShop operatori sizga qo‘ng‘iroq qilib tasdiqlaydi{done.next === 'confirm_by_sms' ? ' (telefoningizga SMS havola ham yuborildi)' : ''}.</p>
       {done.dev_customer_link_token && <p className="badge test">DEMO: <a href={`/confirm/${done.dev_customer_link_token}`}>tasdiqlash sahifasi</a> · kod <code>{done.dev_customer_code}</code></p>}
       <p className="muted small">Hech qachon karta ma’lumoti yoki bank SMS kodini hech kimga bermang.</p>
     </div>
@@ -49,7 +49,7 @@ export default function CustomerFill({ params }: { params: Promise<{ token: stri
         {d.lines.map((l: any) => <div key={l.sku_id} className="sum-row"><span>{pick(l.product?.name, lang)}{Object.values(l.product?.variant ?? {}).length ? ` (${Object.values(l.product.variant).join(' / ')})` : ''} × {l.qty}</span><b>{som(l.line_total.amount_minor)}</b></div>)}
         {zone && <div className="sum-row"><span>Yetkazish</span><b>{som(zone.tariff_minor)}</b></div>}
         <div className="sum-row total"><span>Jami</span><b>{som(String(BigInt(d.subtotal?.amount_minor ?? '0') + BigInt(zone?.tariff_minor ?? '0')))}</b></div>
-        <p className="muted small">Yakuniy summa SMS orqali tasdiqlash sahifasida ko‘rsatiladi.</p>
+        <p className="muted small">Yakuniy summani operator qo‘ng‘iroqda aytadi.</p>
       </div>
       {formErr && <div className="notice" role="alert">{formErr}</div>}
       <form onSubmit={async (e) => {

@@ -17,6 +17,47 @@ const MONEY: Record<string, string> = { external: 'Yangi', estimated: 'Taxminiy'
 const MONEY_REASON: Record<string, string> = { order_created: 'buyurtma yaratildi', delivered_and_settled: 'yetkazildi va pul tushdi', hold_elapsed: 'qaytarish muddati tugadi', order_cancelled: 'buyurtma bekor bo‘ldi' };
 const DIM: Record<string, string> = { commercial: 'Buyurtma', fulfillment: 'Yetkazish', payment: 'To‘lov', refund: 'Qaytarish' };
 
+const CALL: Record<string, string> = { confirmed: 'tasdiqladi', no_answer: 'mijoz javob bermadi', rejected: 'mijoz rad etdi', wrong_data: 'ma’lumot noto‘g‘ri', call_later: 'keyinroq qo‘ng‘iroq so‘radi' };
+const tm = (iso: string) => new Date(iso).toLocaleString('uz-UZ', { timeZone: 'Asia/Tashkent', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+function gap(a: string | null, b: string | null) {
+  if (!a || !b) return '';
+  const m = Math.max(0, Math.round((Date.parse(b) - Date.parse(a)) / 60000));
+  return m < 60 ? `${m} daq o‘tib` : m < 1440 ? `${Math.floor(m / 60)} soat ${m % 60} daq o‘tib` : `${Math.floor(m / 1440)} kun ${Math.floor((m % 1440) / 60)} soat o‘tib`;
+}
+
+/** Order milestones: received → operator call(s) → accepted → shipped → delivered (→ paid). Times in Tashkent. */
+function Milestones({ m }: { m: any }) {
+  if (!m) return null;
+  const lastCall = m.calls.length ? m.calls[m.calls.length - 1].created_at : null;
+  const rows: { icon: string; title: string; at: string | null; sub?: string; prev?: string | null; bad?: boolean }[] = [
+    { icon: '🛒', title: 'Buyurtma tushdi', at: m.received_at },
+    ...(m.calls.length ? m.calls.map((c: any, i: number) => ({ icon: '📞', title: `Operator${c.operator ? ` ${c.operator}` : ''} gaplashdi`, at: c.created_at, sub: CALL[c.outcome] ?? c.outcome, prev: i === 0 ? m.received_at : m.calls[i - 1].created_at, bad: c.outcome === 'rejected' }))
+      : [{ icon: '📞', title: `Operator${m.operator ? ` ${m.operator}` : ''} qo‘ng‘irog‘i`, at: null }]),
+    { icon: '✅', title: 'Qabul qilindi', at: m.accepted_at, prev: lastCall ?? m.received_at },
+    { icon: '🚚', title: 'Yetkazishga chiqarildi', at: m.shipped_at, prev: m.accepted_at },
+    { icon: '📦', title: 'Mijozga yetib bordi', at: m.delivered_at, prev: m.shipped_at },
+  ];
+  if (m.paid_at) rows.push({ icon: '💵', title: 'Pul do‘konga tushdi', at: m.paid_at, prev: m.delivered_at });
+  if (m.cancelled_at) rows.push({ icon: '❌', title: 'Bekor qilindi', at: m.cancelled_at, bad: true });
+  if (m.returned_at) rows.push({ icon: '↩️', title: 'Qaytarildi / yetkazilmadi', at: m.returned_at, bad: true });
+  return (
+    <section className="card ms">
+      <b>⏱ Buyurtma yo‘li</b>
+      <ol className="ms-list">
+        {rows.map((r, i) => (
+          <li key={i} className={r.at ? (r.bad ? 'bad' : 'done') : 'wait'}>
+            <span className="ms-ico" aria-hidden>{r.icon}</span>
+            <div className="ms-body">
+              <div className="ms-row"><b>{r.title}</b><span className="ms-time">{r.at ? tm(r.at) : 'kutilmoqda'}</span></div>
+              {(r.sub || (r.at && r.prev)) && <div className="small muted">{[r.sub, r.at && r.prev ? gap(r.prev, r.at) : ''].filter(Boolean).join(' · ')}</div>}
+            </div>
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+}
+
 function ruleText(r: any): string {
   if (!r) return '—';
   if (r.kind === 'percent' && r.rate_bps != null) return `Narxdan ${(Number(r.rate_bps) / 100).toLocaleString('uz-UZ')}%`;
@@ -53,6 +94,8 @@ export default function SalesPassport({ params }: { params: Promise<{ id: string
             <div className="small muted">{d.customer} · {d.district ?? '—'} · {new Date(d.created_at).toLocaleString('uz-UZ', { timeZone: 'Asia/Tashkent', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</div>
           </section>
 
+          <Milestones m={d.milestones} />
+
           <details className="card pp-more">
             <summary>Batafsil: manba va bonus hisobi</summary>
             <div className="kv"><span>Manba</span><b>{d.source}</b></div>
@@ -70,7 +113,7 @@ export default function SalesPassport({ params }: { params: Promise<{ id: string
           </details>
 
           <details className="card pp-more">
-            <summary>Tarix ({d.timeline.length + d.entries.length})</summary>
+            <summary>Bonus harakatlari va to‘liq tarix ({d.timeline.length + d.entries.length})</summary>
             <ul className="timeline">
               {d.timeline.map((e: any, i: number) => (
                 <li key={i}><b>{DIM[e.dimension] ?? e.dimension}: {STATUS_TEXT[e.to_status] ?? e.to_status}</b><span className="muted small"> · {new Date(e.created_at).toLocaleString('uz-UZ', { dateStyle: 'short', timeStyle: 'short' })}</span></li>

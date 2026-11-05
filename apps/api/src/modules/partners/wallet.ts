@@ -143,13 +143,29 @@ export function registerPartnerWallet(app: FastifyInstance, deps: Deps): void {
       SELECT a.id, a.state, ${ACCRUAL_REASON_SQL} AS reason, a.target_minor::text, a.rule_snapshot, a.available_after, a.available_at, ol.product_snapshot->'name' AS product, ol.qty, ol.returned_qty, ol.unit_price_minor::text, ol.line_gross_minor::text
         FROM commission_accruals a JOIN orders o ON o.id=a.order_id JOIN order_lines ol ON ol.id=a.order_line_id WHERE a.order_id=$1 AND a.partner_id=$2 ORDER BY a.created_at`, [params.id, p.id]);
     const timeline = await many(db, `SELECT dimension, from_status, to_status, reason, created_at FROM order_status_events WHERE order_id=$1 ORDER BY id`, [params.id]);
+    // Clear milestones for the partner: received → operator call(s) (who, when, result) → accepted → shipped → delivered → paid.
+    const calls = await many<{ outcome: string; created_at: string; operator: string | null }>(db, `SELECT c.outcome, c.created_at, split_part(u.display_name, ' ', 1) AS operator FROM call_logs c LEFT JOIN users u ON u.id=c.operator_id WHERE c.order_id=$1 ORDER BY c.id`, [params.id]);
+    const ev = timeline as { dimension: string; to_status: string; created_at: string }[];
+    const first = (pred: (e: { dimension: string; to_status: string }) => boolean) => ev.find(pred)?.created_at ?? null;
+    const op = await maybeOne<{ name: string | null }>(db, `SELECT split_part(u.display_name, ' ', 1) AS name FROM orders o JOIN users u ON u.id=o.assigned_operator_id WHERE o.id=$1`, [params.id]);
+    const milestones = {
+      received_at: o.created_at,
+      operator: op?.name ?? calls.find((c) => c.operator)?.operator ?? null,
+      calls,
+      accepted_at: first((e) => (e.dimension === 'confirmation' && e.to_status === 'verified') || (e.dimension === 'commercial' && e.to_status === 'confirmed')),
+      shipped_at: first((e) => e.dimension === 'fulfillment' && e.to_status === 'shipped'),
+      delivered_at: o.delivered_at ?? first((e) => e.dimension === 'fulfillment' && e.to_status === 'delivered'),
+      paid_at: first((e) => e.dimension === 'payment' && e.to_status === 'paid'),
+      cancelled_at: first((e) => (e.dimension === 'commercial' && e.to_status === 'cancelled') || (e.dimension === 'confirmation' && ['rejected', 'expired'].includes(e.to_status))),
+      returned_at: first((e) => e.dimension === 'fulfillment' && ['returned', 'failed'].includes(e.to_status)),
+    };
     const entries = await many(db, `SELECT from_bucket, to_bucket, amount_minor::text, reason, created_at FROM partner_ledger WHERE partner_id=$1 AND source_type='accrual' AND source_id IN (SELECT id::text FROM commission_accruals WHERE order_id=$2) ORDER BY id`, [p.id, params.id]);
     const total = accruals.reduce((s, a: Record<string, unknown>) => s + (a.state === 'reversed' ? 0n : BigInt(a.target_minor as string)), 0n);
     return {
       ...rest, customer: maskName(cname), customer_phone: maskTail(cphone), source,
       attribution: { reason: attribution?.reason ?? null, reason_label: reasonText[String(attribution?.reason)] ?? String(attribution?.reason ?? '—') },
       commission: { total_minor: total.toString(), lines: accruals.map((a: Record<string, unknown>) => ({ ...a, reason_label: REASON_LABEL[a.reason as string] ?? a.reason })) },
-      timeline, entries,
+      timeline, entries, milestones,
       explain: explainOrder({ bucket: String(o.bucket), channel: String(o.channel), confirmation_status: String(o.confirmation_status), payment_status: String(o.payment_status), reasons: accruals.map((a: Record<string, unknown>) => String(a.reason)), available_after: (accruals.find((a: Record<string, unknown>) => a.state === 'pending') as { available_after?: string } | undefined)?.available_after ?? null }),
     };
   });

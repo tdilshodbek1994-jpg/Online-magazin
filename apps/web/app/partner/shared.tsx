@@ -4,6 +4,7 @@ import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { api, som } from '@/lib/api';
 import { errText } from '@/lib/errors';
+import { tgAppName } from '@/lib/telegram';
 
 export const PARTNER_TABS: [string, string, string[]][] = [
   ['/partner', 'Bosh sahifa', []], ['/partner/orders', 'Buyurtmalar', ['/partner/requests']], ['/partner/new', '+ Buyurtma', ['/partner/order']],
@@ -94,9 +95,11 @@ export function PartnerGuard({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let tok: string | null = null;
     try { tok = localStorage.getItem('om_token'); } catch {}
-    if (!tok) { setState('out'); return; }
+    // Inside the Telegram mini app there is no login card: the entry screen links Telegram and logs in.
+    const out = () => { if (tgAppName() === 'partner') location.replace('/tg/partner'); else setState('out'); };
+    if (!tok) { out(); return; }
     // An expired/revoked session must lead to the login card, not a raw UNAUTHENTICATED error.
-    api('/me').then(() => setState('in')).catch((e) => { if (e?.status === 401) { try { localStorage.removeItem('om_token'); } catch {} setState('out'); } else setState('in'); });
+    api('/me').then(() => setState('in')).catch((e) => { if (e?.status === 401) { try { localStorage.removeItem('om_token'); } catch {} out(); } else setState('in'); });
   }, []);
   if (state === 'checking') return null;
   if (state === 'out') return (
@@ -136,6 +139,34 @@ export function TelegramConnect({ compact = false }: { compact?: boolean }) {
         : <button className="btn sm tg" onClick={async () => { setErr(null); try { const r = await api('/me/telegram/link-token', { method: 'POST' }); setLink(r.deep_link); if (r.deep_link) window.open(r.deep_link, '_blank', 'noopener'); } catch (e: any) { setErr(errText(e)); } }}>Telegram'ni ulash</button>}
       {link && <div className="muted small" style={{ gridColumn: '1 / -1' }}>Botda «Start» tugmasini bosing, keyin bu sahifani yangilang. Havola 10 daqiqa amal qiladi.</div>}
       {err && <span className="field-error">{err}</span>}
+    </div>
+  );
+}
+
+/** «Telegram ilovada ochish»: one-time link that opens the partner bot's mini app already tied to this account. */
+export function TgAppConnect() {
+  const [s, setS] = useState<any>(null);
+  const [err, setErr] = useState<any>(null);
+  const [busy, setBusy] = useState(false);
+  const load = () => api('/me/telegram/apps').then((r) => setS(r.items.find((i: any) => i.app === 'partner'))).catch(() => {});
+  useEffect(() => { void load(); }, []);
+  if (!s?.configured || tgAppName()) return null;
+  return (
+    <div className="card tg-app-card">
+      <div className="tac-head"><span className="tac-icon" aria-hidden>📱</span><div><b>Telegram ilova</b><p className="muted small">Kabinet @{s.bot_username} botida ochiladi — parol va kodsiz.</p></div></div>
+      {err && <p className="notice" role="alert">{errText(err)}</p>}
+      {s.linked ? (
+        <div className="tac-row">
+          <span className="pill b-delivered">Ulangan{s.tg_username ? ` · @${s.tg_username}` : ''}</span>
+          <a className="btn sm" href={`https://t.me/${s.bot_username}`} target="_blank" rel="noopener noreferrer">Botni ochish</a>
+          <button type="button" className="btn secondary sm" disabled={busy} onClick={async () => { setBusy(true); try { await api('/me/telegram/apps/partner', { method: 'DELETE' }); await load(); } catch (e) { setErr(e); } finally { setBusy(false); } }}>Uzish</button>
+        </div>
+      ) : (
+        <button type="button" className="btn" disabled={busy} onClick={async () => {
+          setBusy(true); setErr(null);
+          try { const r = await api('/me/telegram/apps/link-token', { method: 'POST', body: { app: 'partner' } }); if (r.url) location.href = r.url; } catch (e) { setErr(e); } finally { setBusy(false); }
+        }}>Telegram ilovada ochish</button>
+      )}
     </div>
   );
 }

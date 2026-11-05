@@ -1995,3 +1995,25 @@ a.ocard { gap: 6px; }
 .rv-avg b { font-size: 18px; } .rv-st { color: #f5a524; letter-spacing: 1px; }
 .rv-item { display: grid; gap: 4px; padding: 8px 0; border-top: 1px solid var(--border); } .rv-item p { margin: 0; font-size: 14px; }
 .rv-pick { display: flex; gap: 4px; } .rv-pick button { font-size: 28px; line-height: 1; border: 0; background: none; color: #d0d5dd; cursor: pointer; padding: 2px; } .rv-pick button.on { color: #f5a524; }
+
+/* ---------- Telegram Mini App (html.tg-app is set only inside Telegram) ---------- */
+html.tg-app .site-foot, html.tg-app .install-bar { display: none !important; }
+html.tg-app body { overscroll-behavior-y: none; }
+html.tg-app .bottom-nav { padding-bottom: max(env(safe-area-inset-bottom), var(--tg-safe-area-inset-bottom, 0px)); }
+.tg-entry { max-width: 440px; margin: 24px auto; text-align: center; display: grid; gap: 12px; justify-items: center; }
+.tg-entry.card { padding: 22px 18px; }
+.tg-entry h1 { font-size: 1.3rem; margin: 0; }
+.tg-entry p { margin: 0; }
+.tg-entry .lc-icon { font-size: 2.4rem; line-height: 1; }
+.tg-entry .tg-current, .tg-entry .tg-otp { width: 100%; display: grid; gap: 8px; text-align: left; }
+.tg-entry .tg-current { padding: 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); }
+.tg-entry .tg-otp input { width: 100%; box-sizing: border-box; font-size: 1.05rem; }
+.tg-entry .btn { width: 100%; }
+.tg-entry .linklike { background: none; border: 0; padding: 0; color: var(--primary); text-decoration: underline; cursor: pointer; font: inherit; }
+.tg-spin { width: 36px; height: 36px; border-radius: 50%; border: 3px solid var(--border); border-top-color: var(--primary); animation: tgspin .8s linear infinite; margin-top: 30vh; }
+@keyframes tgspin { to { transform: rotate(360deg); } }
+.tg-app-card { display: grid; gap: 10px; }
+.tg-app-card .tac-head { display: flex; gap: 10px; align-items: center; }
+.tg-app-card .tac-head p { margin: 2px 0 0; }
+.tg-app-card .tac-icon { font-size: 1.6rem; }
+.tg-app-card .tac-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }

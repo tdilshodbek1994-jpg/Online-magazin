@@ -8,7 +8,7 @@ import { useI18n } from '@/lib/i18n';
 import { useEffect, useState } from 'react';
 
 export const isStaffPath = (p: string) => /^\/(admin|ops|courier)(\/|$)/.test(p);
-export const isWorkPath = (p: string) => p.startsWith('/partner') || isStaffPath(p);
+export const isWorkPath = (p: string) => p.startsWith('/partner') || p.startsWith('/tg/') || isStaffPath(p);
 
 /** Mobile bottom navigation (hidden on desktop by CSS). */
 export function BottomNav() {
@@ -17,6 +17,7 @@ export function BottomNav() {
   const count = useCartCount();
   const [logged, setLogged] = useState(false);
   useEffect(() => { setLogged(!!getToken()); }, [path]);
+  if (path.startsWith('/tg/')) return null;
   if (path.startsWith('/partner')) {
     // V2 §02: five things a partner does daily. Owner (2026-11-05): the big middle button opens the AI assistant;
     // a new customer order starts from «Buyurtmalar» (+ Buyurtma) and the home page.

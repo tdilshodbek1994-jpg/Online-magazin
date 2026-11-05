@@ -38,6 +38,10 @@ export function registerHealth(app: FastifyInstance, deps: Deps): void {
     const tgOn = !!process.env.TELEGRAM_BOT_TOKEN;
     checks.push({ key: 'telegram', label: 'Telegram bot', state: !tgOn ? 'not_configured' : tg.failed > tg.sent && tg.failed > 0 ? 'degraded' : 'ok',
       detail: tgOn ? `24 soat: yuborildi ${tg.sent}, xato ${tg.failed}, ulanmagan foydalanuvchi ${tg.suppressed}. «Yuborildi» = Telegram qabul qildi, o‘qildi degani emas.` : 'Bot token qo‘yilmagan — xabarlar faqat kabinetda ko‘rinadi.', action: tgOn ? undefined : 'Serverga TELEGRAM_BOT_TOKEN qo‘ying.' });
+    const tgApp = await one<{ links: number; logins_24h: number }>(db, `SELECT COUNT(*)::int AS links, COUNT(*) FILTER (WHERE last_login_at > now() - interval '24 hours')::int AS logins_24h FROM tg_app_links WHERE app='partner'`);
+    const tgAppOn = !!(process.env.TELEGRAM_PARTNER_BOT_TOKEN && process.env.TELEGRAM_PARTNER_BOT_USERNAME);
+    checks.push({ key: 'telegram_partner_app', label: 'Telegram hamkor ilovasi', state: tgAppOn ? 'ok' : 'not_configured',
+      detail: tgAppOn ? `@${process.env.TELEGRAM_PARTNER_BOT_USERNAME}: ulangan hamkorlar ${tgApp.links}, 24 soatda kirganlar ${tgApp.logins_24h}` : 'Hamkor boti ulanmagan — kabinet faqat saytda.', action: tgAppOn ? undefined : 'Serverda: bash scripts/server/telegram-app-setup.sh partner' });
     const sms = await one<{ n: number }>(db, `SELECT COUNT(*)::int AS n FROM notifications WHERE channel='sms' AND created_at > now() - interval '24 hours'`);
     checks.push({ key: 'sms', label: 'SMS', state: 'not_configured', detail: `SMS provayder ulanmagan (24 soatda ${sms.n} ta xabar faqat jurnalga yozildi, yuborilmadi).`, action: 'SMS provayder shartnomasi va kaliti kerak.' });
 

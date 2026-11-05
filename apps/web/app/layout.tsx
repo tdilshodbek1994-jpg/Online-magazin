@@ -7,6 +7,7 @@ import { BottomNav, Footer } from '@/components/Shell';
 import { I18nProvider } from '@/lib/i18n';
 import { InstallApp } from '@/components/InstallApp';
 import { ConsentBanner } from '@/components/ConsentBanner';
+import { TelegramBridge } from '@/components/TelegramBridge';
 
 export const metadata: Metadata = {
   title: 'UzShop — onlayn do‘kon',
@@ -31,6 +32,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <ConsentBanner />
           <Toaster />
           <ScrollRestorer />
+          <TelegramBridge />
         </I18nProvider>
       </body>
     </html>

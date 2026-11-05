@@ -7,6 +7,7 @@ import { api, getToken, setToken } from '@/lib/api';
 import { SearchBox } from '@/components/SearchBox';
 import { CatalogMenu } from '@/components/CatalogMenu';
 import { useI18n } from '@/lib/i18n';
+import { markTgApp, tgAppName } from '@/lib/telegram';
 
 /** Fire after any cart change so the header/bottom-nav badges refresh. */
 export const notifyCart = () => { try { window.dispatchEvent(new Event('om-cart')); } catch {} };
@@ -53,7 +54,15 @@ export function Header() {
   else if (roles.includes('operator')) staff.push(['/ops/ai', '🤖 AI']);
   if (roles.includes('courier')) staff.push(['/courier', 'Kuryer']);
   if (roles.includes('owner') || roles.includes('finance')) staff.push(['/account/security', 'MFA']);
-  const logout = async () => { await api('/auth/logout', { method: 'POST' }).catch(() => {}); setToken(null); location.href = '/'; };
+  const logout = async () => {
+    // Inside the Telegram mini app «Chiqish» also unties this Telegram, otherwise the next open would log straight back in.
+    const tgApp = tgAppName();
+    if (tgApp) await api(`/me/telegram/apps/${tgApp}`, { method: 'DELETE' }).catch(() => {});
+    await api('/auth/logout', { method: 'POST' }).catch(() => {});
+    setToken(null);
+    if (tgApp) { markTgApp(tgApp); location.href = `/tg/${tgApp}`; } else location.href = '/';
+  };
+  if (path?.startsWith('/tg/')) return null; // mini app entry has its own screen
   if (path?.startsWith('/partner')) {
     // V2 §02: the partner cabinet is a work tool — no store search, staff bar or cart; one compact profile menu.
     return (

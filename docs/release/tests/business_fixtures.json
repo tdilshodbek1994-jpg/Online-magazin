@@ -1,0 +1,243 @@
+[
+  {
+    "id": "B01",
+    "label": "SYNTHETIC",
+    "type": "commission",
+    "input": {
+      "base_uzs": "30000",
+      "units": 1
+    },
+    "expected": {
+      "commission_uzs": "30000"
+    }
+  },
+  {
+    "id": "B02",
+    "label": "SYNTHETIC",
+    "type": "commission",
+    "input": {
+      "base_uzs": "30000",
+      "units": 2
+    },
+    "expected": {
+      "commission_uzs": "37500"
+    }
+  },
+  {
+    "id": "B03",
+    "label": "SYNTHETIC",
+    "type": "commission",
+    "input": {
+      "base_uzs": "30000",
+      "units": 3
+    },
+    "expected": {
+      "commission_uzs": "52500"
+    }
+  },
+  {
+    "id": "B04",
+    "label": "SYNTHETIC",
+    "type": "return_reprice",
+    "assumption": "Қолган eligible unit учун original matrixда қайта ҳисоблаш сиёсати тасдиқланган; charity ва payout йўқ.",
+    "input": {
+      "base_uzs": "30000",
+      "old_units": 3,
+      "retained_units": 2
+    },
+    "expected": {
+      "old_commission_uzs": "52500",
+      "new_commission_uzs": "37500",
+      "commission_adjustment_uzs": "-15000",
+      "coin_adjustment": -1
+    }
+  },
+  {
+    "id": "B05",
+    "label": "SYNTHETIC",
+    "type": "return_reprice",
+    "assumption": "Original matrixда retained units; no other movements.",
+    "input": {
+      "base_uzs": "30000",
+      "old_units": 2,
+      "retained_units": 1
+    },
+    "expected": {
+      "old_commission_uzs": "37500",
+      "new_commission_uzs": "30000",
+      "commission_adjustment_uzs": "-7500",
+      "coin_adjustment": -1
+    }
+  },
+  {
+    "id": "B06",
+    "label": "SYNTHETIC",
+    "type": "mixed_quantities",
+    "input": {
+      "base_uzs": "30000",
+      "one_unit_orders": 36,
+      "two_unit_orders": 20
+    },
+    "expected": {
+      "orders": 56,
+      "units": 76,
+      "commission_uzs": "1830000",
+      "eligible_coins": 76
+    }
+  },
+  {
+    "id": "B07",
+    "label": "SYNTHETIC",
+    "type": "wallet_bridge",
+    "assumption": "Available/reserved алоҳида; payout reservationдан кейинги paid availableни яна камайтирмайди.",
+    "input": {
+      "opening_available_uzs": "200000",
+      "credit_uzs": "100000",
+      "correction_uzs": "20000",
+      "new_payout_reserve_uzs": "50000"
+    },
+    "expected": {
+      "closing_available_uzs": "230000",
+      "reserved_uzs": "50000",
+      "available_after_same_reserved_payout_paid_uzs": "230000"
+    }
+  },
+  {
+    "id": "B08",
+    "label": "SYNTHETIC",
+    "type": "charity_earmark",
+    "assumption": "Ҳамкор 1%га рози; сумма available; ҳали ташқи ўтказма йўқ.",
+    "input": {
+      "commission_uzs": "52500",
+      "percent": "1"
+    },
+    "expected": {
+      "earmarked_uzs": "525",
+      "available_after_reserve_uzs": "51975",
+      "transferred_uzs": "0"
+    }
+  },
+  {
+    "id": "B09",
+    "label": "SYNTHETIC",
+    "type": "coin_cash",
+    "assumption": "Курс фақат fixture учун; actual хизматдан snapshot.",
+    "input": {
+      "coins": 100,
+      "rate_uzs": "3000"
+    },
+    "expected": {
+      "cash_quote_uzs": "300000",
+      "cash_paid_uzs": "0"
+    }
+  },
+  {
+    "id": "B10",
+    "label": "SYNTHETIC",
+    "type": "cod",
+    "input": {
+      "collected_uzs": "200000",
+      "remitted_uzs": "150000"
+    },
+    "expected": {
+      "unremitted_uzs": "50000"
+    }
+  },
+  {
+    "id": "B11",
+    "label": "SYNTHETIC",
+    "type": "fx_result",
+    "assumption": "12000 — сунъий курс, ҳақиқий валюта маълумоти эмас. Комиссия ҳақиқатан eligible, реклама ҳамкорники.",
+    "input": {
+      "commission_uzs": "1830000",
+      "ad_usd": "100",
+      "fx_rate": "12000",
+      "fx_nominal": "1"
+    },
+    "expected": {
+      "ad_uzs": "1200000",
+      "after_ad_result_uzs": "630000",
+      "wallet_debit_for_ad_entry_uzs": "0"
+    }
+  },
+  {
+    "id": "B12",
+    "label": "SYNTHETIC",
+    "type": "refund_limit",
+    "input": {
+      "captured_uzs": "100000",
+      "refunded_uzs": "40000",
+      "requested_refund_uzs": "70000"
+    },
+    "expected": {
+      "refundable_uzs": "60000",
+      "decision": "reject_exceeds_refundable",
+      "additional_refund_uzs": "0"
+    }
+  },
+  {
+    "id": "B13",
+    "label": "SYNTHETIC",
+    "type": "coin_concurrency",
+    "input": {
+      "available": 100,
+      "cashout_request_coins": 80,
+      "gift_request_coins": 30
+    },
+    "expected": {
+      "max_successful_reservations": 1,
+      "allowed_end_states": [
+        {
+          "reserved": 80,
+          "available": 20
+        },
+        {
+          "reserved": 30,
+          "available": 70
+        }
+      ],
+      "negative_available_allowed": false
+    }
+  },
+  {
+    "id": "B14",
+    "label": "SYNTHETIC",
+    "type": "date_window",
+    "input": {
+      "local_day": "2026-10-25",
+      "timezone": "Asia/Tashkent"
+    },
+    "expected": {
+      "start_inclusive_utc": "2026-10-24T19:00:00Z",
+      "end_exclusive_utc": "2026-10-25T19:00:00Z"
+    }
+  },
+  {
+    "id": "B15",
+    "label": "SYNTHETIC",
+    "type": "averages",
+    "input": {
+      "earning_links": 20,
+      "total_commission_usd": "6000"
+    },
+    "expected": {
+      "average_commission_usd": "300",
+      "claim_every_link_earned_300": false
+    }
+  },
+  {
+    "id": "B16",
+    "label": "SYNTHETIC",
+    "type": "stock_concurrency",
+    "input": {
+      "available_stock": 1,
+      "regular_order_requested_units": 1,
+      "reward_order_requested_units": 1
+    },
+    "expected": {
+      "max_reserved_total_units": 1,
+      "max_successful_orders": 1,
+      "negative_stock_allowed": false
+    }
+  }
+]

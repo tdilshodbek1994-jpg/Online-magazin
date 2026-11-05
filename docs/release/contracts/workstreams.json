@@ -1,0 +1,442 @@
+[
+  {
+    "id": "M01",
+    "title": "Ўзгармас бизнес модели ва иш чегараси",
+    "priority": "P0",
+    "classification": "proposed_requirement_not_audited",
+    "acceptance_ids": [
+      "AC001",
+      "AC002",
+      "AC003"
+    ]
+  },
+  {
+    "id": "M02",
+    "title": "Репозиторий аудити ва ҳақиқий тайёрлик харитаси",
+    "priority": "P0",
+    "classification": "proposed_requirement_not_audited",
+    "acceptance_ids": [
+      "AC004",
+      "AC005",
+      "AC006"
+    ]
+  },
+  {
+    "id": "M03",
+    "title": "Ягона буюртма тарихи ва ҳолатлар луғати",
+    "priority": "P0",
+    "classification": "proposed_requirement_not_audited",
+    "acceptance_ids": [
+      "AC007",
+      "AC008",
+      "AC009"
+    ]
+  },
+  {
+    "id": "M04",
+    "title": "Рольга мос Бугунги ишларим маркази",
+    "priority": "P1",
+    "classification": "proposed_requirement_not_audited",
+    "acceptance_ids": [
+      "AC010",
+      "AC011",
+      "AC012"
+    ]
+  },
+  {
+    "id": "M05",
+    "title": "Мижознинг осон кириши ва ҳисобини тиклаши",
+    "priority": "P0",
+    "classification": "proposed_requirement_not_audited",
+    "acceptance_ids": [
+      "AC013",
+      "AC014",
+      "AC015"
+    ]
+  },
+  {
+    "id": "M06",
+    "title": "Ақлли каталог ва ҳалол маҳсулот маълумоти",
+    "priority": "P1",
+    "classification": "proposed_requirement_not_audited",
+    "acceptance_ids": [
+      "AC016",
+      "AC017",
+      "AC018"
+    ]
+  },
+  {
+    "id": "M07",
+    "title": "Сават, манзил ва нархни тасдиқлаш",
+    "priority": "P0",
+    "classification": "proposed_requirement_not_audited",
+    "acceptance_ids": [
+      "AC019",
+      "AC020",
+      "AC021"
+    ]
+  },
+  {
+    "id": "M08",
+    "title": "Мижознинг Буюртмам қаерда саҳифаси",
+    "priority": "P0",
+    "classification": "proposed_requirement_not_audited",
+    "acceptance_ids": [
+      "AC022",
+      "AC023",
+      "AC024"
+    ]
+  },
+  {
+    "id": "M09",
+    "title": "Мижознинг ўзгартириш ва қайта буюртма қулайлиги",
+    "priority": "P1",
+    "classification": "proposed_requirement_not_audited",
+    "acceptance_ids": [
+      "AC025",
+      "AC026",
+      "AC027"
+    ]
+  },
+  {
+    "id": "M10",
+    "title": "Қайтариш, алмаштириш ва кафолат кабинети",
+    "priority": "P0",
+    "classification": "proposed_requirement_not_audited",
+    "acceptance_ids": [
+      "AC028",
+      "AC029",
+      "AC030"
+    ]
+  },
+  {
+    "id": "M11",
+    "title": "Хабарлар маркази ва алоқа танловлари",
+    "priority": "P0",
+    "classification": "proposed_requirement_not_audited",
+    "acceptance_ids": [
+      "AC031",
+      "AC032",
+      "AC033"
+    ]
+  },
+  {
+    "id": "M12",
+    "title": "Ҳамкорнинг тез бошлаш ва реклама материаллари маркази",
+    "priority": "P1",
+    "classification": "proposed_requirement_not_audited",
+    "acceptance_ids": [
+      "AC034",
+      "AC035",
+      "AC036"
+    ]
+  },
+  {
+    "id": "M13",
+    "title": "Мижоз номидан бир экранда буюртма",
+    "priority": "P0",
+    "classification": "proposed_requirement_not_audited",
+    "acceptance_ids": [
+      "AC037",
+      "AC038",
+      "AC039"
+    ]
+  },
+  {
+    "id": "M14",
+    "title": "Мижоз ўзи тўлдирадиган таклиф ҳаволаси",
+    "priority": "P1",
+    "classification": "proposed_requirement_not_audited",
+    "acceptance_ids": [
+      "AC040",
+      "AC041",
+      "AC042"
+    ]
+  },
+  {
+    "id": "M15",
+    "title": "Ҳамкорнинг пул ҳолати ва баҳслар кабинети",
+    "priority": "P0",
+    "classification": "proposed_requirement_not_audited",
+    "acceptance_ids": [
+      "AC043",
+      "AC044",
+      "AC045"
+    ]
+  },
+  {
+    "id": "M16",
+    "title": "Оқим, лендинг ва реклама бир-бирига мослиги",
+    "priority": "P0",
+    "classification": "proposed_requirement_not_audited",
+    "acceptance_ids": [
+      "AC046",
+      "AC047",
+      "AC048"
+    ]
+  },
+  {
+    "id": "M17",
+    "title": "Операторнинг ягона иш столи",
+    "priority": "P0",
+    "classification": "proposed_requirement_not_audited",
+    "acceptance_ids": [
+      "AC049",
+      "AC050",
+      "AC051"
+    ]
+  },
+  {
+    "id": "M18",
+    "title": "Мурожаатлар, callback ва сменани топшириш",
+    "priority": "P1",
+    "classification": "proposed_requirement_not_audited",
+    "acceptance_ids": [
+      "AC052",
+      "AC053",
+      "AC054"
+    ]
+  },
+  {
+    "id": "M19",
+    "title": "Оператор бошлиғи ва адолатли иш тақсимоти",
+    "priority": "P1",
+    "classification": "proposed_requirement_not_audited",
+    "acceptance_ids": [
+      "AC055",
+      "AC056",
+      "AC057"
+    ]
+  },
+  {
+    "id": "M20",
+    "title": "Омбор: йиғиш, текшириш ва қадоқлаш",
+    "priority": "P0",
+    "classification": "proposed_requirement_not_audited",
+    "acceptance_ids": [
+      "AC058",
+      "AC059",
+      "AC060"
+    ]
+  },
+  {
+    "id": "M21",
+    "title": "Етказиш, вақт оралиғи ва курьер пули",
+    "priority": "P0",
+    "classification": "proposed_requirement_not_audited",
+    "acceptance_ids": [
+      "AC061",
+      "AC062",
+      "AC063"
+    ]
+  },
+  {
+    "id": "M22",
+    "title": "Товарни тўлдириш ва таъминотчига буюртма",
+    "priority": "P1",
+    "classification": "proposed_requirement_not_audited",
+    "acceptance_ids": [
+      "AC064",
+      "AC065",
+      "AC066"
+    ]
+  },
+  {
+    "id": "M23",
+    "title": "Админ контент, нарх ва оммавий таҳрир",
+    "priority": "P1",
+    "classification": "proposed_requirement_not_audited",
+    "acceptance_ids": [
+      "AC067",
+      "AC068",
+      "AC069"
+    ]
+  },
+  {
+    "id": "M24",
+    "title": "Эга учун Қарорлар ва муаммолар маркази",
+    "priority": "P0",
+    "classification": "proposed_requirement_not_audited",
+    "acceptance_ids": [
+      "AC070",
+      "AC071",
+      "AC072"
+    ]
+  },
+  {
+    "id": "M25",
+    "title": "Молия: солиштириш, кунни ёпиш ва чеклар",
+    "priority": "P0",
+    "classification": "proposed_requirement_not_audited",
+    "acceptance_ids": [
+      "AC073",
+      "AC074",
+      "AC075"
+    ]
+  },
+  {
+    "id": "M26",
+    "title": "Конкурс, UzCoin, хайрия ва сифатнинг биргаликда ишлаши",
+    "priority": "P0",
+    "classification": "proposed_requirement_not_audited",
+    "acceptance_ids": [
+      "AC076",
+      "AC077",
+      "AC078"
+    ]
+  },
+  {
+    "id": "M27",
+    "title": "Қайта харид, шарҳлар ва мижозга хизмат",
+    "priority": "P1",
+    "classification": "proposed_requirement_not_audited",
+    "acceptance_ids": [
+      "AC079",
+      "AC080",
+      "AC081"
+    ]
+  },
+  {
+    "id": "M28",
+    "title": "Назоратли автоматлаштириш конструктори",
+    "priority": "P1",
+    "classification": "proposed_requirement_not_audited",
+    "acceptance_ids": [
+      "AC082",
+      "AC083",
+      "AC084"
+    ]
+  },
+  {
+    "id": "M29",
+    "title": "Умумий қидирув, оммавий амал ва экспорт",
+    "priority": "P1",
+    "classification": "proposed_requirement_not_audited",
+    "acceptance_ids": [
+      "AC085",
+      "AC086",
+      "AC087"
+    ]
+  },
+  {
+    "id": "M30",
+    "title": "Ҳисоб хавфсизлиги, ҳуқуқлар ва муҳим тасдиқлар",
+    "priority": "P0",
+    "classification": "proposed_requirement_not_audited",
+    "acceptance_ids": [
+      "AC088",
+      "AC089",
+      "AC090"
+    ]
+  },
+  {
+    "id": "M31",
+    "title": "Ягона дизайн, кирилл/лотин ва офлайн қораламалар",
+    "priority": "P1",
+    "classification": "proposed_requirement_not_audited",
+    "acceptance_ids": [
+      "AC091",
+      "AC092",
+      "AC093"
+    ]
+  },
+  {
+    "id": "M32",
+    "title": "AIни қайта қурмасдан ишга боғлаш",
+    "priority": "P0",
+    "classification": "proposed_requirement_not_audited",
+    "acceptance_ids": [
+      "AC094",
+      "AC095",
+      "AC096"
+    ]
+  },
+  {
+    "id": "M33",
+    "title": "Маълумот ва воқеаларнинг ишончли архитектураси",
+    "priority": "P0",
+    "classification": "proposed_requirement_not_audited",
+    "acceptance_ids": [
+      "AC097",
+      "AC098",
+      "AC099"
+    ]
+  },
+  {
+    "id": "M34",
+    "title": "Ҳуқуқий матнлар, розилик ва маълумотни сақлаш",
+    "priority": "P0",
+    "classification": "proposed_requirement_not_audited",
+    "acceptance_ids": [
+      "AC100",
+      "AC101",
+      "AC102"
+    ]
+  },
+  {
+    "id": "M35",
+    "title": "Мониторинг, support диагностикаси ва авария ҳолати",
+    "priority": "P0",
+    "classification": "proposed_requirement_not_audited",
+    "acceptance_ids": [
+      "AC103",
+      "AC104",
+      "AC105"
+    ]
+  },
+  {
+    "id": "M36",
+    "title": "Захира, тиклаш ва миграция хавфсизлиги",
+    "priority": "P0",
+    "classification": "proposed_requirement_not_audited",
+    "acceptance_ids": [
+      "AC106",
+      "AC107",
+      "AC108"
+    ]
+  },
+  {
+    "id": "M37",
+    "title": "Тезлик ва ҳақиқий юклама синовлари",
+    "priority": "P0",
+    "classification": "proposed_requirement_not_audited",
+    "acceptance_ids": [
+      "AC109",
+      "AC110",
+      "AC111"
+    ]
+  },
+  {
+    "id": "M38",
+    "title": "Автоматик тест, реал синов ва далиллар реестри",
+    "priority": "P0",
+    "classification": "proposed_requirement_not_audited",
+    "acceptance_ids": [
+      "AC112",
+      "AC113",
+      "AC114"
+    ]
+  },
+  {
+    "id": "M39",
+    "title": "Қулайликдан релизгача кичик PRлар",
+    "priority": "P0",
+    "classification": "proposed_requirement_not_audited",
+    "acceptance_ids": [
+      "AC115",
+      "AC116",
+      "AC117"
+    ]
+  },
+  {
+    "id": "M40",
+    "title": "Ишга тушириш дарвозалари ва якуний қабул",
+    "priority": "P0",
+    "classification": "proposed_requirement_not_audited",
+    "acceptance_ids": [
+      "AC118",
+      "AC119",
+      "AC120"
+    ]
+  }
+]

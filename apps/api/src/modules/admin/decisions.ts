@@ -48,6 +48,8 @@ export async function problems(q: Queryable): Promise<Problem[]> {
     await count(q, `SELECT COUNT(*)::int AS n, MIN(created_at) AS since FROM data_requests WHERE status IN ('requested','in_review')`));
   add({ kind: 'quality_cases', severity: 4, title: 'Ochiq sifat tekshiruvlari', owner_role: 'Sifat nazorati', href: '/admin?tab=quality', hint: 'Signal — ayb emas; dalil bilan qaror qiling.' },
     await count(q, `SELECT COUNT(*)::int AS n, MIN(created_at) AS since FROM quality_cases WHERE status NOT IN ('final','resolved_no_fault','inconclusive','confirmed_violation')`));
+  add({ kind: 'automation_alerts', severity: 3, title: 'Avtomatik qoidalar ogohlantirdi (24 soat)', owner_role: 'Ega', href: '/admin?tab=automation', hint: 'Har birini ko‘rib chiqing; qoida faqat ogohlantiradi, o‘zi hech narsani hal qilmaydi.' },
+    await count(q, `SELECT COUNT(*)::int AS n, MIN(x.created_at) AS since FROM automation_runs x JOIN automation_rules r ON r.id=x.rule_id WHERE x.outcome='done' AND r.action='alert_owner' AND x.created_at > now() - interval '24 hours'`));
   return out.sort((a, b) => a.severity - b.severity || b.count - a.count);
 }
 

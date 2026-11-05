@@ -52,6 +52,7 @@ import { registerPickScan } from './modules/fulfillment/pickscan.js';
 import { registerReplenishment } from './modules/inventory/replenishment.js';
 import { registerSearch } from './modules/admin/search.js';
 import { registerReviews } from './modules/catalog/reviews.js';
+import { registerAutomation } from './modules/admin/automation.js';
 import { registerReturns } from './modules/returns/routes.js';
 import { registerPayments } from './modules/payments/routes.js';
 import { registerSupport } from './modules/support/routes.js';
@@ -218,6 +219,7 @@ export async function buildApp(cfg: AppConfig, db: Db): Promise<FastifyInstance>
       registerReplenishment(api, deps);
       registerSearch(api, deps);
       registerReviews(api, deps);
+      registerAutomation(api, deps);
     },
     { prefix: '/api/v1' },
   );

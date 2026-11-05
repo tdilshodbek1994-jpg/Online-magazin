@@ -71,6 +71,7 @@ export async function runScheduledOnce(db: Db, now: Date = new Date()): Promise<
       const released = await withTx(db, (tx) => releaseMatured(tx, now));
       await dispatchTracking(db, process.env.NODE_ENV === 'production' ? 'production' : 'development', undefined, now).catch(() => {});
       await runAdSafety(db, loadConfig()).catch(() => {}); // protective pause requests only
+      { const { runAutomation } = await import('./modules/admin/automation.js'); await runAutomation(db).catch(() => {}); } // shadow/active rules, capped
       await db.query(`UPDATE outbox_events SET dispatched_at=now() WHERE dispatched_at IS NULL AND id IN (SELECT id FROM outbox_events WHERE dispatched_at IS NULL ORDER BY id LIMIT 1000)`);
       return { expired, released };
     } finally {

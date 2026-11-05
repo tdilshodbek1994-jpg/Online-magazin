@@ -189,3 +189,33 @@ describe('global search (M29)', () => {
     expect(byProd.json.items.some((i: any) => i.type === 'product')).toBe(true);
   });
 });
+
+describe('controlled automation (M28)', () => {
+  it('shadow first (journal only), owner activates, cap/cooldown respected, no financial actions possible', async () => {
+    const op = s.operator;
+    expect((await api(t, 'POST', '/admin/automation/rules', { token: op.token, body: { name: 'Sinov', trigger: 'order_unassigned', action: 'alert_owner' } })).status).toBe(403);
+    expect((await api(t, 'POST', '/admin/automation/rules', { token: s.owner.token, body: { name: 'Pul', trigger: 'order_unassigned', action: 'refund' } })).status).toBe(400);
+    expect((await api(t, 'POST', '/admin/automation/rules', { token: s.owner.token, body: { name: 'Nojo‘ya', trigger: 'order_unassigned', action: 'reorder_draft' } })).json.code).toBe('ACTION_NOT_ALLOWED_FOR_TRIGGER');
+    const prod = await mkProduct(t, { prices: [30_000], stock: [5] });
+    const o = await placeOrder(t, { guest: randomUUID() + randomUUID(), phone: nextPhone() }, [{ sku_id: prod.skuIds[0]!, qty: 1 }]);
+    await t.db.query(`UPDATE orders SET created_at = now() - interval '3 hours', assigned_operator_id=NULL WHERE id=$1`, [o.json.order_id]);
+    const r = await api(t, 'POST', '/admin/automation/rules', { token: s.owner.token, body: { name: 'Egasiz buyurtma', trigger: 'order_unassigned', action: 'alert_owner', params: { minutes: 60 }, daily_cap: 50 } });
+    expect(r.json.mode).toBe('shadow');
+    expect((await api(t, 'POST', `/admin/automation/rules/${r.json.id}/activate`, { token: s.owner.token })).json.code).toBe('SHADOW_RUN_REQUIRED');
+    const n0 = (await t.db.query(`SELECT COUNT(*)::int AS n FROM notifications WHERE template='automation.alert'`)).rows[0].n;
+    const run1 = await api(t, 'POST', '/admin/automation/run', { token: s.owner.token });
+    expect(run1.json.would_do).toBeGreaterThan(0);
+    expect((await t.db.query(`SELECT COUNT(*)::int AS n FROM notifications WHERE template='automation.alert'`)).rows[0].n).toBe(n0); // shadow sends nothing
+    expect((await api(t, 'POST', `/admin/automation/rules/${r.json.id}/activate`, { token: s.owner.token })).json.mode).toBe('active');
+    await api(t, 'POST', '/admin/automation/run', { token: s.owner.token }); // cooldown: objects seen in shadow are not repeated
+    await t.db.query(`DELETE FROM automation_runs WHERE rule_id=$1`, [r.json.id]);
+    const run3 = await api(t, 'POST', '/admin/automation/run', { token: s.owner.token });
+    expect(run3.json.done).toBeGreaterThan(0);
+    expect((await t.db.query(`SELECT COUNT(*)::int AS n FROM notifications WHERE template='automation.alert'`)).rows[0].n).toBeGreaterThan(n0);
+    const run4 = await api(t, 'POST', '/admin/automation/run', { token: s.owner.token });
+    expect(run4.json.done).toBe(0); // cooldown
+    await t.db.query(`UPDATE feature_flags SET enabled=false WHERE key='automation.enabled'`);
+    expect((await api(t, 'POST', '/admin/automation/run', { token: s.owner.token })).json.rules).toBe(0); // kill switch
+    await t.db.query(`UPDATE feature_flags SET enabled=true WHERE key='automation.enabled'`);
+  });
+});

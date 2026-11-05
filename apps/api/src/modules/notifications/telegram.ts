@@ -26,6 +26,7 @@ export function renderText(template: string, p: Record<string, unknown>): string
     case 'offer.reminder': return 'UzShop: sizga yuborilgan mahsulot taklifi hali amal qilmoqda. Havolani qayta ochib, tanlashingiz mumkin.';
     case 'partner.level_up': return `${p.badge ?? '🎖️'} Tabriklaymiz! Yangi daraja: ${p.name ?? ''}\nHisobga olingan sotuvlar: ${p.units ?? 0} dona\nSovg‘alarga chegirma: ${p.discount ?? 0}%${p.next ? `\nKeyingi daraja: ${p.next} (${p.remaining} ta qoldi)` : ''}\n\nKabinet → Darajam`;
     case 'partner.coupon_issued': return `🎟️ Sizga bir martalik 50% komissiya kuponi berildi!\n${p.units ?? ''} ta sotuvga yetdingiz. Kabinet → Darajam bo‘limida faollashtiring — keyingi mos buyurtmaga qo‘llanadi.`;
+    case 'automation.alert': return `⚙️ ${p.text ?? ''}`;
     case 'telegram.linked': return '✅ UzShop hamkor bildirishnomalari ulandi. Yangi buyurtma, yetkazish va to‘lovlar haqida shu yerga xabar keladi.';
     default: return String(p.text ?? template);
   }

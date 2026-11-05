@@ -85,3 +85,21 @@ describe('role revocation takes effect immediately (G02)', () => {
     expect((await api(t, 'POST', '/ai/biz/ask', { token: op.token, body: { text: 'navbatim' } })).status).toBe(403);
   });
 });
+
+describe('staff profile', () => {
+  it('owner opens a staff profile (roles, security, own actions); operator cannot; sign-out everywhere ends sessions', async () => {
+    const op = await mkUser(t, ['operator']);
+    expect((await api(t, 'GET', `/admin/staff/${op.id}`, { token: s.operator.token })).status).toBe(403);
+    const p = await api(t, 'GET', `/admin/staff/${op.id}`, { token: s.owner.token });
+    expect(p.status).toBe(200);
+    expect(p.json.roles.map((r: any) => r.role_code)).toContain('operator');
+    expect(p.json.security.sessions).toBe(1);
+    expect(p.json.links.operator).toBe(`/admin/operator/${op.id}`);
+    expect(JSON.stringify(p.json)).not.toMatch(/token_hash|secret_enc|recovery/);
+    const customer = await mkUser(t);
+    expect((await api(t, 'GET', `/admin/staff/${customer.id}`, { token: s.owner.token })).status).toBe(404);
+    const r = await api(t, 'POST', `/admin/staff/${op.id}/sessions/revoke`, { token: s.owner.token, body: { reason: 'telefon yo‘qoldi' } });
+    expect(r.json.revoked).toBe(1);
+    expect((await api(t, 'GET', '/ops/center', { token: op.token })).status).toBe(401);
+  });
+});

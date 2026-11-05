@@ -47,6 +47,7 @@ import { registerAiBiz } from './modules/aibiz/routes.js';
 import { registerSelfService } from './modules/selfservice/routes.js';
 import { registerDecisions } from './modules/admin/decisions.js';
 import { registerHealth } from './modules/admin/health.js';
+import { registerStaffProfile } from './modules/admin/staffprofile.js';
 import { registerReturns } from './modules/returns/routes.js';
 import { registerPayments } from './modules/payments/routes.js';
 import { registerSupport } from './modules/support/routes.js';
@@ -208,6 +209,7 @@ export async function buildApp(cfg: AppConfig, db: Db): Promise<FastifyInstance>
       registerSelfService(api, deps);
       registerDecisions(api, deps);
       registerHealth(api, deps);
+      registerStaffProfile(api, deps);
     },
     { prefix: '/api/v1' },
   );

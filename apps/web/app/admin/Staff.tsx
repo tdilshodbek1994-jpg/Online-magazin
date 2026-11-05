@@ -1,4 +1,5 @@
 'use client';
+import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { errText } from '@/lib/errors';
@@ -48,7 +49,7 @@ export function Staff() {
         <h2>Jamoa ({items?.length ?? 0})</h2>
         {items === null ? <p className="muted">Yuklanmoqda…</p> : items.length === 0 ? <p className="muted">Hali xodim yo‘q.</p> : items.map((u) => (
           <div key={u.id} className="inc-item">
-            <div className="spread"><b>{u.display_name ?? '—'}</b><span className="small muted">{u.phone_e164}</span></div>
+            <Link href={`/admin/staff/${u.id}`} className="spread st-link"><b>{u.display_name ?? '—'} ›</b><span className="small muted">{u.phone_e164}</span></Link>
             <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
               {u.roles.map((r: string) => (
                 <span key={r} className="pill">{ROLE_UZ[r] ?? r}

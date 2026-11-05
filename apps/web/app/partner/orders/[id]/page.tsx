@@ -21,7 +21,7 @@ const tm = (iso: string) => new Date(iso).toLocaleString('uz-UZ', { timeZone: 'A
 function gap(a: string | null, b: string | null) {
   if (!a || !b) return '';
   const m = Math.max(0, Math.round((Date.parse(b) - Date.parse(a)) / 60000));
-  return m < 60 ? `${m} daq o‘tib` : m < 1440 ? `${Math.floor(m / 60)} soat ${m % 60} daq o‘tib` : `${Math.floor(m / 1440)} kun ${Math.floor((m % 1440) / 60)} soat o‘tib`;
+  return m < 1 ? 'darhol' : m < 60 ? `${m} daq o‘tib` : m < 1440 ? `${Math.floor(m / 60)} soat ${m % 60} daq o‘tib` : `${Math.floor(m / 1440)} kun ${Math.floor((m % 1440) / 60)} soat o‘tib`;
 }
 
 /** Order milestones: received → operator call(s) → accepted → shipped → delivered (→ paid). Times in Tashkent. */
@@ -75,49 +75,68 @@ export default function SalesPassport({ params }: { params: Promise<{ id: string
   return (
     <Async loading={!d && !err} error={err}>
       {d && (
-        <div className="passport">
+        <div className="passport pp2">
           <Link href="/partner/orders" className="see-all">← Buyurtmalar</Link>
-          <div className="spread"><h1>Buyurtma {d.masked_number}</h1><span className={`pill b-${d.bucket}`}>{BUCKET_LABEL[d.bucket]}</span></div>
 
-          {off && <div className="notice">{d.bucket === 'cancelled' ? (d.confirmation_status === 'expired' ? 'Mijoz belgilangan vaqtda tasdiqlamadi — buyurtma bekor bo‘ldi.' : d.confirmation_status === 'rejected' ? 'Mijoz buyurtmani rad etdi.' : 'Buyurtma bekor qilindi.') : 'Mahsulot qaytarildi.'}</div>}
-          {/* Short by default (user: "juda uzun, tushunarsiz"): what was sold, my bonus, what happens now. Details fold away. */}
-          <section className="card pp-sum">
-            <div className="pp-prod">{d.commission.lines.length ? d.commission.lines.map((l: any) => `${pick(l.product, lang)}${l.qty > 1 ? ` × ${l.qty}` : ''}`).join(', ') : '—'}</div>
-            <div className="pp-bonus"><span>Sizning bonusingiz</span><b className={d.bucket === 'cancelled' || d.bucket === 'returned' ? 'no-t' : 'ok-t'}>{som(d.commission.total_minor)}</b></div>
-            {d.explain && <p className="pp-now">{d.explain.what} {d.explain.next}</p>}
-            <div className="small muted">{d.customer} · {d.district ?? '—'} · {new Date(d.created_at).toLocaleString('uz-UZ', { timeZone: 'Asia/Tashkent', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</div>
+          {/* Hero: what was sold, its state, my bonus, what happens now */}
+          <section className={`pp-hero b-${d.bucket}`}>
+            <div className="pp-hero-top">
+              <div className="pp-thumb">{d.commission.lines[0]?.image ? <img src={d.commission.lines[0].image} alt="" /> : <span aria-hidden>🛍️</span>}</div>
+              <div className="pp-hero-txt">
+                <div className="pp-num">Buyurtma {d.masked_number}</div>
+                <h1>{d.commission.lines.length ? d.commission.lines.map((l: any) => `${pick(l.product, lang)}${l.qty > 1 ? ` × ${l.qty}` : ''}`).join(', ') : 'Buyurtma'}</h1>
+                <span className={`pill b-${d.bucket}`}>{BUCKET_LABEL[d.bucket]}</span>
+              </div>
+            </div>
+            <div className="pp-bonus2"><span>Sizning bonusingiz</span><b className={off ? 'no-t' : ''}>{som(d.commission.total_minor)}</b></div>
+            {off && <div className="notice">{d.bucket === 'cancelled' ? (d.confirmation_status === 'expired' ? 'Mijoz belgilangan vaqtda tasdiqlamadi — buyurtma bekor bo‘ldi.' : d.confirmation_status === 'rejected' ? 'Mijoz buyurtmani rad etdi.' : 'Buyurtma bekor qilindi.') : 'Mahsulot qaytarildi.'}</div>}
+            {d.explain && <div className="pp-now2"><span aria-hidden>💡</span><div><b>{d.explain.what}</b><div>{d.explain.next}</div></div></div>}
+            <div className="pp-meta"><span>👤 {d.customer}</span><span>📍 {d.district ?? '—'}</span><span>🕒 {tm(d.created_at)}</span></div>
           </section>
 
           <Milestones m={d.milestones} />
 
-          <details className="card pp-more">
-            <summary>Batafsil: manba va bonus hisobi</summary>
-            <div className="kv"><span>Manba</span><b>{d.source}</b></div>
-            <div className="kv"><span>Nega sizniki</span><b>{d.attribution.reason_label}</b></div>
-            <div className="kv"><span>Mijoz</span><b>{d.customer} · {d.customer_phone}</b></div>
-            {d.contact_time_note && <div className="kv"><span>Aloqa vaqti</span><b>{d.contact_time_note}</b></div>}
-            {d.commission.lines.length === 0 && <p className="muted small">Bu buyurtmada bonus yo‘q (mahsulot uchun qoida belgilanmagan yoki buyurtma tasdiqlanmagan).</p>}
-            {d.commission.lines.map((l: any) => (
-              <div key={l.id} className="comm-line">
-                <div className="spread"><b>{pick(l.product, lang)} × {l.qty}{l.returned_qty ? ` (qaytdi: ${l.returned_qty})` : ''}</b><b className={l.state === 'reversed' ? 'no-t' : 'ok-t'}>{som(l.target_minor)}</b></div>
-                <div className="small">Narx {som(l.line_gross_minor)} · {ruleText(l.rule_snapshot)} · <span className={`pill r-${l.reason}`}>{l.reason_label}</span>{l.available_after && l.state === 'pending' ? <span className="muted"> · ochiladi: {new Date(l.available_after).toLocaleDateString('uz-UZ')}</span> : null}</div>
+          {/* Settlement: clean table */}
+          <section className="card pp-sec">
+            <h2 className="pp-h">🧾 Bonus hisob-kitobi</h2>
+            {d.commission.lines.length === 0 ? <p className="muted small">Bu buyurtmada bonus yo‘q (mahsulot uchun qoida belgilanmagan yoki buyurtma tasdiqlanmagan).</p> : d.commission.lines.map((l: any) => (
+              <div key={l.id} className="pp-line">
+                <div className="pp-line-h"><b>{pick(l.product, lang)}</b><span className={`pill r-${l.reason}`}>{l.reason_label}</span></div>
+                <dl className="pp-dl">
+                  <div><dt>Soni</dt><dd>{l.qty} dona{l.returned_qty ? ` (qaytdi ${l.returned_qty})` : ''}</dd></div>
+                  <div><dt>Narx</dt><dd>{som(l.line_gross_minor)}</dd></div>
+                  <div><dt>Komissiya qoidasi</dt><dd>{ruleText(l.rule_snapshot)}</dd></div>
+                  {l.available_after && l.state === 'pending' && <div><dt>Yechish mumkin bo‘ladi</dt><dd>{new Date(l.available_after).toLocaleDateString('uz-UZ')}</dd></div>}
+                  <div className="tot"><dt>Bonus</dt><dd className={l.state === 'reversed' ? 'no-t' : 'ok-t'}>{som(l.target_minor)}</dd></div>
+                </dl>
               </div>
             ))}
-            <p className="muted small">Foiz buyurtma vaqtida qotirilgan: keyin o‘zgarsa ham bu buyurtmaga ta’sir qilmaydi.</p>
-          </details>
+            <p className="pp-foot">🔒 Foiz buyurtma vaqtida qotirilgan — keyin o‘zgarsa ham bu buyurtmaga ta’sir qilmaydi.</p>
+          </section>
 
-          <details className="card pp-more">
-            <summary>Bonus harakatlari va to‘liq tarix ({d.timeline.length + d.entries.length})</summary>
-            <ul className="timeline">
-              {d.timeline.map((e: any, i: number) => (
-                <li key={i}><b>{DIM[e.dimension] ?? e.dimension}: {STATUS_TEXT[e.to_status] ?? e.to_status}</b><span className="muted small"> · {new Date(e.created_at).toLocaleString('uz-UZ', { dateStyle: 'short', timeStyle: 'short' })}</span></li>
-              ))}
-              {d.entries.map((e: any, i: number) => <li key={`m${i}`} className="money"><b>💰 {som(e.amount_minor)}: {MONEY[e.from_bucket] ?? e.from_bucket} → {MONEY[e.to_bucket] ?? e.to_bucket}</b>{e.reason && <span className="muted small"> · {MONEY_REASON[e.reason] ?? e.reason}</span>}</li>)}
-            </ul>
-          </details>
+          <section className="card pp-sec">
+            <h2 className="pp-h">🔗 Buyurtma qayerdan</h2>
+            <dl className="pp-dl">
+              <div><dt>Manba</dt><dd>{d.source}</dd></div>
+              <div><dt>Nega sizniki</dt><dd>{d.attribution.reason_label}</dd></div>
+              <div><dt>Mijoz</dt><dd>{d.customer} · {d.customer_phone}</dd></div>
+              {d.contact_time_note && <div><dt>Aloqa vaqti</dt><dd>{d.contact_time_note}</dd></div>}
+            </dl>
+          </section>
 
-          <details className="card pp-more pp-ask">
-            <summary>✉️ Operatorga yozish</summary>
+          {d.entries.length > 0 && (
+            <details className="card pp-sec pp-fold">
+              <summary><span className="pp-h">💰 Bonus harakatlari</span><span className="pp-count">{d.entries.length}</span></summary>
+              <ul className="pp-moves">
+                {d.entries.map((e: any, i: number) => (
+                  <li key={i}><div><b>{MONEY[e.from_bucket] ?? e.from_bucket} → {MONEY[e.to_bucket] ?? e.to_bucket}</b><div className="small muted">{e.reason ? (MONEY_REASON[e.reason] ?? e.reason) : ''}{e.created_at ? ` · ${tm(e.created_at)}` : ''}</div></div><b className="ok-t">{som(e.amount_minor)}</b></li>
+                ))}
+              </ul>
+            </details>
+          )}
+
+          <details className="card pp-sec pp-fold pp-ask">
+            <summary><span className="pp-h">✉️ Operatorga yozish</span><span className="small muted">savol yoki muammo</span></summary>
             <PartnerRequests orderId={id} />
           </details>
         </div>

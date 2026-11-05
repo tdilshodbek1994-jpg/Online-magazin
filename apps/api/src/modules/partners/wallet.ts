@@ -140,7 +140,8 @@ export function registerPartnerWallet(app: FastifyInstance, deps: Deps): void {
     const source = o.channel === 'partner_assisted' ? 'Siz kiritgan buyurtma' : o.stream_name ? `Oqim «${o.stream_name}»` : 'Sizning havolangiz';
     const reasonText: Record<string, string> = { partner_assisted: 'Buyurtmani o‘zingiz kiritdingiz', last_eligible_click: 'Mijoz oxirgi marta sizning havolangiz orqali kirgan', manual_correction: 'Administrator tuzatishi' };
     const accruals = await many<{ state: string }>(db, `
-      SELECT a.id, a.state, ${ACCRUAL_REASON_SQL} AS reason, a.target_minor::text, a.rule_snapshot, a.available_after, a.available_at, ol.product_snapshot->'name' AS product, ol.qty, ol.returned_qty, ol.unit_price_minor::text, ol.line_gross_minor::text
+      SELECT a.id, a.state, ${ACCRUAL_REASON_SQL} AS reason, a.target_minor::text, a.rule_snapshot, a.available_after, a.available_at, ol.product_snapshot->'name' AS product, ol.qty, ol.returned_qty, ol.unit_price_minor::text, ol.line_gross_minor::text,
+             (SELECT '/media/' || ma.storage_key FROM skus sk JOIN media_assets ma ON ma.product_id=sk.product_id AND ma.status='approved' WHERE sk.id=ol.sku_id ORDER BY ma.sort LIMIT 1) AS image
         FROM commission_accruals a JOIN orders o ON o.id=a.order_id JOIN order_lines ol ON ol.id=a.order_line_id WHERE a.order_id=$1 AND a.partner_id=$2 ORDER BY a.created_at`, [params.id, p.id]);
     const timeline = await many(db, `SELECT dimension, from_status, to_status, reason, created_at FROM order_status_events WHERE order_id=$1 ORDER BY id`, [params.id]);
     // Clear milestones for the partner: received → operator call(s) (who, when, result) → accepted → shipped → delivered → paid.

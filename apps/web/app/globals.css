@@ -1741,3 +1741,48 @@ img.t3-ava { object-fit: cover; display: block; }
   .admin-tab span { font-size: 20px; }
 }
 .notice { overflow-wrap: anywhere; }
+/* Partner order page v2 */
+.pp2 { display: grid; gap: 12px; }
+.pp-hero { position: relative; display: grid; gap: 12px; padding: 16px; border-radius: 20px; color: #fff; background: linear-gradient(140deg, #0b7a55 0%, #075a40 55%, #04382a 100%); box-shadow: 0 10px 24px rgba(4, 56, 42, .25); overflow: hidden; }
+.pp-hero::after { content: ''; position: absolute; right: -40px; top: -40px; width: 160px; height: 160px; border-radius: 50%; background: rgba(255,255,255,.07); }
+.pp-hero.b-cancelled, .pp-hero.b-returned { background: linear-gradient(140deg, #6b7280, #374151); }
+.pp-hero.b-delivered { background: linear-gradient(140deg, #0f9d6b, #066b49 60%, #034d34); }
+.pp-hero-top { display: flex; gap: 12px; align-items: center; position: relative; z-index: 1; }
+.pp-thumb { width: 72px; height: 72px; flex: none; border-radius: 16px; background: #fff; display: grid; place-items: center; overflow: hidden; font-size: 30px; box-shadow: 0 4px 10px rgba(0,0,0,.18); }
+.pp-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.pp-hero-txt { min-width: 0; display: grid; gap: 4px; justify-items: start; }
+.pp-num { font-size: 12px; opacity: .8; letter-spacing: .02em; }
+.pp-hero h1 { margin: 0; font-size: 19px; line-height: 1.25; color: #fff; overflow-wrap: anywhere; }
+.pp-hero .pill { background: rgba(255,255,255,.18); color: #fff; border: 1px solid rgba(255,255,255,.35); }
+.pp-bonus2 { position: relative; z-index: 1; display: flex; justify-content: space-between; align-items: baseline; gap: 10px; padding: 12px 14px; border-radius: 14px; background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.2); }
+.pp-bonus2 span { font-size: 14px; opacity: .9; }
+.pp-bonus2 b { font-size: 26px; font-weight: 900; color: #fff; white-space: nowrap; }
+.pp-bonus2 b.no-t { text-decoration: line-through; opacity: .7; }
+.pp-now2 { position: relative; z-index: 1; display: flex; gap: 10px; padding: 12px; border-radius: 14px; background: #fff; color: var(--text); font-size: 14px; line-height: 1.45; }
+.pp-now2 > span { font-size: 18px; }
+.pp-now2 b { display: block; margin-bottom: 2px; }
+.pp-hero .notice { position: relative; z-index: 1; margin: 0; color: var(--text); }
+.pp-meta { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 6px 12px; font-size: 13px; opacity: .92; }
+.pp-sec { padding: 14px; display: grid; gap: 10px; }
+.pp-h { font-size: 16px; font-weight: 800; margin: 0; }
+.pp-line { display: grid; gap: 8px; padding: 10px 0; border-top: 1px solid var(--border); }
+.pp-line:first-of-type { border-top: 0; padding-top: 0; }
+.pp-line-h { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.pp-dl { margin: 0; display: grid; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.pp-dl > div { display: flex; justify-content: space-between; gap: 12px; padding: 9px 12px; font-size: 14px; }
+.pp-dl > div + div { border-top: 1px solid var(--border); }
+.pp-dl dt { color: var(--muted); }
+.pp-dl dd { margin: 0; font-weight: 700; text-align: right; overflow-wrap: anywhere; }
+.pp-dl > div.tot { background: var(--primary-50); }
+.pp-dl > div.tot dd { font-size: 17px; font-weight: 900; }
+.pp-foot { margin: 0; font-size: 12px; color: var(--muted); }
+.pp-fold summary { display: flex; justify-content: space-between; align-items: center; gap: 8px; cursor: pointer; list-style: none; }
+.pp-fold summary::-webkit-details-marker { display: none; }
+.pp-fold summary::after { content: '▾'; color: var(--muted); }
+.pp-fold[open] summary::after { content: '▴'; }
+.pp-count { margin-left: auto; font-size: 12px; font-weight: 800; padding: 2px 8px; border-radius: 999px; background: var(--surface-2); }
+.pp-moves { list-style: none; margin: 0; padding: 0; display: grid; }
+.pp-moves li { display: flex; justify-content: space-between; gap: 10px; padding: 9px 0; border-top: 1px solid var(--border); font-size: 14px; }
+.pp-moves li:first-child { border-top: 0; }
+.ms .ms-list li.done .ms-time { color: var(--primary-600); }
+.pp-bonus2 span { white-space: nowrap; font-size: 13px; } .pp-bonus2 b { font-size: clamp(20px, 6.5vw, 26px); }

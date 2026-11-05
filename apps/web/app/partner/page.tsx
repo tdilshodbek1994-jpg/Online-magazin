@@ -27,6 +27,7 @@ export default function PartnerDashboard() {
   const { me, error, reload } = usePartnerMe();
   const [period, setPeriod] = useState('today');
   const [avatar, setAvatar] = useState<string | null>(null);
+  const [avatarBroken, setAvatarBroken] = useState(false);
   const [d, setD] = useState<any>(null);
   const [err, setErr] = useState<any>(null);
   const [day, setDay] = useState<any>(null);
@@ -50,13 +51,13 @@ export default function PartnerDashboard() {
           <section className="pd-hero pd-hero2">
             {/* Profile photo (shown on contest boards). Tap to change; without a photo the UzShop mark is used there. */}
             <label className="pd-avatar pd-avatar-up" title="Profil rasmini qo‘yish">
-              {avatar || me.avatar_url ? <img src={avatar ?? me.avatar_url} alt="Profil rasmi" /> : (me.display_name || '?').slice(0, 2).toUpperCase()}
+              {(avatar || me.avatar_url) && !avatarBroken ? <img src={avatar ?? me.avatar_url} alt="" onError={() => setAvatarBroken(true)} /> : (me.display_name || '?').slice(0, 2).toUpperCase()}
               <span className="pd-cam" aria-hidden>📷</span>
               <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" aria-label="Profil rasmini yuklash" onChange={async (e) => {
                 const f = e.target.files?.[0]; e.target.value = ''; if (!f) return;
                 if (f.size > 3 * 1024 * 1024) { toast('Rasm 3 MB dan kichik bo‘lsin', 'err'); return; }
                 const b64 = await new Promise<string>((res) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1] ?? ''); r.readAsDataURL(f); });
-                try { const r = await api('/partner/avatar', { method: 'POST', body: { content_base64: b64 } }); setAvatar(r.avatar_url); toast('✓ Profil rasmi saqlandi'); } catch (er: any) { toast(errText(er), 'err'); }
+                try { const r = await api('/partner/avatar', { method: 'POST', body: { content_base64: b64 } }); setAvatar(r.avatar_url); setAvatarBroken(false); toast('✓ Profil rasmi saqlandi'); } catch (er: any) { toast(errText(er), 'err'); }
               }} />
             </label>
             <div className="pd-who">
@@ -68,9 +69,11 @@ export default function PartnerDashboard() {
 
           {/* Big cards: each one job, each its own colour (user request: like "Mijoz uchun buyurtma", clearly different). */}
           <div className="big-cards">
-            <Link href="/partner/new" className="big-card bc-green">
-              <span className="big-ico" aria-hidden>＋</span>
-              <span className="big-txt"><b>Mijoz uchun buyurtma</b><small>Telefon, manzil — 1 daqiqada</small></span>
+            {/* Owner: the AI assistant takes this slot; «+ Buyurtma» stays in the bottom bar. */}
+            <Link href="/partner/ai" className="big-card bc-ai">
+              <span className="big-ico" aria-hidden>🤖</span>
+              <span className="big-txt"><b>AI yordamchi</b><small>«Bugun qancha pul topdim?» — so‘rang, aniq javob oling</small></span>
+              <span className="big-go" aria-hidden>›</span>
             </Link>
 
             <Link href="/partner/wallet" className="big-card bc-gold">
@@ -124,7 +127,7 @@ export default function PartnerDashboard() {
           {/* Small tiles: about a third of a big card. */}
           <div className="mini-tiles">
             {([
-              ['/partner/ai', '🤖', 'AI yordamchi', 't3'], ['/partner/orders', '📋', 'Buyurtmalar', 't1'], ['/partner/market', '🛍️', 'Market', 't2'], ['/partner/streams', '🔗', 'Oqimlar', 't3'], ['/partner/analytics', '📈', 'Reklama', 't4'],
+              ['/partner/orders', '📋', 'Buyurtmalar', 't1'], ['/partner/market', '🛍️', 'Market', 't2'], ['/partner/streams', '🔗', 'Oqimlar', 't3'], ['/partner/analytics', '📈', 'Reklama', 't4'],
               ['/partner/offers', '🧺', 'Taklif to‘plami', 't5'], ['/partner/contacts', '📒', 'Mijozlar', 't6'], ['/partner/stats', '📊', 'Statistika', 't7'], ['/partner/wallet', '💳', 'Hamyon', 't8'],
               ['/partner/contests', '🏆', 'Konkurs', 't1'], ['/partner/uzcoin', '🪙', 'UzCoin', 't2'], ['/partner/quality', '🛡️', 'Sifat', 't3'], ['/partner/charity', '💝', 'Xayriya', 't4'],
               ['/partner/top', '🥇', d?.month_rank ? `TOP · #${d.month_rank.rank}` : 'TOP va holat', 't5'], ['/partner/notifications', '🔔', 'Xabarlar', 't6'], ['/partner/expenses', '🧾', 'Xarajatlar', 't7'], ['/partner/about', '📘', 'Qoidalar', 't8'],

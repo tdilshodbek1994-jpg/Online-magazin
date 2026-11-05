@@ -1196,6 +1196,7 @@ a.admin-tab { text-decoration: none; color: inherit; }
 .big-sub { opacity: .8 !important; }
 .big-go { font-size: 26px; opacity: .8; flex: 0 0 auto; }
 .bc-green { background: linear-gradient(135deg, #059669, #10b981 60%, #34d399); }
+.bc-ai { background: radial-gradient(120% 140% at 0% 0%, #1f6feb 0%, #0e4b8f 50%, #0b2a52 100%); }
 .bc-gold { background: linear-gradient(135deg, #78350f, #b45309 55%, #f59e0b); }
 .bc-gold .big-txt b { font-size: 24px; }
 .bc-orange { background: linear-gradient(135deg, #9a3412, #ea580c 60%, #fb923c); }

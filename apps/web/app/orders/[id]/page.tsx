@@ -5,6 +5,7 @@ import { api, som } from '@/lib/api';
 import { pick, useI18n } from '@/lib/i18n';
 import { eventLabel, orderStage, PAYMENT_LABEL, STEPS } from '@/lib/orderStatus';
 import { Reorder } from './Reorder';
+import { SelfActions } from './SelfActions';
 
 export default function OrderPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -42,6 +43,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
           )}
           {o.address_snapshot && <p className="small"><b>Manzil:</b> {[o.address_snapshot.district, o.address_snapshot.street, o.address_snapshot.house && `${o.address_snapshot.house}-uy`, o.address_snapshot.apartment && `${o.address_snapshot.apartment}-xonadon`].filter(Boolean).join(', ')}</p>}
           {o.messages?.length > 0 && <div className="ord-msgs"><h2>Do‘kondan xabarlar</h2>{o.messages.map((m: any, i: number) => <div key={i} className="ord-msg"><span>💬 {m.body}</span><small className="muted">{new Date(m.created_at).toLocaleString('uz-UZ', { timeZone: 'Asia/Tashkent', dateStyle: 'short', timeStyle: 'short' })}</small></div>)}</div>}
+          <SelfActions o={{ ...o, id }} onChanged={load} />
           <Reorder lines={o.lines} />
           <details className="ord-hist">
             <summary>Buyurtma tarixi ({o.timeline.length})</summary>

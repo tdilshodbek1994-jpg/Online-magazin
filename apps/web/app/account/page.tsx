@@ -50,6 +50,7 @@ export default function Account() {
         <Link href="/favorites">❤️ Sevimlilar</Link>
         <Link href="/cart">🛒 Savat</Link>
         <Link href="/legal/returns">↩️ Qaytarish shartlari</Link>
+        <Link href="/account/profile">⚙️ Telefon raqam va ma’lumotlarim</Link>
         {roles.includes('partner') ? <Link href="/partner">🤝 Hamkor kabineti</Link> : <Link href="/partner">🤝 Hamkor bo‘lib pul ishlash</Link>}
       </section>
       <button type="button" className="btn secondary acc-logout" onClick={async () => { await api('/auth/logout', { method: 'POST' }).catch(() => {}); setToken(null); location.href = '/'; }}>{t('logout')}</button>

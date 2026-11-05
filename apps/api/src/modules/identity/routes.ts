@@ -14,7 +14,7 @@ import { queueNotification } from '../notifications/service.js';
 const zPhone = z.string().min(5).max(32);
 const zLocale = z.enum(['uz-Latn', 'uz-Cyrl', 'ru']);
 
-function codeHash(challengeId: string, code: string): Buffer {
+export function codeHash(challengeId: string, code: string): Buffer {
   return createHash('sha256').update(`${challengeId}:${code}`).digest();
 }
 

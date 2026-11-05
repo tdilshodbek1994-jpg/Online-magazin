@@ -1912,3 +1912,12 @@ a.ai-row .ai-rt { color: #1d6fd1; }
 @media (prefers-reduced-motion: reduce) { .ai-q, .ai-u { transition: none; } }
 
 .bn-plus.bn-ai { font-size: 18px; background: radial-gradient(120% 140% at 0% 0%, #1f6feb 0%, #0e4b8f 55%, #0b2a52 100%); }
+
+/* ===== Customer self-service ===== */
+.ord-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+.ord-cancel { display: grid; gap: 8px; width: 100%; padding: 12px; }
+.danger-t { color: #b42318; }
+.prof { display: grid; gap: 12px; }
+.prof .card { display: grid; gap: 8px; }
+.prof-codes { display: grid; gap: 10px; }
+.prof-codes label { display: grid; gap: 4px; font-size: 14px; }

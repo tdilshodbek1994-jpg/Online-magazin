@@ -151,7 +151,11 @@ export function registerOrders(app: FastifyInstance, deps: Deps): void {
     });
   };
   route(app, deps, { method: 'POST', url: '/ops/orders/:id/pick', tags: ['warehouse'], summary: 'Start picking', params: zIdParam }, (c) => fulfil('picking', ['reserved'])(c));
-  route(app, deps, { method: 'POST', url: '/ops/orders/:id/pack', tags: ['warehouse'], summary: 'Packed', params: zIdParam }, (c) => fulfil('packed', ['picking'])(c));
+  route(app, deps, { method: 'POST', url: '/ops/orders/:id/pack', tags: ['warehouse'], summary: 'Packed (if scanning was used, every unit must be matched)', params: zIdParam }, async (c) => {
+    const { assertPickComplete } = await import('../fulfillment/pickscan.js');
+    await assertPickComplete(c.db, c.params.id);
+    return fulfil('packed', ['picking'])(c);
+  });
 
   route(app, deps, { method: 'POST', url: '/ops/orders/:id/ship', tags: ['warehouse'], summary: 'Hand over to courier: consumes reservation, stock out', params: zIdParam,
     body: z.object({ courier_user_id: z.string().uuid(), tracking_id: z.string().max(80).optional() }) },

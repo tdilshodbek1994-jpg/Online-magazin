@@ -1970,3 +1970,12 @@ a.ocard { gap: 6px; }
 .ret-line { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 14px; }
 .ret-qty { display: flex; align-items: center; gap: 8px; } .ret-qty button { width: 32px; height: 32px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); font-size: 18px; cursor: pointer; }
 .ret-card { display: grid; gap: 4px; color: inherit; text-decoration: none; }
+
+/* ===== Pick check ===== */
+.pk { display: grid; gap: 8px; padding: 10px; border: 1px dashed var(--border); border-radius: 12px; }
+.pk input { flex: 1; min-width: 0; }
+.pk-cam { width: 100%; max-height: 220px; border-radius: 10px; background: #000; object-fit: cover; }
+.pk-msg { font-weight: 700; padding: 6px 10px; border-radius: 8px; } .pk-msg.ok { background: #e6f4ec; color: #137a43; } .pk-msg.bad { background: #fde8e8; color: #a61b1b; }
+.pk-lines { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.pk-lines li { display: flex; justify-content: space-between; gap: 8px; padding: 6px 8px; border-radius: 8px; background: var(--surface-2); font-size: 14px; }
+.pk-lines li.done { background: #e6f4ec; }

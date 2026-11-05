@@ -103,3 +103,28 @@ describe('staff profile', () => {
     expect((await api(t, 'GET', '/ops/center', { token: op.token })).status).toBe(401);
   });
 });
+
+describe('warehouse pick check (M20)', () => {
+  it('wrong item is refused and blocks packing; the full correct set unlocks it; no customer data in the pick list', async () => {
+    const prod = await mkProduct(t, { prices: [70_000], stock: [5] });
+    const c = await mkUser(t);
+    const o = await placeOrder(t, { token: c.token, phone: c.phone }, [{ sku_id: prod.skuIds[0]!, qty: 2 }]);
+    const id = o.json.order_id;
+    const payable = (await t.db.query(`SELECT payable_minor::text p FROM orders WHERE id=$1`, [id])).rows[0].p;
+    await api(t, 'POST', `/ops/orders/${id}/claim`, { token: s.operator.token });
+    await api(t, 'POST', `/ops/orders/${id}/calls`, { token: s.operator.token, body: { outcome: 'confirmed', confirmed_total_minor: payable } });
+    expect((await api(t, 'POST', `/ops/orders/${id}/pick/scan`, { token: s.warehouse.token, body: { code: 'X' } })).json.code).toBe('NOT_PICKING');
+    expect((await api(t, 'POST', `/ops/orders/${id}/pick`, { token: s.warehouse.token })).status).toBe(200);
+    const wrong = await api(t, 'POST', `/ops/orders/${id}/pick/scan`, { token: s.warehouse.token, body: { code: 'NOT-IN-ORDER' } });
+    expect(wrong.json).toMatchObject({ ok: false, code: 'WRONG_ITEM', complete: false });
+    expect((await api(t, 'POST', `/ops/orders/${id}/pack`, { token: s.warehouse.token })).json.code).toBe('PICK_INCOMPLETE');
+    const sku = (await t.db.query(`SELECT sku_code FROM skus WHERE id=$1`, [prod.skuIds[0]])).rows[0].sku_code;
+    expect((await api(t, 'POST', `/ops/orders/${id}/pick/scan`, { token: s.warehouse.token, body: { code: sku.toLowerCase() } })).json.complete).toBe(false);
+    const done = await api(t, 'POST', `/ops/orders/${id}/pick/scan`, { token: s.warehouse.token, body: { code: sku } });
+    expect(done.json).toMatchObject({ ok: true, complete: true });
+    expect((await api(t, 'POST', `/ops/orders/${id}/pick/scan`, { token: s.warehouse.token, body: { code: sku } })).json).toMatchObject({ ok: false, code: 'EXTRA_UNIT', complete: true });
+    const list = await api(t, 'GET', `/ops/orders/${id}/pick`, { token: s.warehouse.token });
+    expect(JSON.stringify(list.json)).not.toContain(c.phone);
+    expect((await api(t, 'POST', `/ops/orders/${id}/pack`, { token: s.warehouse.token })).status).toBe(200);
+  });
+});

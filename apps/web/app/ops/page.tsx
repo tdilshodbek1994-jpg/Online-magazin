@@ -1,4 +1,5 @@
 'use client';
+import { PickScan } from './PickScan';
 import { useCallback, useEffect, useState } from 'react';
 import { Async } from '@/components/Header';
 import { api, som } from '@/lib/api';
@@ -99,6 +100,7 @@ export default function Ops() {
                   <button className="btn secondary" disabled={sel.fulfillment_status !== 'reserved'} onClick={() => act(() => api(`/ops/orders/${sel.id}/pick`, { method: 'POST' }), '✓ Yig‘ish boshlandi')}>1. Yig‘ishni boshlash</button>
                   <button className="btn secondary" disabled={sel.fulfillment_status !== 'picking'} onClick={() => act(() => api(`/ops/orders/${sel.id}/pack`, { method: 'POST' }), '✓ Qadoqlandi')}>2. Qadoqlandi</button>
                 </div>
+                {sel.fulfillment_status === 'picking' && <PickScan key={sel.id} orderId={sel.id} />}
                 <label htmlFor="courier-sel">3. Kuryer</label>
                 <select id="courier-sel" value={courier} onChange={(e) => setCourier(e.target.value)}><option value="">— kuryerni tanlang —</option>{couriers.map((c) => <option key={c.id} value={c.id}>{c.display_name ?? c.phone_e164}</option>)}</select>
                 <button className="btn" disabled={!courier || sel.fulfillment_status !== 'packed'} onClick={() => act(() => api(`/ops/orders/${sel.id}/ship`, { method: 'POST', body: { courier_user_id: courier } }), '🚚 Kuryerga topshirildi')}>🚚 Kuryerga topshirish</button>

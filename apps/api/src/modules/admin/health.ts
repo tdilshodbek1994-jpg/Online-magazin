@@ -39,10 +39,12 @@ export function registerHealth(app: FastifyInstance, deps: Deps): void {
     const tgOn = !!process.env.TELEGRAM_BOT_TOKEN;
     checks.push({ key: 'telegram', label: 'Telegram bot', state: !tgOn ? 'not_configured' : tg.failed > tg.sent && tg.failed > 0 ? 'degraded' : 'ok',
       detail: tgOn ? `24 soat: yuborildi ${tg.sent}, xato ${tg.failed}, ulanmagan foydalanuvchi ${tg.suppressed}. «Yuborildi» = Telegram qabul qildi, o‘qildi degani emas.` : 'Bot token qo‘yilmagan — xabarlar faqat kabinetda ko‘rinadi.', action: tgOn ? undefined : 'Serverga TELEGRAM_BOT_TOKEN qo‘ying.' });
-    const tgApp = await one<{ links: number; logins_24h: number }>(db, `SELECT COUNT(*)::int AS links, COUNT(*) FILTER (WHERE last_login_at > now() - interval '24 hours')::int AS logins_24h FROM tg_app_links WHERE app='partner'`);
-    const tgAppOn = !!(process.env.TELEGRAM_PARTNER_BOT_TOKEN && process.env.TELEGRAM_PARTNER_BOT_USERNAME);
-    checks.push({ key: 'telegram_partner_app', label: 'Telegram hamkor ilovasi', state: tgAppOn ? 'ok' : 'not_configured',
-      detail: tgAppOn ? `@${process.env.TELEGRAM_PARTNER_BOT_USERNAME}: ulangan hamkorlar ${tgApp.links}, 24 soatda kirganlar ${tgApp.logins_24h}` : 'Hamkor boti ulanmagan — kabinet faqat saytda.', action: tgAppOn ? undefined : 'Serverda: bash scripts/server/telegram-app-setup.sh partner' });
+    for (const [app, label, env] of [['partner', 'Telegram hamkor ilovasi', 'TELEGRAM_PARTNER_BOT'], ['operator', 'Telegram operator ilovasi', 'TELEGRAM_OPERATOR_BOT']] as const) {
+      const st = await one<{ links: number; logins_24h: number }>(db, `SELECT COUNT(*)::int AS links, COUNT(*) FILTER (WHERE last_login_at > now() - interval '24 hours')::int AS logins_24h FROM tg_app_links WHERE app=$1`, [app]);
+      const on = !!(process.env[`${env}_TOKEN`] && process.env[`${env}_USERNAME`]);
+      checks.push({ key: `telegram_${app}_app`, label, state: on ? 'ok' : 'not_configured',
+        detail: on ? `@${process.env[`${env}_USERNAME`]}: ulanganlar ${st.links}, 24 soatda kirganlar ${st.logins_24h}` : 'Bot ulanmagan — faqat saytda ishlaydi.', action: on ? undefined : `Serverda: bash scripts/server/telegram-app-setup.sh ${app}` });
+    }
     const sms = await one<{ n: number; sent: number; failed: number }>(db, `SELECT COUNT(*)::int AS n, COUNT(*) FILTER (WHERE status='sent')::int AS sent, COUNT(*) FILTER (WHERE status='failed')::int AS failed FROM notifications WHERE channel='sms' AND created_at > now() - interval '24 hours'`);
     checks.push(smsConfigured()
       ? { key: 'sms', label: 'SMS (Eskiz)', state: sms.failed > sms.sent && sms.failed > 0 ? 'degraded' : 'ok', detail: `24 soat: yuborildi ${sms.sent}, xato ${sms.failed}. «Yuborildi» = Eskiz qabul qildi.`, action: sms.failed > sms.sent && sms.failed > 0 ? 'Eskiz kabinetida balans va SMS matni tasdiqlanganini tekshiring.' : undefined }

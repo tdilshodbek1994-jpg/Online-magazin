@@ -8,6 +8,7 @@ import { errText } from '@/lib/errors';
 import { toast } from '@/lib/toast';
 import { WorkDesk } from './WorkDesk';
 import { PartnerDiscountWarn } from '@/components/PartnerDiscountWarn';
+import { TgAppConnect } from '@/components/TgAppConnect';
 
 const QUEUES: [string, string][] = [['new', 'Yangi'], ['awaiting_customer', 'Mijoz tasdig‘i'], ['callback', 'Qayta qo‘ng‘iroq'], ['awaiting_payment', 'To‘lov kutilmoqda'], ['ready_to_pick', 'Yig‘ishga tayyor'], ['in_delivery', 'Yetkazishda'], ['problem', 'Muammoli'], ['returns', 'Qaytarish'], ['closed', 'Yopilgan']];
 
@@ -120,6 +121,7 @@ export default function Ops() {
           </section>
         </div>
       )}
+      <TgAppConnect app="operator" />
     </>
   );
 }

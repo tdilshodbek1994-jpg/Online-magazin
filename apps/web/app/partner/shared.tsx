@@ -143,30 +143,4 @@ export function TelegramConnect({ compact = false }: { compact?: boolean }) {
   );
 }
 
-/** «Telegram ilovada ochish»: one-time link that opens the partner bot's mini app already tied to this account. */
-export function TgAppConnect() {
-  const [s, setS] = useState<any>(null);
-  const [err, setErr] = useState<any>(null);
-  const [busy, setBusy] = useState(false);
-  const load = () => api('/me/telegram/apps').then((r) => setS(r.items.find((i: any) => i.app === 'partner'))).catch(() => {});
-  useEffect(() => { void load(); }, []);
-  if (!s?.configured || tgAppName()) return null;
-  return (
-    <div className="card tg-app-card">
-      <div className="tac-head"><span className="tac-icon" aria-hidden>📱</span><div><b>Telegram ilova</b><p className="muted small">Kabinet @{s.bot_username} botida ochiladi — parol va kodsiz.</p></div></div>
-      {err && <p className="notice" role="alert">{errText(err)}</p>}
-      {s.linked ? (
-        <div className="tac-row">
-          <span className="pill b-delivered">Ulangan{s.tg_username ? ` · @${s.tg_username}` : ''}</span>
-          <a className="btn sm" href={`https://t.me/${s.bot_username}`} target="_blank" rel="noopener noreferrer">Botni ochish</a>
-          <button type="button" className="btn secondary sm" disabled={busy} onClick={async () => { setBusy(true); try { await api('/me/telegram/apps/partner', { method: 'DELETE' }); await load(); } catch (e) { setErr(e); } finally { setBusy(false); } }}>Uzish</button>
-        </div>
-      ) : (
-        <button type="button" className="btn" disabled={busy} onClick={async () => {
-          setBusy(true); setErr(null);
-          try { const r = await api('/me/telegram/apps/link-token', { method: 'POST', body: { app: 'partner' } }); if (r.url) location.href = r.url; } catch (e) { setErr(e); } finally { setBusy(false); }
-        }}>Telegram ilovada ochish</button>
-      )}
-    </div>
-  );
-}
+export { TgAppConnect } from '@/components/TgAppConnect';

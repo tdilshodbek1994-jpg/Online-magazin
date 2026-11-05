@@ -129,9 +129,51 @@ describe('mini app login and linking', () => {
 
   it('link requires a logged-in user; link-token reports not configured when the bot env is missing', async () => {
     expect((await api(t, 'POST', '/me/telegram/apps/link', { body: { app: 'partner', init_data: initData({ id: 7007 }) } })).status).toBe(401);
-    const u = await mkUser(t);
-    const r = await api(t, 'POST', '/me/telegram/apps/link-token', { token: u.token, body: { app: 'operator' } });
+    const op = await mkUser(t, ['operator']);
+    const r = await api(t, 'POST', '/me/telegram/apps/link-token', { token: op.token, body: { app: 'operator' } });
     expect(r.json).toMatchObject({ configured: false, url: null });
+  });
+});
+
+describe('operator bot (Uzshop_operator)', () => {
+  const OP_BOT = '555666777:TEST_operator_bot_token_ccccccccccccccccc';
+  beforeAll(() => { process.env.TELEGRAM_OPERATOR_BOT_TOKEN = OP_BOT; process.env.TELEGRAM_OPERATOR_BOT_USERNAME = 'Uzshop_operator_test_bot'; });
+  afterAll(() => { delete process.env.TELEGRAM_OPERATOR_BOT_TOKEN; delete process.env.TELEGRAM_OPERATOR_BOT_USERNAME; });
+
+  it('operator links and logs in; the session opens the operator queues', async () => {
+    const op = await mkUser(t, ['operator']);
+    const tg = { id: 9001, first_name: 'Operator' };
+    expect((await api(t, 'POST', '/me/telegram/apps/link', { token: op.token, body: { app: 'operator', init_data: initData(tg, { token: OP_BOT }) } })).status).toBe(200);
+    const r = await api(t, 'POST', '/auth/telegram/webapp', { body: { app: 'operator', init_data: initData(tg, { token: OP_BOT }) } });
+    expect(r.json).toMatchObject({ linked: true, user_id: op.id, home: '/ops' });
+    expect((await api(t, 'GET', '/ops/queues', { token: r.json.token })).status).toBe(200);
+  });
+
+  it('a customer or partner cannot link the operator bot; partner-bot data is not accepted by the operator bot', async () => {
+    const c = await mkUser(t);
+    const p = await mkPartner(t);
+    expect((await api(t, 'POST', '/me/telegram/apps/link', { token: c.token, body: { app: 'operator', init_data: initData({ id: 9002 }, { token: OP_BOT }) } })).json.code).toBe('TG_APP_ROLE_REQUIRED');
+    expect((await api(t, 'POST', '/me/telegram/apps/link-token', { token: p.token, body: { app: 'operator' } })).status).toBe(403);
+    expect((await api(t, 'POST', '/auth/telegram/webapp', { body: { app: 'operator', init_data: initData({ id: 9003 }) } })).status).toBe(401); // signed by the partner bot
+  });
+
+  it('operator removed from staff: the old link no longer opens the operator room', async () => {
+    const op = await mkUser(t, ['operator']);
+    const tg = { id: 9004 };
+    await api(t, 'POST', '/me/telegram/apps/link', { token: op.token, body: { app: 'operator', init_data: initData(tg, { token: OP_BOT }) } });
+    await t.db.query(`UPDATE memberships SET revoked_at=now() WHERE user_id=$1 AND role_code='operator'`, [op.id]);
+    const r = await api(t, 'POST', '/auth/telegram/webapp', { body: { app: 'operator', init_data: initData(tg, { token: OP_BOT }) } });
+    expect(r.status).toBe(403);
+    expect(r.json.code).toBe('TG_APP_ROLE_REQUIRED');
+  });
+
+  it('the same Telegram can be in both bots for one person (partner and operator are separate links)', async () => {
+    const op = await mkUser(t, ['operator', 'partner']);
+    const tg = { id: 9005 };
+    expect((await api(t, 'POST', '/me/telegram/apps/link', { token: op.token, body: { app: 'operator', init_data: initData(tg, { token: OP_BOT }) } })).status).toBe(200);
+    expect((await api(t, 'POST', '/me/telegram/apps/link', { token: op.token, body: { app: 'partner', init_data: initData(tg) } })).status).toBe(200);
+    const list = await api(t, 'GET', '/me/telegram/apps', { token: op.token });
+    expect(list.json.items.filter((i: any) => i.linked).map((i: any) => i.app).sort()).toEqual(['operator', 'partner']);
   });
 });
 

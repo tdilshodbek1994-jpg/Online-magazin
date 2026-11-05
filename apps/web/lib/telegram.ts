@@ -65,7 +65,12 @@ export function toHex(c: string): string | null {
 /** start_param from the bot link → page inside the app. Unknown values open the home page. */
 export function startPath(app: TgAppName, p: string | null | undefined): string {
   const home = TG_HOME[app];
-  if (!p || app !== 'partner') return home;
+  if (!p) return home;
+  if (app === 'operator') {
+    const oo = /^o_([0-9a-f-]{36})$/.exec(p);
+    if (oo) return `/ops?order=${oo[1]}`;
+    return ({ board: '/ops/board', ai: '/ops/ai', templates: '/ops/templates' } as Record<string, string>)[p] ?? home;
+  }
   const o = /^o_([0-9a-f-]{36})$/.exec(p);
   if (o) return `/partner/orders/${o[1]}`;
   const MAP: Record<string, string> = { orders: '/partner/orders', wallet: '/partner/wallet', ai: '/partner/ai', new: '/partner/new', market: '/partner/market', notifications: '/partner/notifications', stats: '/partner/stats', payouts: '/partner/payouts' };

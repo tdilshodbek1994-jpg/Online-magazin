@@ -2,7 +2,7 @@ import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { audit } from '../../platform/audit.js';
-import { hashToken, newToken, requireUser } from '../../platform/auth.js';
+import { type Actor, can, hashToken, newToken, requireUser } from '../../platform/auth.js';
 import { many, maybeOne, one, type Queryable, withTx } from '../../platform/db.js';
 import { AppError, forbidden } from '../../platform/errors.js';
 import { type Deps, route } from '../../platform/http.js';
@@ -119,6 +119,17 @@ function setGateCookie(reply: FastifyReply): void {
   if (v) reply.header('set-cookie', `${GATE_COOKIE}=${v}; Path=/; Max-Age=${30 * 86400}; Secure; HttpOnly; SameSite=None`);
 }
 
+/** The operator bot is only for staff who work the order queue. */
+const OPERATOR_PERM = 'orders.read_all';
+function requireAppRole(actor: Actor, app: TgApp): void {
+  if (app === 'operator' && !can(actor, OPERATOR_PERM)) throw new AppError(403, 'TG_APP_ROLE_REQUIRED');
+}
+async function hasOperatorRole(tx: Queryable, userId: string): Promise<boolean> {
+  const r = await tx.query(`SELECT 1 FROM memberships m JOIN role_permissions rp ON rp.role_code=m.role_code
+      WHERE m.user_id=$1 AND m.revoked_at IS NULL AND rp.permission_code=$2 LIMIT 1`, [userId, OPERATOR_PERM]);
+  return !!r.rowCount;
+}
+
 async function linkTelegram(tx: Queryable, app: TgApp, userId: string, tg: TgWebAppUser): Promise<void> {
   const other = await maybeOne<{ user_id: string }>(tx, `SELECT user_id FROM tg_app_links WHERE app=$1 AND tg_user_id=$2 FOR UPDATE`, [app, tg.id]);
   if (other && other.user_id !== userId) throw new AppError(409, 'TG_LINKED_TO_OTHER_ACCOUNT');
@@ -152,6 +163,7 @@ export function registerTgApps(app: FastifyInstance, deps: Deps): void {
         `SELECT u.id AS user_id, u.phone_e164, u.status FROM tg_app_links l JOIN users u ON u.id=l.user_id WHERE l.app=$1 AND l.tg_user_id=$2`, [body.app, v.user.id]);
       if (!l) return { linked: false as const, link_token_rejected: !!linkTok, first_name: v.user.first_name ?? null };
       if (l.status !== 'active') throw new AppError(403, 'ACCOUNT_LOCKED');
+      if (body.app === 'operator' && !(await hasOperatorRole(tx, l.user_id))) throw new AppError(403, 'TG_APP_ROLE_REQUIRED');
       const { token, hash } = newToken();
       const s = await one<{ id: string }>(tx, `INSERT INTO sessions (user_id, token_hash, phone_at_issue, user_agent, ip, expires_at)
           VALUES ($1,$2,$3,$4,$5, now() + make_interval(hours => $6)) RETURNING id`,
@@ -169,6 +181,7 @@ export function registerTgApps(app: FastifyInstance, deps: Deps): void {
     body: z.object({ app: zApp, init_data: z.string().min(20).max(4096) }).strict() },
   async ({ actor, body, db, reply }) => {
     requireUser(actor);
+    requireAppRole(actor, body.app);
     const v = verifyOrThrow(body.app, body.init_data);
     await withTx(db, async (tx) => {
       await linkTelegram(tx, body.app, actor.userId!, v.user);
@@ -183,6 +196,7 @@ export function registerTgApps(app: FastifyInstance, deps: Deps): void {
     body: z.object({ app: zApp }).strict() },
   async ({ actor, body, db }) => {
     requireUser(actor);
+    requireAppRole(actor, body.app);
     const bot = botUsername(body.app);
     if (!bot || !botToken(body.app)) return { configured: false, url: null, expires_in_seconds: 0 };
     const recent = await one<{ n: number }>(db, `SELECT COUNT(*)::int AS n FROM tg_app_link_tokens WHERE user_id=$1 AND created_at > now() - interval '1 hour'`, [actor.userId]);

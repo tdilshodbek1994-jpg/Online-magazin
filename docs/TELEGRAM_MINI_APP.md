@@ -10,7 +10,7 @@ There is no second copy of the cabinet: one code base, so every fix on the site 
 | Bot | App | Status |
 |---|---|---|
 | Uzshop_admin | partner cabinet `/tg/partner` → `/partner` | **done (this step)** |
-| Uzshop_operator | operator room `/ops` | API ready (`app: operator`), entry page and setup later |
+| Uzshop_operator | operator room `/tg/operator` → `/ops` | **done** — only staff with `orders.read_all` (operator/owner) can link or log in; removed staff lose access at the next open |
 | Uzshop_push | notifications | later (today notifications use `TELEGRAM_BOT_TOKEN`) |
 
 ## How login works (security)
@@ -32,6 +32,13 @@ There is no second copy of the cabinet: one code base, so every fix on the site 
 Telegram's Back button works on every inner page, outside links open through Telegram (`openLink` / `openTelegramLink`),
 the site footer and «install app» bar are hidden. `startapp` parameters: `orders`, `wallet`, `ai`, `new`, `market`,
 `notifications`, `stats`, `payouts`, `o_<order id>` (opens that order) — for links in future bot messages.
+
+## Operator bot
+
+Same login rules as the partner bot, plus the role rule above. One person can link the same Telegram to both bots
+(two separate links). Website: Operator xonasi → bottom card «Telegram ilovada ochish». `startapp`: `board`, `ai`,
+`templates`, `o_<order id>` (opens that order card). Setup: `bash scripts/server/telegram-app-setup.sh operator`
+with the Uzshop_operator token. Tests: 4 more in `zr-tgapp` (15 total).
 
 ## Owner steps (server, as user `om`)
 

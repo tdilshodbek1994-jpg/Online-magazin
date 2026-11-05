@@ -12,6 +12,7 @@ type State =
   | { k: 'error'; err: unknown };
 
 const TITLE: Record<TgAppName, string> = { partner: 'Hamkor kabineti', operator: 'Operator xonasi' };
+const WHERE: Record<TgAppName, string> = { partner: 'Hamkor kabineti → Bildirishnomalar', operator: 'Operator xonasi (pastda)' };
 
 /**
  * Mini App entry (/tg/<app>). Linked Telegram → straight into the cabinet. Not linked → the person proves the
@@ -79,12 +80,12 @@ export function TgEntry({ app }: { app: TgAppName }) {
 
   return (
     <div className="tg-entry card">
-      <div className="lc-icon" aria-hidden>🤝</div>
+      <div className="lc-icon" aria-hidden>{app === 'partner' ? '🤝' : '🎧'}</div>
       <h1>{st.firstName ? `Assalomu alaykum, ${st.firstName}!` : 'Assalomu alaykum!'}</h1>
-      <p>Telegram’ni UzShop {app === 'partner' ? 'hamkor' : 'xodim'} hisobingizga <b>bir marta</b> ulaymiz. Keyin bot kabinetni o‘zi ochadi — parol va kod so‘ramaydi.</p>
+      <p>Telegram’ni UzShop {app === 'partner' ? 'hamkor' : 'xodim'} hisobingizga <b>bir marta</b> ulaymiz. Keyin bot {app === 'partner' ? 'kabinetni' : 'operator xonasini'} o‘zi ochadi — parol va kod so‘ramaydi.</p>
       {st.rejected && <div className="notice" role="status">Havola eskirgan yoki allaqachon ishlatilgan. Pastdagi usul bilan ulang yoki saytdan yangi havola oling.</div>}
       {err && <div role="alert" className="notice">{err.status === 401 && !err.code
-        ? 'Bu sinov serverida birinchi ulash faqat sayt orqali: uzshop saytida Hamkor kabineti → Bildirishnomalar → «Telegram ilovada ochish».'
+        ? `Bu sinov serverida birinchi ulash faqat sayt orqali: uzshop saytida ${WHERE[app]} → «Telegram ilovada ochish».`
         : errText(err)}{err.details?.retry_after_seconds ? ` (${err.details.retry_after_seconds} soniyadan keyin)` : ''}</div>}
 
       {st.current && (
@@ -96,7 +97,7 @@ export function TgEntry({ app }: { app: TgAppName }) {
       )}
 
       <div className="tg-otp">
-        <label htmlFor="tg-ph">Telefon raqamingiz (hamkor sifatida ro‘yxatdan o‘tgan)</label>
+        <label htmlFor="tg-ph">Telefon raqamingiz ({app === 'partner' ? 'hamkor sifatida ro‘yxatdan o‘tgan' : 'xodim sifatida qo‘shilgan'})</label>
         <input id="tg-ph" type="tel" autoComplete="tel" inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+998 90 123 45 67" disabled={!!ch} />
         {!ch ? (
           <button type="button" className="btn" disabled={busy || phone.replace(/\D/g, '').length < 9} onClick={async () => {
@@ -120,7 +121,7 @@ export function TgEntry({ app }: { app: TgAppName }) {
           </>
         )}
       </div>
-      <p className="muted small">Yoki saytda: Hamkor kabineti → Bildirishnomalar → «Telegram ilovada ochish».</p>
+      <p className="muted small">Yoki saytda: {WHERE[app]} → «Telegram ilovada ochish».</p>
     </div>
   );
 }

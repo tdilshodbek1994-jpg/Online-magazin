@@ -7,7 +7,6 @@ import { pick, useI18n } from '@/lib/i18n';
 import { BUCKET_LABEL } from '../../shared';
 import { PartnerRequests } from './Requests';
 
-const STEPS: [string, string][] = [['new', 'Qabul qilindi'], ['accepted', 'Tasdiqlandi'], ['shipping', 'Yo‘lda'], ['delivered', 'Yetkazildi']];
 const STATUS_TEXT: Record<string, string> = {
   awaiting_confirmation: 'Tasdiqlash kutilmoqda', confirmed: 'Tasdiqlandi', cancelled: 'Bekor qilindi', completed: 'Yakunlandi',
   pending: 'Kutilmoqda', packed: 'Qadoqlandi', shipped: 'Jo‘natildi', delivered: 'Yetkazildi', returned: 'Qaytarildi', failed: 'Yetkazilmadi',
@@ -72,7 +71,6 @@ export default function SalesPassport({ params }: { params: Promise<{ id: string
   const [d, setD] = useState<any>(null);
   const [err, setErr] = useState<any>(null);
   useEffect(() => { api(`/partner/orders/${id}/passport`).then(setD).catch(setErr); }, [id]);
-  const stepIdx = d ? STEPS.findIndex(([k]) => k === d.bucket) : -1;
   const off = d && (d.bucket === 'cancelled' || d.bucket === 'returned');
   return (
     <Async loading={!d && !err} error={err}>
@@ -81,11 +79,7 @@ export default function SalesPassport({ params }: { params: Promise<{ id: string
           <Link href="/partner/orders" className="see-all">← Buyurtmalar</Link>
           <div className="spread"><h1>Buyurtma {d.masked_number}</h1><span className={`pill b-${d.bucket}`}>{BUCKET_LABEL[d.bucket]}</span></div>
 
-          {off ? <div className="notice">{d.bucket === 'cancelled' ? (d.confirmation_status === 'expired' ? 'Mijoz belgilangan vaqtda tasdiqlamadi — buyurtma bekor bo‘ldi.' : d.confirmation_status === 'rejected' ? 'Mijoz buyurtmani rad etdi.' : 'Buyurtma bekor qilindi.') : 'Mahsulot qaytarildi.'}</div> : (
-            <ol className="steps" aria-label="Buyurtma bosqichlari">
-              {STEPS.map(([k, l], i) => <li key={k} className={i < stepIdx ? 'done' : i === stepIdx ? 'now' : ''} aria-current={i === stepIdx ? 'step' : undefined}>{l}</li>)}
-            </ol>
-          )}
+          {off && <div className="notice">{d.bucket === 'cancelled' ? (d.confirmation_status === 'expired' ? 'Mijoz belgilangan vaqtda tasdiqlamadi — buyurtma bekor bo‘ldi.' : d.confirmation_status === 'rejected' ? 'Mijoz buyurtmani rad etdi.' : 'Buyurtma bekor qilindi.') : 'Mahsulot qaytarildi.'}</div>}
           {/* Short by default (user: "juda uzun, tushunarsiz"): what was sold, my bonus, what happens now. Details fold away. */}
           <section className="card pp-sum">
             <div className="pp-prod">{d.commission.lines.length ? d.commission.lines.map((l: any) => `${pick(l.product, lang)}${l.qty > 1 ? ` × ${l.qty}` : ''}`).join(', ') : '—'}</div>

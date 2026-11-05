@@ -72,7 +72,11 @@ export function Header() {
               <Link href="/partner/contacts" aria-current={path === '/partner/contacts' ? 'page' : undefined}>Mijozlar daftari</Link>
               <Link href="/partner/streams" aria-current={path === '/partner/streams' ? 'page' : undefined}>Oqimlarim</Link>
               <Link href="/partner/stats" aria-current={path === '/partner/stats' ? 'page' : undefined}>Statistika</Link>
-              <Link href="/partner/programs" aria-current={path === '/partner/programs' ? 'page' : undefined}>Konkurs va bonuslar</Link>
+              <Link href="/partner/contests" aria-current={path?.startsWith('/partner/contests') ? 'page' : undefined}>Konkurs markazi</Link>
+              <Link href="/partner/programs" aria-current={path === '/partner/programs' ? 'page' : undefined}>Bonus va jarimalar</Link>
+              <Link href="/partner/level" aria-current={path === '/partner/level' ? 'page' : undefined}>Darajam</Link>
+              <Link href="/partner/uzcoin" aria-current={path === '/partner/uzcoin' ? 'page' : undefined}>UzCoin va sovg‘alar</Link>
+              <Link href="/partner/charity" aria-current={path === '/partner/charity' ? 'page' : undefined}>Xayriya</Link>
               <Link href="/partner/notifications" aria-current={path === '/partner/notifications' ? 'page' : undefined}>Bildirishnomalar</Link>
               <Link href="/partner/about" aria-current={path === '/partner/about' ? 'page' : undefined}>Dastur haqida</Link>
               {staff.filter(([h]) => h !== '/partner').map(([href, label]) => <Link key={href} href={href}>{label}</Link>)}

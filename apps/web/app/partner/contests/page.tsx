@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { api, som } from '@/lib/api';
 import { errText } from '@/lib/errors';
 import { dt, METRIC_UZ, STATUS_UZ } from './shared';
+import { ContestCard } from '../LegacyContest';
 
 /** Konkurs markazi: active / upcoming / finished contests. Joining is voluntary and never changes normal commission. */
 export default function ContestCenter() {
@@ -25,19 +26,10 @@ export default function ContestCenter() {
       {err && <div className="notice" role="alert">{errText(err)}</div>}
       {items === null && !err && <div className="loading" role="status"><span className="spinner" aria-hidden />Yuklanmoqda…</div>}
       {items?.length === 0 && legacy.length === 0 && <div className="empty">Hozircha konkurs yo‘q.</div>}
-      {legacy.length > 0 && (
+      {legacy.filter((c) => c.status === 'active').length > 0 && (
         <section>
-          <h2 className="an-h2">Konkurslar</h2>
-          <div className="slist">
-            {legacy.map((c) => (
-              <Link key={c.id} href="/partner/programs#konkurs" className="scard cc-card">
-                <div className="spread"><b>{c.title}</b><span className={`pill ${c.status === 'active' ? 'b-new' : 'b-delivered'}`}>{c.status === 'active' ? 'Davom etmoqda' : 'Yakunlandi'}</span></div>
-                <div className="small muted">{dt(c.starts_at)} — {dt(c.ends_at)} · yetkazilgan buyurtmalar bo‘yicha</div>
-                {Array.isArray(c.prizes) && c.prizes.length > 0 && <div className="small">🏆 {c.prizes.slice(0, 3).map((p: any) => `${p.place}-o‘rin: ${p.text ?? (p.amount_minor ? som(p.amount_minor) : '')}`).join(' · ')}</div>}
-                <div className="small">{c.me?.rank ? <span className="ok-t">Sizning o‘rningiz: #{c.me.rank}</span> : <span className="w-link">Batafsil va reyting ›</span>}</div>
-              </Link>
-            ))}
-          </div>
+          <h2 className="an-h2">Davom etmoqda</h2>
+          {legacy.filter((c) => c.status === 'active').map((c) => <ContestCard key={c.id} c={c} />)}
         </section>
       )}
       {groups.map(([title, sts]) => {
@@ -59,13 +51,18 @@ export default function ContestCenter() {
           </section>
         );
       })}
+      {legacy.filter((c) => c.status !== 'active').length > 0 && (
+        <details className="card pp-more"><summary>O‘tgan konkurslar ({legacy.filter((c) => c.status !== 'active').length})</summary>
+          {legacy.filter((c) => c.status !== 'active').map((c) => <ContestCard key={c.id} c={c} />)}
+        </details>
+      )}
       {prizes.length > 0 && (
         <section>
           <h2 className="an-h2">Mening sovrinlarim</h2>
           {prizes.map((p) => <div key={p.id} className="spread small w-prod"><span>{p.contest} · {p.title}{p.kind === 'money' ? ` (${som(p.value_minor)})` : ''}</span><b>{({ assigned: 'Ajratildi', paid: 'Hisobingizga o‘tkazildi', claimed: 'Qabul qilindi', shipped: 'Yo‘lda', delivered: 'Topshirildi', expired: 'Muddati o‘tdi' } as Record<string, string>)[p.status] ?? p.status}</b></div>)}
         </section>
       )}
-      <p className="small"><Link href="/partner/programs">Bonuslar, jarimalar va hayriya →</Link></p>
+      <p className="small"><Link href="/partner/programs">Bonus va jarimalar →</Link> · <Link href="/partner/charity">Xayriya →</Link></p>
     </div>
   );
 }

@@ -7,14 +7,14 @@ Evidence paths: API `apps/api/src/modules/…`, tests `apps/api/test/…`, web `
 |---|---|---|---|
 | M01 Business rules | exists_verified | `commissions/service.ts` (`matrixUnitAmounts`, `computeOrderTargets`), `zo-release-fixtures` (B01–B06), `n-ad-analytics`, `ze-uzcoin`, `zd-charity-center`, `zc-quality-center` | 4+ units: no approved rule → review (by design) |
 | M02 Audit/status | exists_verified | this file, `docs/STATUS.md`, `docs/*_STATUS.md` | — |
-| M03 Order timeline | partial | `order_status_events`, `/me/orders/:id`, `/partner/orders/:id/passport` (milestones) | one shared status dictionary doc — PR-04 |
+| M03 Order timeline | exists_verified | `order_status_events`, `/me/orders/:id`, partner passport milestones; one vocabulary `docs/release/STATUS_DICTIONARY.md` | — |
 | M04 Today work center | partial | `/partner/attention`, `/partner/dashboard`, `/ops/center/board`, `admin/overview.ts` | owner/warehouse/finance «today» — owner part via M24 |
 | M05 Customer login/recovery | exists_verified | `/auth/otp/*`, `/auth/sessions` (T009–T011); phone change with codes to BOTH phones, all old sessions end (`selfservice/routes.ts`, zp-selfservice) | support-assisted recovery = owner procedure |
 | M06 Catalog | partial | `/products` cyr/lat search, `/waitlist`, `/price-watch` | favorites device-only (P1) |
 | M07 Cart/quote | partial | `/cart`, `/checkout/quotes`, `/delivery-zones` (d-integrity T023–T026) | delivery slots/cutoff — owner decision (no tariffs given) |
 | M08 Where is my order | exists_verified | `/me/orders/:id`; opaque 30-day revocable status link `/order-status/:token` + `/s/[token]` (zp-selfservice) | real courier tracking = provider |
 | M09 Edit/cancel/reorder | exists_verified | reorder, amendments (T050), customer cancel before picking `/me/orders/:id/cancel` (zp-selfservice) | address edit after confirmation goes via operator |
-| M10 Returns | partial | `returns/routes.ts`, `/refunds/*` (d-integrity T068–T070) | customer returns page; exchange flow |
+| M10 Returns | exists_verified | `returns/routes.ts`, `/refunds/*` (T068–T070), customer form + `/me/returns` with goods/money states separate (zp-selfservice) | exchange fulfilment = operator flow |
 | M11 Notifications | partial | `notifications/service.ts`, `/me/consents` (T087), ops night guard | SMS blocked_external; customer quiet hours P1 |
 | M12 Partner start/kit | partial | `/partner/apply`, ad texts, market | onboarding checklist P1 |
 | M13 On-behalf order | exists_verified | `/partner/orders/*`, `/confirm/:token`, drafts (c-partner, l-sales-drafts) | operator call confirms (owner flag) |
@@ -24,22 +24,22 @@ Evidence paths: API `apps/api/src/modules/…`, tests `apps/api/test/…`, web `
 | M17 Operator desk | exists_verified | `/ops/center/next|claim|heartbeat|release` (q-ops-center) | — |
 | M18 Support/handoff | exists_verified | support, r-ops-handoff, v-duplicates | — |
 | M19 Lead/bulk assign | exists_verified | `/ops/center/bulk/assign` preview→apply (T53) | team membership history model — P1 |
-| M20 Warehouse | partial | pick/pack/ship, return inspect, inventory movements | barcode scan UI P1 |
+| M20 Warehouse | exists_verified | pick/pack/ship, return inspect, movements; barcode/SKU pick check, wrong item blocks packing (`fulfillment/pickscan.ts`, zq-decisions) | serial numbers not required by owner |
 | M21 Delivery/COD | partial | zones, courier, `/finance/remittances` (T057) | slots need owner tariffs |
-| M22 Replenishment | missing | `/admin/stock/low` only | P1 — supplier PO draft |
+| M22 Replenishment | exists_verified | suggestions, suppliers, PO draft → owner approval → ordered → idempotent receipts (`inventory/replenishment.ts`, zq-decisions) | — |
 | M23 Admin content/import | exists_verified | imports preview/commit (T029), media (T030) | bulk price edit P1 |
 | M24 Owner decisions center | exists_verified | `/admin/decisions` derived problems with severity/owner/link (zq-decisions), admin tab «Muammolar» | snooze not offered by design |
 | M25 Finance close | partial | daily close `/admin/finance/day` + `/close` (snapshot, correction = new version, zq-decisions), month close, exceptions | online provider statement + fiscal = blocked_external |
 | M26 Rewards together | exists_verified | zb/ze/zd/zc/zm suites | — |
-| M27 Reviews/service | partial | reorder, also-bought, templates | reviews P1 |
-| M28 Automation builder | missing | ad safety rules only | P1 |
-| M29 Search/bulk/export | partial | bulk assign, CSV exports | global search P1 |
-| M30 Security | exists_verified | MFA, step-up (T020), role checks (T006/T007), staff revoke | revoke test — PR-09 |
+| M27 Reviews/service | exists_verified | verified-purchase reviews + moderation (`catalog/reviews.ts`, zp-selfservice), reorder, templates | — |
+| M28 Automation builder | exists_verified | fixed triggers/actions, shadow → owner activation, cap/cooldown/kill switch (`admin/automation.ts`, zq-decisions) | more triggers on request |
+| M29 Search/bulk/export | exists_verified | permission-scoped global search (`admin/search.ts`, zq-decisions), bulk assign preview, CSV exports | — |
+| M30 Security | exists_verified | MFA, step-up (T020), role checks (T006/T007), revoke takes effect next request + staff profile sign-out-everywhere (zq-decisions) | — |
 | M31 Design/offline | partial | sw.js, offline page, dark mode | offline drafts P1 |
 | M32 AI | exists_verified | `aibiz/*` (zn-aibiz 40 tests) | live LLM key external |
 | M33 Outbox/idempotency | exists_verified | outbox, idempotency records (T019/T085/T049) | inbox table unused |
 | M34 Legal/consent/deletion | partial | legal versions + acceptances, consents, data export/deletion requests with staff decision (zp-selfservice) | lawyer-approved texts and retention periods |
-| M35 Monitoring | partial | `/health/live`, `/health/ready`, OPERATIONS.md | integration health page — PR-09 |
+| M35 Monitoring | partial | `/admin/integrations/health` real signals (zq-decisions), `/health/*` | external alerting channel = owner |
 | M36 Backup/restore | exists_verified | `scripts/backup.sh`, `scripts/restore-drill.sh` (invariants), migration checksums (T091) | drill on the real server — owner |
 | M37 Performance | partial | `scripts/load/*`, LOAD_TEST.md | real-device measurement |
 | M38 Tests/CI | exists_verified | `.github/workflows/ci.yml` (Postgres 16, no skips, gitleaks) | browser E2E in CI |
@@ -51,3 +51,4 @@ B01–B06, B14: `zo-release-fixtures`. B07 (wallet bridge): c-partner T078–T08
 
 ## Progress log
 - PR-01 audit + gates (cf0488a). PR-02 customer self-service (b1d85ac). Owner center + daily close (02192a4). Full suite: 42 files / 348 tests passed (local, PostgreSQL 16).
+- Returns cabinet, pick check, status vocabulary, replenishment, global search, reviews, automation (aeba808 → de31dc9). Full suite: 42 files / 357 tests passed (local, PostgreSQL 16).

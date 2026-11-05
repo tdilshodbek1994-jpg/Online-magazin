@@ -49,7 +49,8 @@ export default function Account() {
         <InstallRow />
         <Link href="/favorites">❤️ Sevimlilar</Link>
         <Link href="/cart">🛒 Savat</Link>
-        <Link href="/legal/returns">↩️ Qaytarish shartlari</Link>
+        <Link href="/account/returns">↩️ Qaytarishlarim</Link>
+        <Link href="/legal/returns">📄 Qaytarish shartlari</Link>
         <Link href="/account/profile">⚙️ Telefon raqam va ma’lumotlarim</Link>
         {roles.includes('partner') ? <Link href="/partner">🤝 Hamkor kabineti</Link> : <Link href="/partner">🤝 Hamkor bo‘lib pul ishlash</Link>}
       </section>

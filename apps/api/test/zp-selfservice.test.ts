@@ -109,3 +109,21 @@ describe('data requests (M34)', () => {
     expect((await api(t, 'POST', `/admin/data-requests/${randomUUID()}/resolve`, { token: s.owner.token, body: { status: 'done', resolution: 'yo‘q narsa' } })).status).toBe(404);
   });
 });
+
+describe('customer returns cabinet (M10)', () => {
+  it('customer opens a return for a delivered order and sees goods and money states separately; others see nothing', async () => {
+    const { c, orderId } = await myOrder();
+    const payable = (await t.db.query(`SELECT payable_minor::text p FROM orders WHERE id=$1`, [orderId])).rows[0].p;
+    await api(t, 'POST', `/ops/orders/${orderId}/claim`, { token: s.operator.token });
+    await api(t, 'POST', `/ops/orders/${orderId}/calls`, { token: s.operator.token, body: { outcome: 'confirmed', confirmed_total_minor: payable } });
+    await fulfilCod(t, s, orderId);
+    const line = (await api(t, 'GET', `/me/orders/${orderId}`, { token: c.token })).json.lines[0];
+    const r = await api(t, 'POST', '/returns', { token: c.token, body: { order_id: orderId, lines: [{ order_line_id: line.id, qty: 1 }], reason: 'Nuqsonli', desired_resolution: 'refund' } });
+    expect(r.status, JSON.stringify(r.json)).toBe(200);
+    const again = await api(t, 'POST', '/returns', { token: c.token, body: { order_id: orderId, lines: [{ order_line_id: line.id, qty: 1 }], reason: 'Yana', desired_resolution: 'refund' } });
+    expect(again.json.code).toBe('RETURN_QTY_EXCEEDS_DELIVERED');
+    const mine = await api(t, 'GET', '/me/returns', { token: c.token });
+    expect(mine.json.items[0]).toMatchObject({ status: 'requested', status_label: 'So‘rov qabul qilindi', refund_label: null });
+    expect((await api(t, 'GET', '/me/returns', { token: (await mkUser(t)).token })).json.items).toHaveLength(0);
+  });
+});

@@ -1965,3 +1965,8 @@ a.ocard { gap: 6px; }
 .oc-sum { color: #137a43; font-size: 16px; } .oc-date { color: var(--muted); font-size: 13px; white-space: nowrap; }
 .oc-meta { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12.5px; color: var(--muted); }
 .oc-none { color: #b45309; } .oc-num { margin-left: auto; font-variant-numeric: tabular-nums; }
+
+.ret-form { display: grid; gap: 8px; margin-top: 10px; padding: 12px; }
+.ret-line { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 14px; }
+.ret-qty { display: flex; align-items: center; gap: 8px; } .ret-qty button { width: 32px; height: 32px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); font-size: 18px; cursor: pointer; }
+.ret-card { display: grid; gap: 4px; color: inherit; text-decoration: none; }

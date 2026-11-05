@@ -148,6 +148,21 @@ export function registerSelfService(app: FastifyInstance, deps: Deps): void {
     });
   });
 
+  // ---------------------------------------------------------------- my returns (statuses kept separate: goods back ≠ money back)
+  route(app, deps, { method: 'GET', url: '/me/returns', tags: T, summary: 'My return requests with item lines and the separate refund state' }, async ({ actor, db }) => {
+    requireUser(actor);
+    const u = await one<{ phone_e164: string }>(db, `SELECT phone_e164 FROM users WHERE id=$1`, [actor.userId]);
+    const rows = await many<{ id: string; order_id: string; number: string; status: string; desired_resolution: string; reason: string; decision_note: string | null; created_at: string; updated_at: string; lines: { name: Record<string, string>; qty: number; received_qty: number }[]; refund: string | null }>(db,
+      `SELECT r.id, r.order_id, o.number, r.status, r.desired_resolution, r.reason, r.decision_note, r.created_at, r.updated_at,
+         (SELECT json_agg(json_build_object('name', ol.product_snapshot->'name', 'qty', rl.qty, 'received_qty', rl.received_qty)) FROM return_lines rl JOIN order_lines ol ON ol.id=rl.order_line_id WHERE rl.return_id=r.id) AS lines,
+         (SELECT f.status FROM refunds f WHERE f.return_id=r.id ORDER BY f.created_at DESC LIMIT 1) AS refund
+       FROM return_requests r JOIN orders o ON o.id=r.order_id
+      WHERE o.user_id=$1 OR (o.user_id IS NULL AND o.customer_phone=$2) ORDER BY r.created_at DESC LIMIT 50`, [actor.userId, u.phone_e164]);
+    const ST: Record<string, string> = { requested: 'So‘rov qabul qilindi', reviewing: 'Ko‘rib chiqilmoqda', approved: 'Tasdiqlandi — tovarni topshiring', received: 'Tovar qabul qilindi, tekshirilmoqda', inspected: 'Tekshirildi', resolved: 'Yakunlandi', rejected: 'Rad etildi' };
+    const RF: Record<string, string> = { requested: 'Pul qaytarish so‘raldi', approved: 'Pul qaytarish tasdiqlandi', reserved: 'Pul qaytarish tayyorlanmoqda', submitted: 'Pul yuborildi, tasdiq kutilmoqda', succeeded: 'Pul qaytarildi', failed: 'Pul qaytarishda xato — operator bog‘lanadi', unknown_result: 'Pul holati tekshirilmoqda', rejected: 'Pul qaytarish rad etildi' };
+    return { items: rows.map((r) => ({ ...r, status_label: ST[r.status] ?? r.status, refund_label: r.refund ? RF[r.refund] ?? r.refund : null })) };
+  });
+
   // ---------------------------------------------------------------- data requests
   route(app, deps, { method: 'POST', url: '/me/data-requests', tags: T, summary: 'Ask for a copy of my data or for deletion (handled by an authorised person)',
     body: z.object({ kind: z.enum(['export', 'delete']), note: z.string().trim().max(500).optional() }).strict() },

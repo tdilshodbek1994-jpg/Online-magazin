@@ -43,6 +43,7 @@ import { registerTargetSafety } from './modules/target/safety.js';
 import { registerExperiments } from './modules/landings/experiments.js';
 import { isCustomHost, registerDomains } from './modules/landings/domains.js';
 import { registerLevels } from './modules/levels/routes.js';
+import { registerAiBiz } from './modules/aibiz/routes.js';
 import { registerReturns } from './modules/returns/routes.js';
 import { registerPayments } from './modules/payments/routes.js';
 import { registerSupport } from './modules/support/routes.js';
@@ -200,6 +201,7 @@ export async function buildApp(cfg: AppConfig, db: Db): Promise<FastifyInstance>
       registerStockAlerts(api, deps);
       registerMessaging(api, deps);
       registerAi(api, deps);
+      registerAiBiz(api, deps);
     },
     { prefix: '/api/v1' },
   );

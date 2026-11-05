@@ -1,0 +1,354 @@
+[
+  {
+    "id": "G01",
+    "synthetic": true,
+    "kind": "commission",
+    "title_cyrl": "Бир дона",
+    "input": {
+      "base_uzs": "30000",
+      "quantity": 1,
+      "coefficients": [
+        "1"
+      ]
+    },
+    "expected": {
+      "commission_uzs": "30000"
+    },
+    "app_test_status": "not_run"
+  },
+  {
+    "id": "G02",
+    "synthetic": true,
+    "kind": "commission",
+    "title_cyrl": "Икки дона",
+    "input": {
+      "base_uzs": "30000",
+      "quantity": 2,
+      "coefficients": [
+        "1",
+        "0.25"
+      ]
+    },
+    "expected": {
+      "commission_uzs": "37500"
+    },
+    "app_test_status": "not_run"
+  },
+  {
+    "id": "G03",
+    "synthetic": true,
+    "kind": "commission",
+    "title_cyrl": "Уч дона",
+    "input": {
+      "base_uzs": "30000",
+      "quantity": 3,
+      "coefficients": [
+        "1",
+        "0.5",
+        "0.25"
+      ]
+    },
+    "expected": {
+      "commission_uzs": "52500"
+    },
+    "app_test_status": "not_run"
+  },
+  {
+    "id": "G04",
+    "synthetic": true,
+    "kind": "order_mix",
+    "title_cyrl": "Буюртма ва дона",
+    "input": {
+      "base_uzs": "30000",
+      "groups": [
+        {
+          "orders": 36,
+          "quantity": 1,
+          "coefficients": [
+            "1"
+          ]
+        },
+        {
+          "orders": 20,
+          "quantity": 2,
+          "coefficients": [
+            "1",
+            "0.25"
+          ]
+        }
+      ]
+    },
+    "expected": {
+      "orders": 56,
+      "units": 76,
+      "commission_uzs": "1830000"
+    },
+    "app_test_status": "not_run"
+  },
+  {
+    "id": "G05",
+    "synthetic": true,
+    "kind": "retained_bundle",
+    "title_cyrl": "Учтадан иккита қолди",
+    "input": {
+      "base_uzs": "30000",
+      "old": [
+        "1",
+        "0.5",
+        "0.25"
+      ],
+      "remaining": [
+        "1",
+        "0.25"
+      ],
+      "policy": "revalue_retained_quantity_from_original_matrix_after_approved_return"
+    },
+    "expected": {
+      "before_uzs": "52500",
+      "after_uzs": "37500",
+      "adjustment_uzs": "-15000"
+    },
+    "app_test_status": "not_run"
+  },
+  {
+    "id": "G06",
+    "synthetic": true,
+    "kind": "ledger_summary",
+    "title_cyrl": "Комиссия ва pending/payout",
+    "input": {
+      "recognized_entries_uzs": [
+        "600000",
+        "-30000"
+      ],
+      "pending_uzs": "120000",
+      "payout_paid_uzs": "200000"
+    },
+    "expected": {
+      "commission_recognized_net_uzs": "570000",
+      "pending_uzs": "120000",
+      "payout_paid_uzs": "200000"
+    },
+    "app_test_status": "not_run"
+  },
+  {
+    "id": "G07",
+    "synthetic": true,
+    "kind": "balance",
+    "title_cyrl": "Point-in-time баланс",
+    "input": {
+      "daily_available_uzs": [
+        "100000",
+        "200000"
+      ]
+    },
+    "expected": {
+      "available_as_of_uzs": "200000",
+      "sum_snapshots_allowed": false
+    },
+    "app_test_status": "not_run"
+  },
+  {
+    "id": "G08",
+    "synthetic": true,
+    "kind": "ad_result",
+    "title_cyrl": "Ҳамкорнинг ўз харажати",
+    "input": {
+      "commission_uzs": "570000",
+      "expenses": [
+        {
+          "payer": "partner",
+          "amount_uzs": "20000"
+        },
+        {
+          "payer": "store",
+          "amount_uzs": "40000"
+        }
+      ],
+      "other_known_partner_cost_uzs": "10000"
+    },
+    "expected": {
+      "partner_after_ad_result_uzs": "540000",
+      "label": "Рекламадан кейинги натижа"
+    },
+    "app_test_status": "not_run"
+  },
+  {
+    "id": "G09",
+    "synthetic": true,
+    "kind": "missing_expense",
+    "title_cyrl": "Сарф етишмайди",
+    "input": {
+      "commission_uzs": "570000",
+      "ad_expense_uzs": null
+    },
+    "expected": {
+      "commission_uzs": "570000",
+      "final_result_uzs": null,
+      "status": "partial",
+      "reason": "expense_not_available"
+    },
+    "app_test_status": "not_run"
+  },
+  {
+    "id": "G10",
+    "synthetic": true,
+    "kind": "uzcoin",
+    "title_cyrl": "Coin эквиваленти",
+    "input": {
+      "available_coins": 100,
+      "rate_uzs_per_coin": "3000"
+    },
+    "expected": {
+      "cash_equivalent_uzs": "300000",
+      "cash_paid_inferred": false
+    },
+    "app_test_status": "not_run"
+  },
+  {
+    "id": "G11",
+    "synthetic": true,
+    "kind": "rates",
+    "title_cyrl": "100/70/56 funnel",
+    "input": {
+      "created": 100,
+      "accepted_finalized": 70,
+      "delivered": 56,
+      "accepted": 70
+    },
+    "expected": {
+      "acceptance_percent": "70",
+      "delivery_of_finalized_percent": "80",
+      "delivery_of_created_percent": "56"
+    },
+    "app_test_status": "not_run"
+  },
+  {
+    "id": "G12",
+    "synthetic": true,
+    "kind": "weighted_rate",
+    "title_cyrl": "Умумий конверсия",
+    "input": {
+      "groups": [
+        {
+          "num": 1,
+          "den": 1
+        },
+        {
+          "num": 0,
+          "den": 9
+        }
+      ]
+    },
+    "expected": {
+      "numerator": 1,
+      "denominator": 10,
+      "percent": "10"
+    },
+    "app_test_status": "not_run"
+  },
+  {
+    "id": "G13",
+    "synthetic": true,
+    "kind": "growth_zero",
+    "title_cyrl": "Нолдан ўсиш",
+    "input": {
+      "previous_uzs": "0",
+      "current_uzs": "100000"
+    },
+    "expected": {
+      "absolute_change_uzs": "100000",
+      "growth_percent": null,
+      "status": "new_from_zero"
+    },
+    "app_test_status": "not_run"
+  },
+  {
+    "id": "G14",
+    "synthetic": true,
+    "kind": "percentage_points",
+    "title_cyrl": "Пункт ва фоиз",
+    "input": {
+      "old_percent": "20",
+      "new_percent": "30"
+    },
+    "expected": {
+      "percentage_points": "10",
+      "relative_growth_percent": "50"
+    },
+    "app_test_status": "not_run"
+  },
+  {
+    "id": "G15",
+    "synthetic": true,
+    "kind": "day_bounds",
+    "title_cyrl": "Тошкент куни",
+    "input": {
+      "local_date": "2026-10-25",
+      "timezone": "Asia/Tashkent"
+    },
+    "expected": {
+      "start_utc": "2026-10-24T19:00:00Z",
+      "end_exclusive_utc": "2026-10-25T19:00:00Z"
+    },
+    "app_test_status": "not_run"
+  },
+  {
+    "id": "G16",
+    "synthetic": true,
+    "kind": "previous_week",
+    "title_cyrl": "Ўтган тўлиқ ҳафта",
+    "input": {
+      "now_utc": "2026-11-05T07:00:00Z",
+      "timezone": "Asia/Tashkent"
+    },
+    "expected": {
+      "start_local": "2026-10-26",
+      "end_exclusive_local": "2026-11-02",
+      "start_utc": "2026-10-25T19:00:00Z",
+      "end_exclusive_utc": "2026-11-01T19:00:00Z"
+    },
+    "app_test_status": "not_run"
+  },
+  {
+    "id": "G17",
+    "synthetic": true,
+    "kind": "scope",
+    "title_cyrl": "Ҳамкор изоляцияси",
+    "input": {
+      "authenticated_partner": "P_A",
+      "requested_partner": "P_B",
+      "data": [
+        {
+          "partner": "P_A",
+          "commission_uzs": "10000"
+        },
+        {
+          "partner": "P_B",
+          "commission_uzs": "90000"
+        }
+      ]
+    },
+    "expected": {
+      "status": "forbidden_or_invalid_scope",
+      "may_return_partner_b": false,
+      "may_return_global_total": false
+    },
+    "app_test_status": "not_run"
+  },
+  {
+    "id": "G18",
+    "synthetic": true,
+    "kind": "missing_versus_zero",
+    "title_cyrl": "Бўш ва узилган хизмат",
+    "input": {
+      "authorized_complete_empty_rows": [],
+      "ads_service_status": "unavailable"
+    },
+    "expected": {
+      "orders_created": 0,
+      "ad_spend": null,
+      "ad_spend_status": "unavailable"
+    },
+    "app_test_status": "not_run"
+  }
+]

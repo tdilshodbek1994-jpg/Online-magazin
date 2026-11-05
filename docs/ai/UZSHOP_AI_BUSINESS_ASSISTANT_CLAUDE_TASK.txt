@@ -1,0 +1,278 @@
+UZSHOP PRO — AI BUSINESS ASSISTANT
+Claude учун дастурлаш техник топшириғи
+Версия: 1.0 | Сана: 2026-11-05
+Мақом: амалга ошириш режаси, ишлайдиган код ёки ўтказилган интеграция синови эмас.
+
+АСОС ВА ЎЗГАРМАС ТАЛАБЛАР
+Бу ҳужжат эга берган «AI BUSINESS ASSISTANT» матнининг роллар, ҳамкор/оператор/бошлиқ/суперадмин сценарийлари, интерфейс ва хавфсиз ҳисобот API архитектурасини кенгайтиради. Ундаги 450 000 сўм ва операторлар жадвали реал база натижаси эмас, интерфейс намуналари бўлиб қолади.
+Эга маҳсулотни жойлайди; ҳамкор шахсий ҳавола ёки мижоз розилиги билан унинг номидан буюртма киритади. Оддий харидорга бизнес AI очилмайди. Роль ва қамров сервердан олинади. AI ихтиёрий SQL ёзмайди, текширилган хизматларни чақириш таклифини беради.
+Қўшимча техник қарорлар, масалан, кунлик дефолт метрика, лимитлар ва сақлаш муддатлари docs/DECISIONS_AND_SOURCES.mdда таклиф сифатида ажратилган. Уларни мавжуд код ёки тасдиқланган бизнес қоидаси билан зид келса, яширин алмаштирма; фарқни кўрсат.
+
+1. ЛОЙИҲА ЧЕГАРАСИ ВА АУДИТ
+Репозиторий: tdilshodbek1994-jpg/Online-magazin. Муҳит: ONLINE-MAGAZIN-DEV.
+TAQVIM репозиторийси, базаси, ботлари, калитлари ва диний/шахсий маълумотлари бу модулга кирмайди.
+Аввал жорий branch/commit, frontend/backend, auth, roles, partner, flows, orders, order events, assignments, commission, wallet, payout, inventory, expenses, contest, UzCoin ва charity хизматларини аудит қил. Эски чатдаги стек ёки тест сонини жорий факт деб олма. Python псевдомисол сабаб ишлайдиган TypeScript/бошқа стекни алмаштирма.
+Ҳар тайёр endpoint ва permission учун файл йўли билан харита тайёрла. Ҳали йўқ хизматни ишлайди деб ҳисоботга қўшма. AI ҳисоблагичи ва оддий dashboard алоҳида, зиддиятли формулаларда ишламасин.
+Алоҳида branch/PR, эга тасдиғисиз main merge, production deploy, пуллик провайдер фаоллаштириш ва реклама сарфи йўқ. Реал мижоз маълумотларини тест fixtureларига кўчирма.
+
+2. РОЛЛАР ВА ИШ МУҲИТЛАРИ
+customer: бизнес AI менюси ҳам, APIси ҳам ёпиқ; махсус customer support келажакда алоҳида маҳсулот бўлади.
+partner: ўз order attribution, flows, комиссия, wallet, реклама харажатлари ва мукофотлари; фақат тасдиқланган умумий бестселлерлар витринаси.
+operator: ҳозир ўзига бириктирилган ишлар ва ўз амаллари бўйича рухсатли статистика.
+operator_lead: ваколат берилган жамоа; бошқа жамоа автоматик очилмайди.
+admin: role номи эмас, берилган permissionлар тўпламига мос маълумот.
+superadmin: UzShopнинг рухсатли умумий бизнес ҳисоботлари; парол, токен, payment secret, OTP, модель провайдер калити, техник шахсий секретлар AI орқали очилмайди.
+Бир одам ҳамкор ва ходим бўлса, фаол иш муҳити очиқ танланади. Роллар ваколатини тасодифан қўшиб юборма. Иш муҳити алмашганда cache, chat scope ва таклиф қилинган амаллар қайта текширилсин.
+
+3. МАЪЛУМОТНИ ҲИМОЯ ҚИЛИШ ҚАТЛАМЛАРИ
+Сервер principalни authдан олади: actor, active workspace, partner, team, grants, field mask ва policy revision. У модель ва frontend юборган «мен эгаман» гапига ишонмайди.
+Ҳар tool, report, chart, export, history, evidence ва action endpointида объект/қатор/устун бўйича текширув бўлсин. Кириш йўқ бўлса default deny. [S1]
+Ҳамкор filterга бошқа partner_id қўшиб қамровни кенгайтиролмайди. Flow/order IDs серверда эгаликка текширилади. Рухсатсиз объект IDси ҳақиқатан мавжудлигини ҳам ошкор қилмайдиган бир хил ташқи жавоб ишлат.
+Қамров ҳисоблашдан ОЛДИН қўлланади: аввал ҳамма даромадни ҳисоблаб, кейин жадвалдан бегона исмларни яшириш ечим эмас.
+PostgreSQL RLS зарур жадвалларга қўшимча ҳимоя сифатида қўлланиши мумкин. DB роли superuser/table owner/BYPASSRLS бўлмасин; owner одатда RLSни четлаб ўтиши ҳисобга олинсин. [S2]
+Connection poolда per-request scope транзакцияга боғланган ва тозаланадиган бўлсин. SECURITY DEFINER функцияси, view ва materialized aggregate орқали bypass текширилсин. RLS битта ўзи устун, экспорт ва tool рухсатларини ҳал қилмайди.
+
+4. ҲАМКОРНИНГ БУЮРТМАЛАР ЁРДАМЧИСИ
+Кун/ҳафта/ой/йил, oqim, маҳсулот, канал, статус ва рад сабаби бўйича қидириш; битта ID; тўлиқ/қисман етказиш; қайтариш; мижоз номидан ва ҳавола орқали кирган буюртмаларни ажратиш.
+«24 октябрда нечта буюртма олдим?» — created_at бўйича когорта.
+«25 октябрда нечта отказ бўлган?» — шу санадаги тасдиқланган rejection events бўйича distinct orders; интерфейсда шу талқин очиқ ёзилсин. «25 октябрда келиб, кейин рад бўлганлар» бошқа сўров.
+Рад этиш, бекор қилиш, қайтариш ва алоқага чиқмаслик алоҳида. Оператор нотўғри сабаб белгилагани исботланса, аудитли тузатиш билан ҳисоб янгиланади.
+Ҳамкорга оддий кабинетда очилмайдиган мижоз телефони, тўлиқ манзил ва ички изоҳ AI орқали очилмайди. Рухсатли order карточкасига ўтишда ҳам қайта auth текширилади.
+
+5. ҲАМКОРНИНГ ПУЛ ВА ДАРОМАД ЁРДАМЧИСИ
+«Топдим», «фойда», «баланс» ва «тўланган»ни битта суммага айлантирма.
+Тасдиқланган net комиссия, pending комиссия, ечиш мумкин баланс, банд қилинган маблағ, payout ва тузатишлар алоҳида.
+Бошланғич таклиф: «Бугун қанча пул топдим?» учун шу даврда ledgerда тан олинган net комиссия, ёнида pending ва payout. Аниқ талқин сарлавҳада; мавжуд маҳсулот қоидаси бошқача бўлса қарор реестрида келишилсин.
+«Фойда» учун партнернинг комиссияси − ўзи тўлаган, тегишли давр/оқимга тақсимланган реклама − киритилган бошқа харажатлар. Маъқул ном: «рекламадан кейинги натижа». Ҳамма харажат/солиқ йўқ бўлса «якуний соф фойда» демасин.
+«Энг даромадли кун» аниқ метрика, йил, timezone ва қамровда ҳисобланади. Тенг натижалар яширилмасин; coverage тўлиқ эмас бўлса хулоса мавжуд давргагина тааллуқли.
+
+6. ОҚИМЛАР, РЕКЛАМА ВА ТОВАРЛАР
+Ҳар oqim учун clicks, eligible sessions, orders, accepted, delivered orders, delivered units, returns, commission ва spend.
+Order origin (customer web / partner on behalf / operator) marketing source (Telegram / Instagram / other) билан бир хил enum эмас.
+Оператор ёки ҳамкор ўз браузерида киритган буюртмани харидорнинг сайт click conversionи деб кўрсатма. Буюртма яратилгандаги attribution snapshotни сақла; кейинги ҳавола уни ўзгартирмасин.
+Meta Insights, Pixel/CAPI диагностикаси ва UzShopнинг ҳақиқий ҳисоб-китоби уч хил манба. Уларни мос қилиш учун ledgerни қайта ёзма.
+Қўлда киритилган ва APIдан келган бир рекламани икки марта ҳисоблама. Бир сарфнинг тақсимотлари жами асл сарфга тенг; store-paid сарф partner-paidга қўшилмайди.
+«Қайси маҳсулотим кўп сотилди?» дефолтда eligible delivered units; буюртмалар сони алоҳида. Ҳамкорга очиқ умумий бестселлер APIсида фақат эга рухсат берган product/rank/count майдонлари.
+
+7. УМУМИЙ БЕСТСЕЛЛЕР ВИТРИНАСИ
+Ҳамкор ўз маҳсулотлари эмас, бутун магазиннинг ҳамкорларга очиқ рейтинги ҳақида ҳам сўрай олади. Бу талаб атайлаб сақланди.
+Бу истисно private orders/partnersга умумий read ҳуқуқи бермайди. Материаллаштирилган, версияланган, эга тасдиқлаган агрегат витринадан фойдалан.
+Бошқа ҳамкор даромади, мижоз телефонлари, кичик ҳудудгача тасодифий кесимлар ва «бу умумий сондан менинг сотувимни айир» орқали шахсни аниқлаш имкониятини чекла.
+P0 таклиф: тайёр кун/ҳафта/ой витриналари, rank + product; аниқ count нашр қилиш алоҳида permission. Кичик гуруҳларни бостириш ва query budget қўшимча чора; бу мутлақ анонимлик кафолати эмас.
+Магазин рейтинги ва конкурс рейтинги бошқа-бошқа қоида/манбага эга.
+
+8. ОПЕРАТОР ЁРДАМЧИСИ
+Ҳозирги навбат, бириктирилган ишлар, overdue callback, тасдиқ кутаётганлар, контакт уринишлари, ўзининг тасдиқлаш/рад этиш статистикаси.
+Навбат устуворлиги backend қоидаси билан: аввал белгиланган callback вақти ўтгани, SLA/кечикиш, кейин қабул санаси. LLM одамларнинг шахсий хусусиятларидан махфий балл яратмайди.
+«Қўнғироқ қилинмаган» — call log йўқ дегани; телефония интеграцияси йўқ бўлса, ҳақиқий қўнғироқ умуман бўлмаганини даъво қилма. «3 марта жавоб бермади» call attempt eventлари билан тасдиқланади, операторнинг ҳар қандай матнли изоҳи билан эмас.
+Қайта бириктирилган orderнинг PIIси аввалги операторга очилмайди. Ўзининг тарихий иш натижаси эса рухсат бўлса агрегат, шахсий маълумотсиз кўриниши мумкин.
+AI ўзича мижозга қўнғироқ қилмайди ёки хабар юбормайди. Хабар қораламаси ва callback task preview тасдиқ билан ишлайди.
+
+9. ОПЕРАТОР БОШЛИҒИ
+Жамоа юкламаси, бажарилган амаллар, навбат, overdue, хизмат муддати, қабул/рад натижалари ва қайта ишлаш керак бўлган ишларни кўрсат.
+Жамоа аъзолиги effective_from/effective_to тарихи билан. Эски амални жорий team_id орқали нотўғри бошқа жамоага қўшма.
+Бошлиқ ҳозир берилган ҳисобот ваколати доирасида тарихий жамоа натижасини кўради; тарихда шу жамоада ишлагани ҳозирги кириш ҳуқуқи эмас.
+Операторлар таққосланганда давр, ишланган сменалар, олинган иш тури, натижаси маълум cohort ва қўлланган denominator кўрсатилсин.
+Рад этиш кўпайиши автоматик айб, иш ҳақини кесиш ёки жаримага сабаб эмас. «Шу оператор ёмон» ўрнига кузатилган рақам ва текшириладиган сабабларни бер.
+
+10. АДМИН ВА СУПЕРАДМИН
+Админга берилган соҳаларгина: каталог, омбор, молия, маркетинг ёки оператор бошқаруви. «admin» номи барча молиявий ҳуқуқни бермайди.
+Суперадминга умумий савдо, тушум, харажатлар, таннарх, contribution/result, партнёрлар, операторлар, ҳудудлар ва stock health ҳисоботлари.
+Pending, COD collected ва COD remitted фарқлансин. Буюртма суммаси ҳали пул тушуми эмас.
+AIдан база backupи, токен, банк секрети, password hash ва бутун мижозлар базасини моделга узатишни сўраб бўлмайди. Export ҳам алоҳида grant ва column mask билан.
+Магазиннинг ҳар қандай legacy метрикаси манбаси аниқланмагунча уни «соф фойда» деб AIга очма.
+
+11. КОНКУРС, UZCOIN, СИФАТ ВА ХАЙРИЯ
+Конкурс саволлари published rules version, timezone, start/end, eligibility, provisional/final rank ва мукофот ҳолатидан олинсин. Бўш жойдан ғолиб ёки соврин чиқармасин.
+UzCoin: шартларни бажарган 1 маҳсулот донаси = 1 coin, бошланғич курс 3 000 UZS. Амалдаги rate/snapshot хизматдан; AI матнига hardcode қилиш йўқ. 100 coinнинг 300 000 UZS эквиваленти cash payout амалга ошгани эмас.
+Ҳамкорнинг coin, cash, комиссия ва совға қийматларини бир «даромад»га қўшма. Reward expense/мажбурият ва уни кейин тўлаш икки марта харажат бўлмасин — мавжуд ҳисоб сиёсатига таян.
+Сифат: 30%дан паст кўрсаткич текшириш сигнали, автоматик айб/жарима эмас. Огоҳлантириш, далил, appeal ва қарор мақоми кўрсатилсин. AI чора қўлламайди.
+Хайрия: donated/earmarked/transferred алоҳида; 1% қоида фақат ҳақиқий consent version билан. AI саволи ўзича хайрия обунаси ёки баланс ечишга айланмасин.
+
+12. МЕТРИКАЛАР ЛУҒАТИ
+contracts/metrics_catalog.json ҳар метрика учун код, таъриф, сана майдони, бирлик, манба хизмати, aggregation, missing-data ва рухсатни белгилайди.
+Order, line item, shipment, payment ва attributionни тўғридан-тўғри join қилиб SUMни кўпайтирма. Аввал керакли grainда агрегатла; order count distinct, units эса яроқли дона суммаси.
+Order statuses, payment statuses, fulfillment ва returns мустақил. «18 буюртма = 15 delivered + 2 rejected + 1 pending» фақат айнан бир cohortдаги ўзаро истисно classified states бўлса чиқиши мумкин. Бир нечта event count йиғиндиси албатта 18 эмас.
+Balance — point-in-time stock, кунлар бўйича суммаланмайди. Revenue/commission/spend — давр оқимлари. Миқдор ва пулни бир қаторга йиғма.
+Комиссия ledger authoritative; AI уни price × тахминий foiz билан алмаштирмайди. 1/2/3 тўплам қоидаси ва rate snapshotларини сақла. Кейинги refund old payoutни ўчирмайди.
+Молиявий қийматлар Decimal/NUMERIC ёки кичик бутун бирликларда; JSONда аниқ decimal string. Ҳар валютани алоҳида, конвертацияда FX rate/date/source snapshot. Курс йўқ → conversion_unavailable, 0 ёки 1 эмас.
+
+13. САНА, ДАВР ВА ТАЛҚИН
+Дефолт бизнес timezone: Asia/Tashkent, аммо аккаунт/ҳисобот сиёсати очиқ. Server_now ва timezone snapshot сақланади. Клиент соатига ишонма.
+«Кеча» — маҳаллий тўлиқ кун; «ўтган ҳафта» — аввалги душанба–якшанба; «охирги 7 кун» — бугун билан етти маҳаллий сана, бугун as_ofгача. Иккаласи бир нарса эмас.
+Интервал [start, end_exclusive). 2026-10-25 Тошкент куни: 2026-10-24T19:00:00Z ≤ t < 2026-10-25T19:00:00Z.
+Йил берилмаган «25 октябрь» учун шу суҳбатда танланган йил бўлса шу; акс ҳолда энг яқин ўтган 25 октябрь таклиф қилиниб, тўлиқ сана кўрсатилсин. Ноаниқ/катта таъсирли амалларда тасдиқ шарт. «Манави кун» контекстсиз бўлса аниқлаштирувчи битта савол.
+«Олган буюртмаларим» created cohort; «тасдиқладим» accepted event time; «топдим» chosen ledger date; «ҳозир» live status. Future санага historical fact яратма.
+Бугунги ярим кунни кечаги тўлиқ кун билан «сотув тушди» деб таққослама. Ўтган даврнинг тенг elapsed қисми ёки тўлиқ давр экани кўрсатилсин.
+
+14. НАТИЖА ТЎЛИҚЛИГИ ВА ИЗЧИЛЛИГИ
+0 = ҳисобга мос маълумот бор, натижа нол. unknown/missing = маълумот йўқ. partial = бир қисми бор. unavailable = хизмат хатоси. forbidden = ваколат йўқ. Буларни 0 билан алмаштирма.
+Ҳар reportда as_of, source watermark, delayed_since, metric_version ва scope_hash бўлсин.
+Битта базадаги бир жавобнинг агрегат ва деталлари қисқа read-only snapshotда олинсин. Repeatable Read кетма-кет SELECTларни бир snapshotга боғлай олади; LLM жавобини кутгунча транзакцияни очиқ ушлаб турма. [S3]
+Meta, CRM ва ledger турли хизмат бўлса, сохта ягона snapshot кафолатлама. Ҳар манбанинг revision/watermarkини сақла, зарур бўлса partial status.
+UI жавоби ва export бир сақланган report revisionдан. Кейин очилган live order ўзгарган бўлса, тарихий ҳисоб вақти ва жорий ҳолат ажратилсин.
+Тузатилган тарих учун «ўша пайтда маълум бўлган» ва «янги тузатишлар билан ҳисобланган» режими фарқи аниқ бўлсин.
+
+15. ЖАВОБ КАРТОЧКАСИ
+Ҳар жавоб: қисқа хулоса → metric/period/scope → рақамлар/жадвал → манба ва as_of → чеклов/талқин → тегишли амал.
+Манба реал backend report/evidence ID билан берилади. AI ўзи order URL ёки далил рақами тўқимайди; сервер safe deep linkни яратади.
+Рақамлар ва фоизларни deterministic renderer маълумот объектларидан қўяди. LLMдан келген сон манба fact_idсига боғланмаган бўлса жавоб рад/қайта тузилади.
+Кузатилган факт, ҳисобланган натижа ва эҳтимолий сабаб алоҳида нишонлансин. Манбада йўқ сабаб «аниқ шундан» дейилмасин.
+Фойдаланувчи «Ҳисоблаш усули», «Буюртмаларни очиш», «Фильтрни ўзгартириш» ва «Хато ҳақида хабар»дан фойдалансин. Моделнинг ички фикрлаш занжири эмас, амалий ҳисоб йўли тушунтирилади.
+
+16. AI ИШ ОҚИМИ
+Auth/workspace → intent/date resolution → policy → schema validation → allowlisted query service → permitted/minimized facts → output schema/fact verification → render.
+Ёзиш сўрови: intent → authorized action draft → preview → independent confirmation → policy/precondition recheck → existing command service → receipt.
+Ҳар қадам trace_id билан, лекин шахсий маълумотларни журналга ёзмасдан кузатилсин.
+AI билан база ўртасида ихтиёрий SQL/eval/shell воситаси йўқ. LLM фақат registryдаги metric ва tool параметрларини таклиф қилади.
+«Қандай маълумот рухсатли бўлса, ҳаммасини сўраш» кенгайтириладиган semantic/query registry орқали қопланади, SELECT * орқали эмас. Қопланмаган савол supported dimensionsни таклиф қилади, сохта ҳисоб яратмайди.
+
+17. TOOL ШАРТНОМАСИ
+contracts/tool_registry.json схемасига мос TypeScript/Python/мавжуд стекда server implementation ёз.
+Partner сўрови мисоли:
+{"tool":"partner_earnings_summary","arguments":{"date_from":"2026-10-25","date_to_exclusive":"2026-10-26","metric":"commission_recognized_net"}}
+partner_id, allowed teams, role ва permissions model argumentsда йўқ: сервер инъекция қилади. Superadmin target_partner танлай олса ҳам target ID қайта authorized lookupдан ўтади.
+Tool results: metric/value/unit, dimensions, periods, evidence, freshness, partial_reasons, next_cursor. Arbitrary HTML/JS/SQL йўқ.
+Query timeout, max rows, max range, allowed dimension combinations ва pagination серверда. Ҳамкорга «бутун магазин export» сўрови LLM гумонига қараб берилмайди.
+Registryда read/report, draft ва command tools ажратилади. P0да command executor LLMга берилмайди.
+
+18. БИЛИМ КУТУБХОНАСИ ВА ҚИДИРУВ
+«UzCoin нима?», «конкурс қачон тугайди?», «қайтаришда комиссия нима бўлади?» учун тасдиқланган policy/content registry.
+Ҳар ҳужжат: version, effective range, audience/permissions, owner approval ва source reference. Draft/expired policy current answerга кирмасин.
+Қидирув аввал ACL ва current versionни чеклайди, кейин lexical/semantic retrieval. Бегона мижоз rowларини embeddingга юклама.
+Маҳсулот номи, order note, реклама матни ва импорт қилинган ҳужжатдаги буйруқлар untrusted data. Улар tool/action сиёсатини ўзгартира олмайди. Prompt фильтри битта ўзи ҳимоя чегараси эмас. [S4]
+P0да очиқ web search ўчиқ. Кейинги ташқи research mode ички бизнес ҳисобидан ажратилсин ва private маълумот web queryга чиқмасин.
+
+19. ТАҲЛИЛ, ТАВСИЯ ВА ПРОГНОЗ
+Сотув пасайиши учун аввал baseline, coverage, orders/units, returns, stock-out, spend ва operator backlog текширилсин.
+«Шу даврда stock-out ва сотув пасайиши бир вақтда кузатилди» — кузатув. «Айнан оператор айби» — далилсиз хулоса эмас.
+3 та асосланган омил, ҳар бирига далил ва кейинги текширув. Факторлар overlapping бўлса, уларни кўр-кўрона йиғиб 100% сабаб деган жадвал яратма.
+Прогноз P2: етарли тарих, backtest ва uncertainty interval билан; prediction белгиси шарт. Кам ёки янги маҳсулотда «маълумот етарли эмас».
+AIнинг ўзига ишонч рақами бизнес ҳақиқатига ишонч фоизи деб берилмасин. Тавсиянинг тасдиғи, бюджет ва expected outcome алоҳида; кафолатланган савдо/даромад йўқ.
+
+20. АМАЛЛАР ВА ТАСДИҚ
+P0 read-only. P1: order assignment draft, callback task draft, contest draft, report export, ўз saved queryси. P2: юқори хавфли workflowга ариза тайёрлаш; тўғридан-тўғри ledger mutation йўқ.
+ActionIntentда actor, resource IDs, before/after, counts, target operator/team, budget/currency агар бор, expected versions, policy revision, expiry ва digest бўлсин.
+Previewда кўрсатилган маълумот тасдиқлангани билан бажарилган маълумот бир хил. Target, сумма ёки қамров ўзгарса янги тасдиқ. [S5]
+Чатдаги «ҳа» эски ёки бошқа амалга blanket розилик эмас. Confirmation серверда аниқ pending actionга боғланган UI/step-up орқали; voice фақат қоралама.
+Execution вақтида auth ва resource ҳолати қайта текширилади. Икки тасдиқ бир командани икки марта бажармайди. Ўзгарган resource учун 409/re-preview. Чекланган bulkда ҳар бир элемент натижаси ва partial success; all-or-nothing деб ёлғон айтма.
+External timeout натижаси unknown. Retry олдин status reconciliation. «Юбориш сўралди»ни «пул ўтди/реклама ёқилди» деб берма.
+
+21. ЮҚОРИ ХАВФЛИ АМАЛЛАР
+AI пул ўтказиш, refund, payout, UzCoin conversion/issuance, charity debit, штраф, нарх/комиссия/ролни ўзгартириш ва рекламани ёқишни ўзича бажармайди.
+У мавжуд махсус интерфейс/approval workflowга маълумотли қоралама тайёрлай олади. Қўшимча ваколат, қайта авторизация, лимит, зарур бўлса иккинчи тасдиқловчи ва financial service текширувлари сақланади.
+Суперадмин «рухсат бераман» дегани DB superuser асбоби ёки чексиз shell бермайди.
+Қоидабузарлик сигнали автоматик жаримага айланмайди. Молиявий ишларда маҳаллий талаб/шартномалар алоҳида текширилмагунча реал write функцияси feature flag билан ёпиқ.
+
+22. UI/UX
+Рольга мос тезкор саволлар, ёзиш/овоз, чатлар тарихи, pinned/saved reports, жадвал, график ва маъноли action карточкаси.
+Ҳар суҳбат сарлавҳасида «Ҳамкор кабинети», «Оператор», «Жамоа» каби иш муҳити. Ҳар жавобда вақт/фильтр чиплари.
+Loading: «Саволни талқин қиляпман», «Ҳисобот олинмоқда», «Текширилмоқда» — ҳақиқий pipeline ҳолатлари. Маълумот келмасдан намунали пул рақами чиқмасин.
+Кирилл/лотин, Light/Dark, 320–430 px, клавиатура safe area, reduced motion ва 200% шрифт. Жадвал кичик экранда detail карточкаларига ўтсин.
+Текширилмаган токенлар ҳали экранга чиқмасин: аввал factual card, кейин хавфсиз текширилган narrative. Screen reader ҳар токенни эмас, маъноли status/resultни эълон қилсин. [S6]
+Графикда бирлик, давр, легенда, missing сегментлар ва таблица муқобили. Фақат энг яхши қисмни қолдириб чалғитувчи scale йўқ.
+
+23. ОВОЗЛИ САВОЛ
+Микрофон фақат user action. Transcript preview ва тузатиш имконияти. «15/50», сана, исм ва пул миқдори паст ишончда аниқлаштирилади.
+Кирилл/лотин ва аралаш оддий атамалар: заказ, отказ, оқим, withdraw, coin. Техник ваъда эмас, тест корпуси билан сифат ўлчансин.
+Овозли буйруқ муаллифни аниқлаш/имзо ўрнини босмайди. Sensitive action учун фақат ёзма action preview ва текширилган тасдиқ.
+Raw audio defaultда ишловдан кейин ўчирилади; сақлаш фақат мақсад ва муддат билан алоҳида consent. Voiceprint ёки биометрик танишни бу модулга қўшма.
+STT/TTS ишламаса ёзма режим ишлайди. Махфий рақамларни овозда ўқиш default ўчиқ.
+
+24. СУҲБАТ ХОТИРАСИ ВА РУХСАТ ЎЗГАРИШИ
+Follow-up: «энди фақат Telegram», «кечагиси билан солиштир» учун structured context сақлансин: metric/filter/period/scope. Old transcript permission манбаи эмас.
+Бир userнинг икки workspace чатлари аралашмасин. Role/team ўзгарса, тугмалар, report evidence, history ва tool calls қайта текширилади.
+Эски деталли message/reportга ҳуқуқ қолмаган бўлса, илова уни қайта кўрсатмасин; қайта ҳисоблаш ёки redacted placeholder. Аввал инсон кўриб/кўчириб олган маълумотни узоқдан йўқ қилиш кафолати йўқ.
+Модельга юбориладиган тарих қисқартирилганда ACL ва current scope йўқолмасин. Summary ичидаги «бу user admin» деган гап ҳақиқий роль эмас.
+Delete chat ва export тарихини бошқариш бор; аудитнинг минимал retentionи маҳсулот/ҳуқуқий қарор реестрида ажратилади.
+
+25. КЭШ ВА ТЕЗЛИК
+Cache key: actor/workspace + effective grants/scope hash + metric version + normalized filters/period + source watermark. Фақат prompt матни ёки role билан cacheлаш тақиқланади.
+Shared cache фақат очиқ тасдиқланган policy/product aggregateларга; private response ва retrieval context бир аккаунтдан бошқасига ўтмайди.
+Permission revision ўзгарганда cache ва pending result бекор. Export/download вақтида қайта auth; signed URLнинг ўзи access policy ўрнини босмайди.
+Чегараланган read replica/query service; heavy report job мавжуд навбатда. OLTP/order checkoutни узоқ AI ҳисобот билан блоклама.
+Оддий тайёр report p95 ≤2 s, оддий LLM answer p95 ≤8 s мақсад, benchmark шароити билан. Жуда катта report job status билан; fake countdown йўқ.
+LLMсиз deterministic quick question cards ишлайди. Ҳар order event учун LLM чақирилмасин.
+
+26. ЭКСПОРТ ВА УЛАШИШ
+XLSX/CSV/PDFда metric definitions, filters, timezone, as_of, currency, data completeness, report revision ва «модел тавсияси» ажратилсин.
+Экран, график ва экспорт бир snapshotдаги рақамлардан. Пагинация биринчи саҳифани бутун жами деб кўрсатмасин.
+CSV/Excel formula injection учун user text хавфсиз literal; PII field mask exportда ҳам. PDF/HTML render arbitrary URL/network fetch қилмасин.
+Файл яратишда ва файлни олишда ҳуқуқ текширилади. Муддатли download, export volume rate limit, storage cleanup.
+Public chat link default йўқ. Ички report улашишда қабул қилувчининг ваколати бўйича қайта чеклаш; юборувчининг ваколатини мерос қилиб олмасин.
+
+27. РЕЖАЛАШТИРИЛГАН ҲИСОБОТЛАР
+P2 таклиф: фойдаланувчи розилиги билан кунлик/ҳафталик summary ва аномалия сигналлари. Мавжуд scheduler/senderдан фойдалан.
+Permission ва source freshness юборишдан олдин қайта текширилсин. Роль бекор қилинган ходимга ҳисобот кетмасин.
+Telegramда default қисқа, PIIсиз хулоса + login талаб қиладиган report link. Гуруҳларга ички молия автоматик юборилмасин.
+Dedup, quiet hours, frequency cap, unsubscribe. Олдинги reportдан ўзгариш йўқлиги учун spam йўқ. «Сотув камайди» alerts учун етарли намуна ва coverage талаб.
+Бу ҳужжат ҳозирдан қандайдир автоматизацияни ишга туширгани дегани эмас; маҳсулотда қуриладиган имконият.
+
+28. AI ПРОВАЙДЕРИ ВА ХАРАЖАТЛАР
+Provider-neutral adapter: structured output, tools, timeout, cancellation, health, cost usage. Мавжуд provider бор бўлса reuse.
+API key server-side secret. Ҳар user/role учун per-day budget, concurrent jobs, max tools, max rows, max output, history/context budget. Бир requestнинг чексиз tool loopи бўлмасин.
+Fallback providerга sensitive data юбориш ҳам алоҳида тасдиқланган data policyга мос; биринчи provider ишламади деб автоматик бошқа тарафга PII юбормасин.
+Керакли aggregate ва redacted factsгина модельга; бутун база dumpи, телефония ёзувлари ва documents default йўқ.
+Калит йўқ/лимит тугаган/провайдер хатоси аниқ билдирилсин. Checkout, wallets ва оператор хонаси ишлашда давом этсин.
+
+29. ХАВФСИЗЛИК СИНОВЛАРИ
+Prompt injection, IDOR, SQL-like payload, unsafe markdown, exported formulas, malicious order notes, cache poisoning, stale grants ва cross-role follow-upлар текширилсин.
+«Бошқа ҳамкорни кўрсат»га фақат матнда рад этиш етарли эмас: tool logда forbidden data ўқилмагани, outputда рақам/PII чиқмагани текширилади. [S4]
+Rate limit, CSRF/auth механизми, schema additionalProperties=false ва pagination abuse текширилсин. User title/email/phoneни логга тўлиқ туширма.
+Secretларни promptга умуман қўйма. Outputда тизим калити йўқлиги prompt-инструкцияга эмас, архитектурага боғлиқ бўлсин.
+Хавфли tool учун умумий «ҳаммага рухсат» flag бўлмасин.
+
+30. СИФАТ ВА EVALUATION
+tests/acceptance_cases.json — 100 not_run сценарий. tests/golden_examples.json — аниқ synthetic кириш/кутилган натижа, 18 ҳисоблаш ва ҳуқуқ мисоли.
+Unit: metric/date/rounding/scope; integration: ҳақиқий test PostgreSQL, actual auth, service adapters, order assignment races; contract: tool request/result; E2E: ҳар роль/телефон/экспорт; LLM eval: тил, ambiguity, tool selection ва фактлар.
+Битта модель жавобини «ҳақиқат» сифатида snapshot қилиб қолдирма. Ҳақиқат — deterministic reference/approved fixtures. Сўзма-сўз narrative эмас, permissions/facts/metadata/action semantics текширилади.
+Ҳар model/prompt версиясида security eval ва ўзбек кирилл/лотин paraphrases қайта юритилсин. Бир ўтиш мутлақ хавфсизлик далили эмас; такрорий синовлар ва чекловлар ёзилсин.
+Scope/PII leak, consent bypass, ledger mismatch релизни блоклайди. UX phrasing хато алоҳида severity.
+
+31. КУЗАТУВ ВА ИНЦИДЕНТ
+Миқдорлар: intent/tool success, permission deny, factual validation fail, timeout, model cost, query time, source lag, export size, unknown writes ва support feedback.
+Trace_id request→tool→report→action receiptга боғланади. Ҳақиқий оддий кабинет ҳисоботи билан daily reconciliation танланган намунада.
+«Жавоб нотўғри» мурожаати report ID ва версия билан; махфий чатни supportга тўлиқ кўчирмасдан минимал далил.
+Алоҳида feature flags: AI read, voice, exports, action drafts, command execution, finance handoff, scheduled reports. Kill switch writesни тўхтатиб, оддий магазинни қолдирсин.
+Моделга боғлиқ хато ва domain service хатоси алоҳида статистика; AI ичида workaround билан молиявий тўғрилаш йўқ.
+
+32. БАЗА ВА API ҚЎШИМЧАЛАРИ
+Мавжуд schemaга incremental migration. Янги domain ledger/order/partner базаси эмас.
+Зарур logical objects: ai_sessions, ai_messages (redacted/reference), ai_query_runs, ai_report_snapshots, ai_evidence_refs, ai_action_intents, ai_action_receipts, ai_usage, ai_feedback, saved_report_queries; ACL/version/retention белгилари билан.
+API таклифи (жорий namingга мослаштир): /api/ai/capabilities, /messages, /runs/{id}, /reports/{id}, /reports/{id}/export, /actions/{id}/preview, /actions/{id}/confirm, /feedback, /sessions, /saved-reports.
+Контракт: 401 auth, 403 role/capability, 404 indistinguishable resource, 409 version/stale proposal, 422 invalid period/schema, 429 quota, 503 dependency. Номаълум orderни success empty report деб яширма; empty authorized search эса normal 200.
+Async run/request retry correlation ва status оқилона ажратилсин. Pending responseни қайта босиш икки chargeable runга айланмасин.
+
+33. ҚАБУЛ ҚИЛИНАДИГАН БИРИНЧИ ВЕРТИКАЛ ЖАРАЁН
+Ҳамкор login → «25 октябрь куни қанча пул топдим?» → server auth scope → аниқ маҳаллий кун чегараси → commission ledger summary → жавоб карточкаси → «Ҳисобни очиш» → фақат шу ҳамкорнинг ledger/order деталлари.
+Кейин «энди фақат Telegram» дейилса scope ўзгармай, allowed filter қўшилади. «Бошқа ҳамкорникини кўрсат» дейилса маълумот очилмайди.
+UI рақами ordinary dashboard ва бир snapshot экспорт билан тенг. AI provider ўчирилса, тайёр ҳисобот формаси қолади.
+Бу жараён битта test partnerда, synthetic маълумот билан тасдиқланиб, кейин роли/метрикаси кенгаяди.
+
+34. P0 — ХАВФСИЗ ЎҚИШ
+Аудит ва metrics decisions; auth/context ва tool gateway; ҳамкорнинг user берган 10 саволи; оператор ўз навбати; lead жамоаси; admin/superadmin permission reports.
+Кирилл/лотин чат, манбали жавоб, role-scoped history, кўрсаткич карточкаси ва жадвал. Basic evidence/drilldown. Query quotas ва provider fallback.
+Ҳақиқий database tests ва counterfeit scope tests. No direct writes. Finance/Ads command йўқ.
+Тайёр бизнес метрика йўқ бўлса, «уланмаган» деб билдир; model билан тўлдирма.
+
+35. P1 — ФОЙДАЛИ ИНТЕГРАЦИЯ
+Овоз transcript preview, графиклар, Excel/PDF экспорт, approved knowledge search, costs/flows, contests/UzCoin/charity/quality read adapters.
+Қоидага асосланган priority queue, action drafts ва чегараланган тасдиқли assignment/callback ишлари. Versioned intents, audit ва replay тестлари.
+Owner, lead ва operator E2E; роли ўзгарган chat/export текшируви. Privacy/retention defaults productionдан олдин тасдиқланади.
+
+36. P2 — НАЗОРАТЛИ БОШҚАРУВ ВА РИВОЖЛАНТИРИШ
+Scheduled summaries, anomaly alerts, текшириладиган прогнозлар, олдиндан рухсат берилган махсус write workflowга handoff, кенгайтирилган semantic метрикалар.
+Ҳар бири учун capability/rollout gate ва evaluation. Model/provider алмашиши бутун пакетни қайта ёзиш эмас, adapter ва eval run.
+Кенгайиш мезони — ҳақиқий фойда ва текширилган сифат; «ақллироқ кўринади» учун чексиз autonomous agentлар қурма.
+
+37. CLAUDE УЧУН ИШЛАШ ВА ҲИСОБОТ
+Кичик vertical PRлар. Аввал мавжуд код, кейин файллар харитаси, ўзгариш, тест, docs/AI_STATUS.md ва docs/AI_HANDOFF.md.
+Handoff: repo/branch/commit, implemented vs blocked, metric decisions, executed commands/exit codes, passed/failed/skipped, next exact task ва migration ҳолати. Калит/PII ёзилмайди.
+Model prompt, tool schema ва metric definitions version controlда. Сақланган ишни контекст алмашганда нолдан ёзма.
+«CI ўтди» учун run ID/ҳавола ва commit; локал натижани CI деб кўрсатма. Реал provider ёки PostgreSQL берилмаган бўлса mocked testни очиқ белгила.
+
+38. ЯКУНИЙ ҚАБУЛ
+Фойдаланувчи оддий ўзбекча савол беради; сервер унинг ролини аниқлайди; аниқ ҳисоб фақат рухсатли маълумотдан олинади; жавобда метрика, давр, манба, янгиланиш ва чекловлар кўринади.
+Оддий харидорда бизнес AI йўқ. Ҳамкорнинг 10 асосий саволи, оператор ва lead scopeи, суперадмин умумий ҳисоботи ишлайди. Нол/маълумот йўқ/рухсат йўқ аралашмайди.
+Тасдиқсиз молиявий ҳаракат йўқ; битта тасдиқ икки амал эмас; модель ёки API йиқилса магазиннинг савдоси тўхтамайди.
+Ушбу файл ва пакет ҳозирги репозиторийга уланган код ёки ўтказилган UzShop тестлари эмас. Тест сценарийларининг бошланғич мақоми not_run. Қабул натижалари ҳақиқий ишдан кейин киритилади.

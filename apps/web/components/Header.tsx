@@ -67,6 +67,7 @@ export function Header() {
             <div className="pmenu-pop" onClick={(e) => { if ((e.target as HTMLElement).closest('a')) closeMenu(); }}>
               <Link href="/partner/orders" aria-current={path === '/partner/orders' ? 'page' : undefined}>Buyurtmalar</Link>
               <Link href="/partner/analytics" aria-current={path === '/partner/analytics' ? 'page' : undefined}>Reklama va daromad</Link>
+              <Link href="/partner/ai" aria-current={path === '/partner/ai' ? 'page' : undefined}>🤖 AI yordamchi</Link>
               <Link href="/partner/expenses" aria-current={path === '/partner/expenses' ? 'page' : undefined}>Reklama xarajatlari</Link>
               <Link href="/partner/offers" aria-current={path === '/partner/offers' ? 'page' : undefined}>Taklif to‘plami</Link>
               <Link href="/partner/contacts" aria-current={path === '/partner/contacts' ? 'page' : undefined}>Mijozlar daftari</Link>

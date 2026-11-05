@@ -127,3 +127,28 @@ describe('customer returns cabinet (M10)', () => {
     expect((await api(t, 'GET', '/me/returns', { token: (await mkUser(t)).token })).json.items).toHaveLength(0);
   });
 });
+
+describe('reviews (M27)', () => {
+  it('verified purchase only; contacts refused; moderation with limited reasons; published reviews public', async () => {
+    const { c, orderId } = await myOrder();
+    const line = (await api(t, 'GET', `/me/orders/${orderId}`, { token: c.token })).json.lines[0];
+    expect((await api(t, 'POST', '/me/reviews', { token: c.token, body: { order_line_id: line.id, rating: 5 } })).json.code).toBe('REVIEW_REQUIRES_DELIVERY');
+    const payable = (await t.db.query(`SELECT payable_minor::text p FROM orders WHERE id=$1`, [orderId])).rows[0].p;
+    await api(t, 'POST', `/ops/orders/${orderId}/claim`, { token: s.operator.token });
+    await api(t, 'POST', `/ops/orders/${orderId}/calls`, { token: s.operator.token, body: { outcome: 'confirmed', confirmed_total_minor: payable } });
+    await fulfilCod(t, s, orderId);
+    expect((await api(t, 'GET', '/me/reviewable', { token: c.token })).json.items.map((x: any) => x.order_line_id)).toContain(line.id);
+    expect((await api(t, 'POST', '/me/reviews', { token: (await mkUser(t)).token, body: { order_line_id: line.id, rating: 1 } })).status).toBe(404);
+    expect((await api(t, 'POST', '/me/reviews', { token: c.token, body: { order_line_id: line.id, rating: 2, body: 'yomon, tel +998 90 123 45 67' } })).json.code).toBe('REVIEW_HAS_CONTACTS');
+    const r = await api(t, 'POST', '/me/reviews', { token: c.token, body: { order_line_id: line.id, rating: 2, body: 'Sifati o‘rtacha' } });
+    expect(r.json.status).toBe('pending');
+    expect((await api(t, 'POST', '/me/reviews', { token: c.token, body: { order_line_id: line.id, rating: 3 } })).json.code).toBe('ALREADY_REVIEWED');
+    expect((await api(t, 'POST', `/admin/reviews/${r.json.id}/moderate`, { token: s.owner.token, body: { decision: 'rejected' } })).json.code).toBe('REJECT_REASON_REQUIRED');
+    expect((await api(t, 'POST', `/admin/reviews/${r.json.id}/moderate`, { token: s.owner.token, body: { decision: 'rejected', reason: 'low_rating' } })).status).toBe(400);
+    expect((await api(t, 'POST', `/admin/reviews/${r.json.id}/moderate`, { token: s.owner.token, body: { decision: 'published' } })).status).toBe(200);
+    const pub = await api(t, 'GET', `/products/${prod.productId}/reviews`);
+    expect(pub.json).toMatchObject({ count: 1, average: '2.0' });
+    expect(pub.json.items[0]).toMatchObject({ rating: 2, verified: true });
+    expect(JSON.stringify(pub.json)).not.toContain(c.phone);
+  });
+});

@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { notFound, redirect } from 'next/navigation';
 import { AddToCart } from './AddToCart';
 import { Related } from './Related';
+import { Reviews } from './Reviews';
 import { Waitlist } from './Waitlist';
 import { RecentRail } from '@/components/SavedRails';
 
@@ -38,6 +39,7 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(ld).replace(/</g, '\\u003c') }} />
       <AddToCart product={p} minPrice={minPrice?.toString() ?? null} />
       {(p.variants ?? []).length > 0 && (p.variants ?? []).every((v: any) => v.available <= 0) && <Waitlist productId={p.id} />}
+      <Reviews productId={p.id} />
       {p.category_slug && <Related category={p.category_slug} exclude={p.slug} />}
       <RecentRail exclude={p.id} />
     </article>

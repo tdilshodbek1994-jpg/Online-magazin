@@ -15,6 +15,7 @@ import { FinanceAdmin } from './FinanceAdmin';
 import { Decisions } from './Decisions';
 import { Replenishment } from './Replenishment';
 import { GlobalSearch } from './GlobalSearch';
+import { ReviewsAdmin } from './ReviewsAdmin';
 import { ProductEditor } from './ProductEditor';
 import { AdminPrograms } from './Programs';
 import { errText, stText } from '@/lib/errors';
@@ -37,10 +38,11 @@ export default function Admin() {
         <button className="btn" onClick={() => { setTab('products'); setNewProduct((n) => n + 1); }}>+ Mahsulot qo‘shish</button>
       </div>
       <GlobalSearch />
-      <div className="admin-tabs" role="tablist">{[['decisions', '🚨', 'Muammolar'], ['orders', '📦', 'Buyurtmalar'], ['products', '🛍️', 'Mahsulotlar'], ['partners', '🤝', 'Hamkorlar'], ['flow', '🏷️', 'Qabul qilingan tovarlar'], ['stock', '📉', 'Ombor ogohlantirishi'], ['supply', '🚚', 'Ta’minot'], ['contests', '🏆', 'Konkurs markazi'], ['quality', '🛡️', 'Sifat markazi'], ['charity', '💝', 'Xayriya markazi'], ['uzcoin', '🪙', 'UzCoin'], ['levels', '🎖️', 'Darajalar'], ['landings', '🧩', 'Landinglar'], ['target', '🎯', 'Target'], ['programs', '🎁', 'Bonus va jarimalar'], ['summary', '📊', 'Hisobot'], ['payouts', '💳', 'Pul yechish so‘rovlari'], ['finance', '💰', 'Moliya'], ['promos', '🎟️', 'Promokodlar'], ['import', '📄', 'CSV import'], ['staff', '👥', 'Xodimlar'], ['integrations', '⚙️', 'Integratsiyalar']].map(([k, i, l]) => <button key={k} role="tab" aria-selected={tab === k} className={`admin-tab ${tab === k ? 'on' : ''}`} onClick={() => setTab(k!)}><span aria-hidden>{i}</span>{l}</button>)}<a className="admin-tab" href="/admin/commission"><span aria-hidden>🧮</span>Komissiya matritsasi va kurs</a></div>
+      <div className="admin-tabs" role="tablist">{[['decisions', '🚨', 'Muammolar'], ['orders', '📦', 'Buyurtmalar'], ['products', '🛍️', 'Mahsulotlar'], ['partners', '🤝', 'Hamkorlar'], ['flow', '🏷️', 'Qabul qilingan tovarlar'], ['stock', '📉', 'Ombor ogohlantirishi'], ['supply', '🚚', 'Ta’minot'], ['reviews', '⭐', 'Sharhlar'], ['contests', '🏆', 'Konkurs markazi'], ['quality', '🛡️', 'Sifat markazi'], ['charity', '💝', 'Xayriya markazi'], ['uzcoin', '🪙', 'UzCoin'], ['levels', '🎖️', 'Darajalar'], ['landings', '🧩', 'Landinglar'], ['target', '🎯', 'Target'], ['programs', '🎁', 'Bonus va jarimalar'], ['summary', '📊', 'Hisobot'], ['payouts', '💳', 'Pul yechish so‘rovlari'], ['finance', '💰', 'Moliya'], ['promos', '🎟️', 'Promokodlar'], ['import', '📄', 'CSV import'], ['staff', '👥', 'Xodimlar'], ['integrations', '⚙️', 'Integratsiyalar']].map(([k, i, l]) => <button key={k} role="tab" aria-selected={tab === k} className={`admin-tab ${tab === k ? 'on' : ''}`} onClick={() => setTab(k!)}><span aria-hidden>{i}</span>{l}</button>)}<a className="admin-tab" href="/admin/commission"><span aria-hidden>🧮</span>Komissiya matritsasi va kurs</a></div>
       {msg && <div className="notice" role="status">{msg}</div>}
       {tab === 'decisions' && <Decisions go={setTab} />}
       {tab === 'supply' && <Replenishment />}
+      {tab === 'reviews' && <ReviewsAdmin />}
       {tab === 'orders' && <Orders lang={lang} />}
       {tab === 'flow' && <Flow lang={lang} />}
       {tab === 'programs' && <AdminPrograms />}

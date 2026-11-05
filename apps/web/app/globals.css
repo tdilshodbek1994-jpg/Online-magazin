@@ -1989,3 +1989,9 @@ a.ocard { gap: 6px; }
 .gs-item { display: flex; gap: 10px; align-items: center; padding: 8px 10px; border-radius: 8px; color: inherit; text-decoration: none; }
 .gs-item:hover { background: var(--surface-2); } .gs-item span:last-child { display: grid; min-width: 0; } .gs-item b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gs-empty { padding: 8px 10px; }
+
+/* ===== Reviews ===== */
+.rv { display: grid; gap: 8px; margin-top: 12px; }
+.rv-avg b { font-size: 18px; } .rv-st { color: #f5a524; letter-spacing: 1px; }
+.rv-item { display: grid; gap: 4px; padding: 8px 0; border-top: 1px solid var(--border); } .rv-item p { margin: 0; font-size: 14px; }
+.rv-pick { display: flex; gap: 4px; } .rv-pick button { font-size: 28px; line-height: 1; border: 0; background: none; color: #d0d5dd; cursor: pointer; padding: 2px; } .rv-pick button.on { color: #f5a524; }

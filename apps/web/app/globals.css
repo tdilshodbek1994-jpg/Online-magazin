@@ -1921,3 +1921,16 @@ a.ai-row .ai-rt { color: #1d6fd1; }
 .prof .card { display: grid; gap: 8px; }
 .prof-codes { display: grid; gap: 10px; }
 .prof-codes label { display: grid; gap: 4px; font-size: 14px; }
+
+/* ===== Owner decisions center ===== */
+.dec { display: grid; gap: 12px; }
+.dec-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.dec-head h2 { margin: 0; }
+.dec-list { display: grid; gap: 8px; }
+.dec-item { display: grid; gap: 3px; text-align: left; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--border); border-left-width: 5px; background: var(--surface); cursor: pointer; color: inherit; font: inherit; }
+.dec-item.sev1 { border-left-color: #b42318; } .dec-item.sev2 { border-left-color: #dc6803; } .dec-item.sev3 { border-left-color: #1d6fd1; } .dec-item.sev4 { border-left-color: #98a2b3; }
+.dec-sev { font-size: 11.5px; font-weight: 800; text-transform: uppercase; color: var(--muted); letter-spacing: .02em; }
+.dec-title { font-size: 15px; } .dec-n { display: inline-block; min-width: 22px; padding: 0 7px; border-radius: 999px; background: var(--surface-2); font-size: 13px; text-align: center; }
+.dec-meta { font-size: 13px; color: var(--muted); } .dec-hint { font-size: 13px; }
+.dec-day { display: grid; gap: 10px; }
+.dec-fig { margin: 0; display: grid; gap: 4px; } .dec-fig > div { display: flex; justify-content: space-between; gap: 10px; font-size: 14px; } .dec-fig dt { color: var(--muted); } .dec-fig dd { margin: 0; font-weight: 700; white-space: nowrap; }

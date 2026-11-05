@@ -45,6 +45,7 @@ import { isCustomHost, registerDomains } from './modules/landings/domains.js';
 import { registerLevels } from './modules/levels/routes.js';
 import { registerAiBiz } from './modules/aibiz/routes.js';
 import { registerSelfService } from './modules/selfservice/routes.js';
+import { registerDecisions } from './modules/admin/decisions.js';
 import { registerReturns } from './modules/returns/routes.js';
 import { registerPayments } from './modules/payments/routes.js';
 import { registerSupport } from './modules/support/routes.js';
@@ -204,6 +205,7 @@ export async function buildApp(cfg: AppConfig, db: Db): Promise<FastifyInstance>
       registerAi(api, deps);
       registerAiBiz(api, deps);
       registerSelfService(api, deps);
+      registerDecisions(api, deps);
     },
     { prefix: '/api/v1' },
   );

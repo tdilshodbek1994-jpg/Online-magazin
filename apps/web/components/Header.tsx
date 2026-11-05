@@ -8,6 +8,7 @@ import { SearchBox } from '@/components/SearchBox';
 import { CatalogMenu } from '@/components/CatalogMenu';
 import { useI18n } from '@/lib/i18n';
 import { markTgApp, tgAppName } from '@/lib/telegram';
+import { isNativeApp } from '@/lib/native';
 
 /** Fire after any cart change so the header/bottom-nav badges refresh. */
 export const notifyCart = () => { try { window.dispatchEvent(new Event('om-cart')); } catch {} };
@@ -54,6 +55,7 @@ export function Header() {
   else if (roles.includes('operator')) staff.push(['/ops/ai', '🤖 AI']);
   if (roles.includes('courier')) staff.push(['/courier', 'Kuryer']);
   if (roles.includes('owner') || roles.includes('finance')) staff.push(['/account/security', 'MFA']);
+  if ((staff.length || path?.startsWith('/partner')) && isNativeApp()) staff.push(['/app?choose=1', '🔀 Bo‘limlar']); // Android app: switch area
   const logout = async () => {
     // Inside the Telegram mini app «Chiqish» also unties this Telegram, otherwise the next open would log straight back in.
     const tgApp = tgAppName();

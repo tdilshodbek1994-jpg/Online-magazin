@@ -2017,3 +2017,17 @@ html.tg-app .bottom-nav { padding-bottom: max(env(safe-area-inset-bottom), var(-
 .tg-app-card .tac-head p { margin: 2px 0 0; }
 .tg-app-card .tac-icon { font-size: 1.6rem; }
 .tg-app-card .tac-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+
+/* ---------- Android app (html.native-app) and its start screen /app ---------- */
+html.native-app .site-foot, html.native-app .install-bar { display: none !important; }
+html.native-app body { overscroll-behavior-y: none; }
+.app-areas { max-width: 480px; margin: 18px auto; display: grid; gap: 10px; }
+.app-areas h1 { margin: 0; font-size: 1.35rem; }
+.app-areas p { margin: 0 0 6px; }
+.aa-list { display: grid; gap: 10px; }
+.aa-card { display: flex; align-items: center; gap: 14px; width: 100%; text-align: left; padding: 16px; border-radius: 16px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font: inherit; cursor: pointer; }
+.aa-card:active { transform: scale(.99); }
+.aa-icon { font-size: 1.9rem; width: 52px; height: 52px; display: grid; place-items: center; border-radius: 14px; background: var(--primary-50); flex: none; }
+.aa-text { display: grid; flex: 1; min-width: 0; }
+.aa-text small { color: var(--muted); }
+.aa-admin .aa-icon { background: #e8eefc; } .aa-ops .aa-icon { background: #fdf0e3; } .aa-partner .aa-icon { background: #e7f5ef; } .aa-courier .aa-icon { background: #f1ecfb; }

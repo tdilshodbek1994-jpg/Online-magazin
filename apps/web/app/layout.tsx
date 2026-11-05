@@ -8,6 +8,7 @@ import { I18nProvider } from '@/lib/i18n';
 import { InstallApp } from '@/components/InstallApp';
 import { ConsentBanner } from '@/components/ConsentBanner';
 import { TelegramBridge } from '@/components/TelegramBridge';
+import { AppBridge } from '@/components/AppBridge';
 
 export const metadata: Metadata = {
   title: 'UzShop — onlayn do‘kon',
@@ -33,6 +34,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <Toaster />
           <ScrollRestorer />
           <TelegramBridge />
+          <AppBridge />
         </I18nProvider>
       </body>
     </html>

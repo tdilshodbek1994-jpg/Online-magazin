@@ -1,0 +1,21 @@
+{
+  "name": "uzshop-mobile",
+  "private": true,
+  "version": "1.0.0",
+  "description": "UzShop Android app (Capacitor shell around https://uzshop.net). Outside the pnpm workspace on purpose.",
+  "scripts": {
+    "sync": "cap sync android",
+    "apk:debug": "cap sync android && cd android && ./gradlew assembleDebug",
+    "aab:release": "cap sync android && cd android && ./gradlew bundleRelease"
+  },
+  "dependencies": {
+    "@capacitor/android": "8.6.0",
+    "@capacitor/app": "8.1.2",
+    "@capacitor/core": "8.6.0",
+    "@capacitor/splash-screen": "8.0.2",
+    "@capacitor/status-bar": "8.0.4"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.6.0"
+  }
+}

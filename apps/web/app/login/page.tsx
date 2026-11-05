@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { api, setToken } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
 import { errText } from '@/lib/errors';
+import { isNativeApp } from '@/lib/native';
 
 export default function Login() {
   const { t } = useI18n();
@@ -23,7 +24,7 @@ export default function Login() {
           {ch.dev_code && <p className="badge test">DEV: {ch.dev_code}</p>}
           <label htmlFor="otp">{t('code')}</label>
           <input id="otp" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))} />
-          <button className="btn" style={{ marginTop: 12 }} onClick={async () => { setErr(null); try { const r = await api('/auth/otp/verify', { method: 'POST', body: { challenge_id: ch.challenge_id, code } }); setToken(r.token); const next = new URLSearchParams(location.search).get('next'); location.href = next && /^\/[a-z]/.test(next) ? next : '/account'; } catch (e) { setErr(e); } }}>{t('verify')}</button>
+          <button className="btn" style={{ marginTop: 12 }} onClick={async () => { setErr(null); try { const r = await api('/auth/otp/verify', { method: 'POST', body: { challenge_id: ch.challenge_id, code } }); setToken(r.token); const next = new URLSearchParams(location.search).get('next'); location.href = next && /^\/[a-z]/.test(next) ? next : isNativeApp() ? '/app' : '/account'; } catch (e) { setErr(e); } }}>{t('verify')}</button>
         </>
       )}
     </div>

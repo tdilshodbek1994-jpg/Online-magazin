@@ -1,0 +1,22 @@
+{
+  "appId": "net.uzshop.app",
+  "appName": "UzShop",
+  "webDir": "www",
+  "appendUserAgent": "UzShopApp/1.0",
+  "backgroundColor": "#ffffff",
+  "server": {
+    "url": "https://uzshop.net/app",
+    "androidScheme": "https",
+    "allowNavigation": ["uzshop.net", "www.uzshop.net"],
+    "errorPath": "offline.html"
+  },
+  "android": {
+    "allowMixedContent": false,
+    "captureInput": true,
+    "webContentsDebuggingEnabled": false
+  },
+  "plugins": {
+    "SplashScreen": { "launchShowDuration": 800, "backgroundColor": "#0b7a55", "showSpinner": false, "androidScaleType": "CENTER_CROP" },
+    "StatusBar": { "style": "LIGHT", "backgroundColor": "#ffffff", "overlaysWebView": false }
+  }
+}

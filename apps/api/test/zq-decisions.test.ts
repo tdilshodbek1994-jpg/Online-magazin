@@ -128,3 +128,44 @@ describe('warehouse pick check (M20)', () => {
     expect((await api(t, 'POST', `/ops/orders/${id}/pack`, { token: s.warehouse.token })).status).toBe(200);
   });
 });
+
+describe('replenishment (M22)', () => {
+  it('suggestion from confirmed sales; draft → owner approval → ordered → receipts add stock once per reference', async () => {
+    const prod = await mkProduct(t, { prices: [40_000], stock: [3] });
+    const sku = prod.skuIds[0]!;
+    for (let i = 0; i < 2; i++) {
+      const c = await mkUser(t);
+      const o = await placeOrder(t, { token: c.token, phone: c.phone }, [{ sku_id: sku, qty: 1 }]);
+      const payable = (await t.db.query(`SELECT payable_minor::text p FROM orders WHERE id=$1`, [o.json.order_id])).rows[0].p;
+      await api(t, 'POST', `/ops/orders/${o.json.order_id}/claim`, { token: s.operator.token });
+      await api(t, 'POST', `/ops/orders/${o.json.order_id}/calls`, { token: s.operator.token, body: { outcome: 'confirmed', confirmed_total_minor: payable } });
+    }
+    const sg = await api(t, 'GET', '/admin/replenishment/suggestions', { token: s.owner.token });
+    const row = sg.json.items.find((x: any) => x.sku_id === sku);
+    expect(row).toMatchObject({ sold_30d: 2, available: 1, suggest: 1 });
+    expect(sg.json.method).toContain('prognoz emas');
+    expect((await api(t, 'POST', '/admin/purchase-orders', { token: s.operator.token, body: { lines: [{ sku_id: sku, qty: 5 }] } })).status).toBe(403);
+    const sup = await api(t, 'POST', '/admin/suppliers', { token: s.owner.token, body: { name: 'Toshkent ulgurji', lead_days: 3 } });
+    const po = await api(t, 'POST', '/admin/purchase-orders', { token: s.owner.token, body: { supplier_id: sup.json.id, lines: [{ sku_id: sku, qty: 5, unit_cost_minor: '2500000' }] } });
+    expect(po.json.number).toMatch(/^PO-\d+$/);
+    // the suggestion now counts the open draft as incoming → nothing more to order
+    expect((await api(t, 'GET', '/admin/replenishment/suggestions', { token: s.owner.token })).json.items.find((x: any) => x.sku_id === sku)).toBeUndefined();
+    expect((await api(t, 'POST', `/admin/purchase-orders/${po.json.id}/ordered`, { token: s.owner.token })).json.code).toBe('PURCHASE_ORDER_STATE');
+    const cat = await mkUser(t, ['catalog_manager']);
+    expect((await api(t, 'POST', `/admin/purchase-orders/${po.json.id}/approve`, { token: cat.token })).status).toBe(403);
+    expect((await api(t, 'POST', `/admin/purchase-orders/${po.json.id}/approve`, { token: s.owner.token })).json.status).toBe('approved');
+    const ordered = await api(t, 'POST', `/admin/purchase-orders/${po.json.id}/ordered`, { token: s.owner.token });
+    const lineId = ordered.json.lines[0].id;
+    const stock = async () => (await t.db.query(`SELECT SUM(on_hand_sellable)::int AS n FROM stock_balances WHERE sku_id=$1`, [sku])).rows[0].n;
+    const before = await stock();
+    const r1 = await api(t, 'POST', `/admin/purchase-orders/${po.json.id}/receive`, { token: s.owner.token, body: { ref: 'NAK-1', lines: [{ line_id: lineId, qty: 2 }] } });
+    expect(r1.json.status).toBe('partially_received');
+    expect(await stock()).toBe(before + 2);
+    await api(t, 'POST', `/admin/purchase-orders/${po.json.id}/receive`, { token: s.owner.token, body: { ref: 'NAK-1', lines: [{ line_id: lineId, qty: 2 }] } });
+    expect(await stock()).toBe(before + 2); // replay = no second movement
+    expect((await api(t, 'POST', `/admin/purchase-orders/${po.json.id}/receive`, { token: s.owner.token, body: { ref: 'NAK-2', lines: [{ line_id: lineId, qty: 4 }] } })).json.code).toBe('RECEIVE_EXCEEDS_ORDERED');
+    const r3 = await api(t, 'POST', `/admin/purchase-orders/${po.json.id}/receive`, { token: s.owner.token, body: { ref: 'NAK-2', lines: [{ line_id: lineId, qty: 3 }] } });
+    expect(r3.json.status).toBe('received');
+    expect(await stock()).toBe(before + 5);
+  });
+});

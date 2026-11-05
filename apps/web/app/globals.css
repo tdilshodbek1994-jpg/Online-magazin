@@ -1979,3 +1979,6 @@ a.ocard { gap: 6px; }
 .pk-lines { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
 .pk-lines li { display: flex; justify-content: space-between; gap: 8px; padding: 6px 8px; border-radius: 8px; background: var(--surface-2); font-size: 14px; }
 .pk-lines li.done { background: #e6f4ec; }
+
+.rp-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--border); }
+.rp-name { min-width: 0; display: grid; font-size: 14px; } .rp-qty { width: 76px; flex: none; }
